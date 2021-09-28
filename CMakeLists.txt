@@ -10,4 +10,6 @@ add_executable(fps-raymarch
     src/Game.h
     src/Main.cpp)
 
-target_link_libraries(fps-raymarch PUBLIC SDL2::SDL2-static glad)
+target_link_libraries(fps-raymarch PUBLIC
+    SDL2::SDL2-static
+    glad)

@@ -17,6 +17,6 @@ public:
     int run();
 
 private:
-    SDL_Window* window_;
-    SDL_GLContext ogl_context_;
+    SDL_Window* m_window;
+    SDL_GLContext m_ogl_context;
 };
