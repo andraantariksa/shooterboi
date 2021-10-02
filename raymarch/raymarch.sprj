@@ -21,6 +21,7 @@
 			<variables>
 				<variable type="float2" name="uResolution" system="ViewportSize" />
 				<variable type="float" name="uTime" system="Time" />
+				<variable type="float3" name="uCameraPosition" system="CameraPosition3" />
 			</variables>
 			<macros />
 		</pass>
@@ -28,11 +29,13 @@
 	<objects />
 	<cameras />
 	<settings>
+		<entry type="property" name="Simple" item="pipe" />
+		<entry type="file" name="Simple" shader="vs" />
 		<entry type="file" name="Simple" shader="ps" />
 		<entry type="camera" fp="false">
-			<distance>4</distance>
-			<pitch>25</pitch>
-			<yaw>319</yaw>
+			<distance>18</distance>
+			<pitch>6</pitch>
+			<yaw>193</yaw>
 			<roll>360</roll>
 		</entry>
 		<entry type="clearcolor" r="0" g="0" b="0" a="0" />
@@ -49,6 +52,8 @@
 		<entry type="bkpt" file="C:/Users/native-m/Documents/SHADERed Projects/raymarch/shaders/raymarch_SimplePS.glsl" line="224" use_cond="false" cond="" enabled="true" />
 		<entry type="bkpt" file="C:/Users/native-m/Documents/SHADERed Projects/raymarch/shaders/raymarch_SimplePS.glsl" line="223" use_cond="false" cond="" enabled="true" />
 		<entry type="bkpt" file="C:/Users/native-m/Documents/SHADERed Projects/raymarch/shaders/raymarch_SimplePS.glsl" line="222" use_cond="false" cond="" enabled="true" />
+		<entry type="bkpt" file="C:/Users/andra/Projects/raymarched-fps/raymarch/shaders/raymarch_SimplePS.glsl" line="212" use_cond="false" cond="" enabled="true" />
+		<entry type="bkpt" file="C:/Users/andra/Projects/raymarched-fps/raymarch/shaders/raymarch_SimplePS.glsl" line="190" use_cond="false" cond="" enabled="true" />
 	</settings>
 	<plugindata />
 </project>

@@ -1,3 +1,14 @@
 [submodule "extern/SDL"]
 	path = extern/SDL
 	url = https://github.com/libsdl-org/SDL.git
+[submodule "extern/imgui"]
+	path = extern/imgui
+	url = https://github.com/ocornut/imgui.git
+	branch = e3e1fbcf025cf83413815751f7c33500e1314d57
+[submodule "extern/reactphysics3d"]
+	path = extern/reactphysics3d
+	url = https://github.com/DanielChappuis/reactphysics3d.git
+	branch = bdc3153f552f6665ea9d2d13afd20ea871119e17
+[submodule "extern/glm"]
+	path = extern/glm
+	url = https://github.com/g-truc/glm.git

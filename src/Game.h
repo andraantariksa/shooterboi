@@ -2,21 +2,20 @@
 
 #include <SDL.h>
 #undef main
+#include <glm/glm.hpp>
 
 #include "Common.h"
 
 class Game
 {
 public:
-    static constexpr uint32_t window_width = 1280;
-    static constexpr uint32_t window_height = 720;
-
     Game();
     ~Game();
 
     int run();
 
 private:
+    glm::vec2 m_window_size = glm::vec2(1280.0f, 720.f);
     SDL_Window* m_window;
     SDL_GLContext m_ogl_context;
 };
