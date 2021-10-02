@@ -1,0 +1,54 @@
+<?xml version="1.0"?>
+<project version="2">
+	<pipeline>
+		<pass name="Simple" type="shader" active="true" patchverts="1">
+			<shader type="vs" path="shaders\raymarch_SimpleVS.glsl" entry="main" />
+			<shader type="ps" path="shaders\raymarch_SimplePS.glsl" entry="main" />
+			<inputlayout>
+				<item value="Position" semantic="POSITION" />
+			</inputlayout>
+			<rendertexture />
+			<items>
+				<item name="Quad" type="geometry">
+					<type>ScreenQuadNDC</type>
+					<width>1</width>
+					<height>1</height>
+					<depth>1</depth>
+					<topology>TriangleList</topology>
+				</item>
+			</items>
+			<itemvalues />
+			<variables>
+				<variable type="float2" name="uResolution" system="ViewportSize" />
+				<variable type="float" name="uTime" system="Time" />
+			</variables>
+			<macros />
+		</pass>
+	</pipeline>
+	<objects />
+	<cameras />
+	<settings>
+		<entry type="file" name="Simple" shader="ps" />
+		<entry type="camera" fp="false">
+			<distance>4</distance>
+			<pitch>25</pitch>
+			<yaw>319</yaw>
+			<roll>360</roll>
+		</entry>
+		<entry type="clearcolor" r="0" g="0" b="0" a="0" />
+		<entry type="usealpha" val="false" />
+		<entry type="vecwatch_expr" expr="cam_pos" color_r="0.882352948" color_g="0.454901963" color_b="0.988235295" />
+		<entry type="vecwatch_expr" expr="dir" color_r="0.564705908" color_g="0.498039216" color_b="0.121568628" />
+		<entry type="vecwatch_expr" expr="dir" color_r="0.184313729" color_g="0.956862748" color_b="0.450980395" />
+		<entry type="bkpt" file="C:/Users/native-m/Documents/SHADERed Projects/raymarch/shaders/raymarch_SimplePS.glsl" line="230" use_cond="false" cond="" enabled="true" />
+		<entry type="bkpt" file="C:/Users/native-m/Documents/SHADERed Projects/raymarch/shaders/raymarch_SimplePS.glsl" line="229" use_cond="false" cond="" enabled="true" />
+		<entry type="bkpt" file="C:/Users/native-m/Documents/SHADERed Projects/raymarch/shaders/raymarch_SimplePS.glsl" line="228" use_cond="false" cond="" enabled="true" />
+		<entry type="bkpt" file="C:/Users/native-m/Documents/SHADERed Projects/raymarch/shaders/raymarch_SimplePS.glsl" line="227" use_cond="false" cond="" enabled="true" />
+		<entry type="bkpt" file="C:/Users/native-m/Documents/SHADERed Projects/raymarch/shaders/raymarch_SimplePS.glsl" line="226" use_cond="false" cond="" enabled="true" />
+		<entry type="bkpt" file="C:/Users/native-m/Documents/SHADERed Projects/raymarch/shaders/raymarch_SimplePS.glsl" line="225" use_cond="false" cond="" enabled="true" />
+		<entry type="bkpt" file="C:/Users/native-m/Documents/SHADERed Projects/raymarch/shaders/raymarch_SimplePS.glsl" line="224" use_cond="false" cond="" enabled="true" />
+		<entry type="bkpt" file="C:/Users/native-m/Documents/SHADERed Projects/raymarch/shaders/raymarch_SimplePS.glsl" line="223" use_cond="false" cond="" enabled="true" />
+		<entry type="bkpt" file="C:/Users/native-m/Documents/SHADERed Projects/raymarch/shaders/raymarch_SimplePS.glsl" line="222" use_cond="false" cond="" enabled="true" />
+	</settings>
+	<plugindata />
+</project>
