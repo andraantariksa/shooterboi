@@ -11,16 +11,17 @@ include(cmake/ImGui.cmake)
 add_executable(fps-raymarch
     src/Game.cpp
     src/Game.h
+    src/InputProcessor.cpp
+    src/InputProcessor.h
     src/Main.cpp)
 
 target_include_directories(fps-raymarch PUBLIC
-    ${IMGUI_DIR}
     extern/glm)
 
 target_link_libraries(fps-raymarch PUBLIC
     SDL2::SDL2-static
     glad
-    IMGUI_LIBRARY)
+    imgui)
 
 convert_file_to_header_directory("src/shaders" "src/shaders/generated")
 

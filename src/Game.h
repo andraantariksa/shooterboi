@@ -5,6 +5,7 @@
 #include <glm/glm.hpp>
 
 #include "Common.h"
+#include "InputProcessor.h"
 
 class Game
 {
@@ -15,7 +16,8 @@ public:
     int run();
 
 private:
-    glm::vec2 m_window_size = glm::vec2(1280.0f, 720.f);
+    glm::ivec2 m_window_size{ 1280, 720 };
     SDL_Window* m_window;
     SDL_GLContext m_ogl_context;
+    InputProcessor m_input_processor;
 };
