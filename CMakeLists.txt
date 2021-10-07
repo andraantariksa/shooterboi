@@ -11,7 +11,7 @@ include(cmake/ImGui.cmake)
 add_executable(fps-raymarch
     src/Game.cpp
     src/Game.h
-    src/Main.cpp)
+    src/Main.cpp  )
 
 target_include_directories(fps-raymarch PUBLIC
     ${IMGUI_DIR}

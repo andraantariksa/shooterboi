@@ -165,39 +165,42 @@ int Game::run()
             }
             else if (event.type == SDL_MOUSEMOTION)
             {
-                std::cout << camera_direction.x << camera_direction.y << camera_direction.z << '\n';
-                glm::vec4 camera_direction_(camera_direction, 1.0f);
-                camera_direction_ =
-                    glm::rotate(
-                        glm::mat4(1.0f),
-                        glm::radians(static_cast<float>(event.motion.xrel)),
-                        glm::vec3(0.0f, 1.0f, 0.0f)) *
-                    glm::rotate(
-                        glm::mat4(1.0f),
-                        glm::radians(static_cast<float>(event.motion.yrel)),
-                        glm::vec3(1.0f, 0.0f, 0.0f)) *
-                    camera_direction_;
-                camera_direction_ /= camera_direction_.w;
-                camera_direction = camera_direction_;
+                float yoffset = event.motion.yrel;
+                float xoffset = event.motion.xrel;
+
+                float sensitivity = 0.3f;
+                xoffset *= sensitivity;
+                yoffset *= sensitivity;
+
+                m_yaw -= xoffset;
+                m_pitch -= yoffset;
+
+                m_pitch = glm::clamp(m_pitch, -89.0f, 89.0f);
+
+                glm::vec3 direction;
+                direction.x = std::cos(glm::radians(m_yaw)) * std::cos(glm::radians(m_pitch));
+                direction.y = std::sin(glm::radians(m_pitch));
+                direction.z = std::sin(glm::radians(m_yaw)) * std::cos(glm::radians(m_pitch));
+                camera_direction = glm::normalize(direction);
             }
 
 
             if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_w)
             {
-                camera_position += camera_direction * 3.0f * delta_time;
+                camera_position += camera_direction * 10.0f * delta_time;
             }
             else if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_s)
             {
-                camera_position -= camera_direction * 3.0f * delta_time;
+                camera_position -= camera_direction * 10.0f * delta_time;
             }
 
             if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_d)
             {
-                camera_position += glm::cross(glm::vec3(0.0f, 1.0f, 0.0f), camera_direction) * 3.0f * delta_time;
+                camera_position += glm::cross(glm::vec3(0.0f, 1.0f, 0.0f), camera_direction) * 10.0f * delta_time;
             }
             else if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_a)
             {
-                camera_position -= glm::cross(glm::vec3(0.0f, 1.0f, 0.0f), camera_direction) * 3.0f * delta_time;
+                camera_position -= glm::cross(glm::vec3(0.0f, 1.0f, 0.0f), camera_direction) * 10.0f * delta_time;
             }
         }
 

@@ -180,11 +180,7 @@ float light(vec3 n, vec3 lp, vec3 l)
 
 vec3 lookat(vec2 uv, vec3 pos, vec3 dir, vec3 up)
 {
-	#ifdef DEV
 	vec3 cam_dir = normalize(dir - pos);
-	#else
-	vec3 cam_dir = dir;
-	#endif	
 	vec3 right = normalize(cross(up, cam_dir));
 	vec3 cam_up = normalize(cross(cam_dir, right));
 	return normalize(uv.x * right + uv.y * cam_up + cam_dir * 2.0);
@@ -202,7 +198,7 @@ void main()
     //vec3 cam_pos = vec3(0, 10, 0.1);
     vec3 cam_dir = uCameraDirection;
     vec3 cam_up = vec3(0.0, 1.0, 0.0);
-    vec3 dir = lookat(uv, cam_pos, cam_dir, cam_up);
+    vec3 dir = lookat(uv, cam_pos, cam_pos + cam_dir, cam_up);
     //vec3 cam_dir = normalize(vec3(sin(uTime), 2.0, cos(uTime)) - cam_pos);
     vec3 ray_dir = dir;
     

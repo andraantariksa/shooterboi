@@ -18,4 +18,7 @@ private:
     glm::vec2 m_window_size = glm::vec2(1280.0f, 720.f);
     SDL_Window* m_window;
     SDL_GLContext m_ogl_context;
+
+    float m_yaw = 0.0f;
+    float m_pitch = 0.0f;
 };
