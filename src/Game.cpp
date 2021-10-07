@@ -1,4 +1,3 @@
-#include "Game.h"
 #include <array>
 #include <iostream>
 #include <chrono>
@@ -11,17 +10,20 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <backends/imgui_impl_sdl.h>
 #include <backends/imgui_impl_opengl3.h>
+#include <reactphysics3d/reactphysics3d.h>
+#include <soloud.h>
+#include <soloud_wav.h>
 
-#include "shaders/generated/main_PS.hpp"
-
-struct GameObject {
-};
+#include "RenderObjectData.hpp"
+#include "logic/systems/Systems.hpp"
+#include "Game.h"
+#include "shaders/generated/mainPS.hpp"
+#include "Camera.hpp"
 
 Game::Game() :
-    m_window(nullptr)
-{
-    if (SDL_Init(SDL_INIT_EVERYTHING) < 0)
-    {
+    m_window(nullptr) {
+    if (SDL_Init(SDL_INIT_EVERYTHING) < 0) {
+        std::cout << SDL_GetError() << '\n';
         assert(false && "Cannot initialize SDL");
     }
 
@@ -29,14 +31,15 @@ Game::Game() :
         "FPS",
         SDL_WINDOWPOS_CENTERED,
         SDL_WINDOWPOS_CENTERED,
-        static_cast<uint32_t>(m_window_size.x),
-        static_cast<uint32_t>(m_window_size.y),
+        m_window_size.x,
+        m_window_size.y,
         SDL_WINDOW_OPENGL);
 
-    if (m_window == nullptr)
-    {
+    if (m_window == nullptr) {
         assert(false && "Cannot create window");
     }
+
+    m_input_processor.init();
 
     const char* glsl_version = "#version 430";
 
@@ -74,10 +77,18 @@ Game::Game() :
 
     ImGui_ImplSDL2_InitForOpenGL(m_window, m_ogl_context);
     ImGui_ImplOpenGL3_Init(glsl_version);
+
+    m_physics_world = m_physics_common.createPhysicsWorld();
+
+    m_soloud.init();
 }
 
 Game::~Game()
 {
+    m_soloud.deinit();
+
+    m_physics_common.destroyPhysicsWorld(m_physics_world);
+
     SDL_GL_DeleteContext(m_window);
     SDL_DestroyWindow(m_window);
     SDL_Quit();
@@ -92,10 +103,12 @@ int Game::run()
         1.f, 1.f, 0.f,
     };
 
-    std::array<GameObject, 1000> gameobjects_buffer;
+    std::array<RenderObjectData, 1000> renderobjectdata_buffer;
+    renderobjectdata_buffer[0].m_type = RenderObjectDataType::Enemy;
+    renderobjectdata_buffer[0].m_data.enemies.m_position = glm::vec3(-2.0f, 0.5f, -2.0f);
 
     GLuint fragment_shader_id = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(fragment_shader_id, 1, &MAIN_PS, nullptr);
+    glShaderSource(fragment_shader_id, 1, &MAINPS, nullptr);
     glCompileShader(fragment_shader_id);
 
     GLuint shader_program_handle = glCreateProgram();
@@ -110,11 +123,17 @@ int Game::run()
     glGenBuffers(1, &vertex_buffer_handle);
     glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer_handle);
     glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+    //glBindBuffer(GL_ARRAY_BUFFER, 0);
 
     GLuint ssbo_handle;
     glGenBuffers(1, &ssbo_handle);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo_handle);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, gameobjects_buffer.size() * sizeof(GameObject), gameobjects_buffer.data(), GL_DYNAMIC_COPY);
+    glBufferData(GL_SHADER_STORAGE_BUFFER,
+        renderobjectdata_buffer.size() * sizeof(RenderObjectData),
+        renderobjectdata_buffer.data(),
+        GL_DYNAMIC_COPY);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, ssbo_handle);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     
     
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), nullptr);
@@ -122,36 +141,27 @@ int Game::run()
 
     glBindVertexArray(vertex_array_handle);
 
-    // Uniform
-    /*unsigned int uniform_buffer_handle;
-    glGenBuffers(1, &uniform_buffer_handle);
-    glBindBuffer(GL_UNIFORM_BUFFER, uniform_buffer_handle);
-    glBufferData(GL_UNIFORM_BUFFER, 152, NULL, GL_STATIC_DRAW);
-    glBindBuffer(GL_UNIFORM_BUFFER, 0);
-
-    GLuint uniform_indices_uCameraPosition = glGetUniformBlockIndex(shader_program_handle, "uCameraPosition");
-    GLuint uniform_indices_uResolution = glGetUniformBlockIndex(shader_program_handle, "uResolution");
-    GLuint uniform_indices_uTime = glGetUniformBlockIndex(shader_program_handle, "uTime");*/
-    // End uniform
-
     SDL_SetRelativeMouseMode(SDL_TRUE);
 
-    auto camera_position = glm::vec3(8.0f, 3.0f, -8.0f);
-    auto camera_direction = glm::vec3(0.0f, 0.0f, -1.0f);
+    Camera camera(glm::vec3(8.0f, 3.0f, -8.0f));
 
     float system_time = 0.f;
     float delta_time = 0.f;
-    auto start_time = std::chrono::system_clock::now();
+    auto start_time = std::chrono::high_resolution_clock::now();
 
     GLint uniform_location_uTime = glGetUniformLocation(shader_program_handle, "uTime");
     GLint uniform_location_uResolution = glGetUniformLocation(shader_program_handle, "uResolution");
     GLint uniform_location_uCameraPosition = glGetUniformLocation(shader_program_handle, "uCameraPosition");
     GLint uniform_location_uCameraDirection = glGetUniformLocation(shader_program_handle, "uCameraDirection");
 
+    glm::vec2 reso = m_window_size;
+    init(m_registry, m_soloud);
+
     bool running = true;
     while (running) {
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
+            m_input_processor.process(event);
             if (event.type == SDL_QUIT || (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE)) {
                 running = false;
             }
@@ -161,66 +171,39 @@ int Game::run()
                 {
                     m_window_size.x = event.window.data1;
                     m_window_size.y = event.window.data2;
+
+                    reso = m_window_size;
                 }
             }
-            else if (event.type == SDL_MOUSEMOTION)
-            {
-                float yoffset = event.motion.yrel;
-                float xoffset = event.motion.xrel;
+            else if (event.type == SDL_MOUSEMOTION) {
+                float y_offset = event.motion.yrel;
+                float x_offset = event.motion.xrel;
 
-                float sensitivity = 0.3f;
-                xoffset *= sensitivity;
-                yoffset *= sensitivity;
-
-                m_yaw -= xoffset;
-                m_pitch -= yoffset;
-
-                m_pitch = glm::clamp(m_pitch, -89.0f, 89.0f);
-
-                glm::vec3 direction;
-                direction.x = std::cos(glm::radians(m_yaw)) * std::cos(glm::radians(m_pitch));
-                direction.y = std::sin(glm::radians(m_pitch));
-                direction.z = std::sin(glm::radians(m_yaw)) * std::cos(glm::radians(m_pitch));
-                camera_direction = glm::normalize(direction);
-            }
-
-
-            if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_w)
-            {
-                camera_position += camera_direction * 10.0f * delta_time;
-            }
-            else if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_s)
-            {
-                camera_position -= camera_direction * 10.0f * delta_time;
-            }
-
-            if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_d)
-            {
-                camera_position += glm::cross(glm::vec3(0.0f, 1.0f, 0.0f), camera_direction) * 10.0f * delta_time;
-            }
-            else if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_a)
-            {
-                camera_position -= glm::cross(glm::vec3(0.0f, 1.0f, 0.0f), camera_direction) * 10.0f * delta_time;
+                camera.move_direction(glm::vec2(x_offset, y_offset));
             }
         }
 
-        /*camera_direction = glm::rotate(
-            glm::mat4(1.0f),
-            glm::radians(1.0f),
-            glm::vec3(0.0f, 1.0f, 0.0f)) *
-            glm::vec4(camera_direction, 1.0f);*/
+        if (m_input_processor.is_action_key_down(ActionKey::ExitGame)) {
+            running = false;
+        }
 
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
 
-        float current_time = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now() - start_time).count() / 1000000.0f;
+        auto new_time = std::chrono::high_resolution_clock::now();
+        float current_time = std::chrono::duration_cast<std::chrono::duration<float>>(new_time - start_time).count();
         delta_time = current_time - system_time;
         system_time = current_time;
 
+        update(m_registry, delta_time, m_input_processor, camera, m_soloud);
+        m_physics_world->update(delta_time);
+        m_soloud.update3dAudio();
+
+        glViewport(0, 0, m_window_size.x, m_window_size.y);
         glUseProgram(shader_program_handle);
-        glUniform2fv(uniform_location_uResolution, 1, glm::value_ptr(m_window_size));
-        glUniform3fv(uniform_location_uCameraPosition, 1, glm::value_ptr(camera_position));
-        glUniform3fv(uniform_location_uCameraDirection, 1, glm::value_ptr(camera_direction));
+        glUniform2fv(uniform_location_uResolution, 1, glm::value_ptr(reso));
+        glUniform3fv(uniform_location_uCameraPosition, 1, glm::value_ptr(camera.m_position));
+        glUniform3fv(uniform_location_uCameraDirection, 1, glm::value_ptr(camera.get_direction()));
         glUniform1f(uniform_location_uTime, current_time);
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 

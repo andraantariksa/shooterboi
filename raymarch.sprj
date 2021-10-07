@@ -48,6 +48,7 @@
 				<variable type="float2" name="uResolution" system="ViewportSize" />
 				<variable type="float" name="uTime" system="Time" />
 				<variable type="float3" name="uCameraPosition" system="CameraPosition3" />
+				<variable type="float3" name="uCameraDirection" system="CameraPosition3" />
 			</variables>
 			<macros />
 		</pass>
@@ -55,11 +56,9 @@
 	<objects />
 	<cameras />
 	<settings>
-		<entry type="property" name="Simple" item="pipe" />
+		<entry type="property" name="POV" item="pipe" />
 		<entry type="file" name="POV" shader="vs" />
 		<entry type="file" name="POV" shader="ps" />
-		<entry type="file" name="Simple" shader="vs" />
-		<entry type="file" name="Simple" shader="ps" />
 		<entry type="camera" fp="false">
 			<distance>10</distance>
 			<pitch>21</pitch>

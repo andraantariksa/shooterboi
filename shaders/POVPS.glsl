@@ -3,6 +3,17 @@
 #define DEV
 #define EPS 0.001
 
+struct GameObject {
+	uint type;
+	vec3 position;
+	vec4 rotation;
+};
+
+layout(std430, binding = 0) readonly buffer gameobjectsz
+{
+	restrict GameObject gameobjects[];
+};
+
 uniform vec2 uResolution;
 uniform float uTime;
 uniform vec3 uCameraPosition;
@@ -105,10 +116,22 @@ vec3 repeat(vec3 pos, vec3 c)
 
 float scene_dist(vec3 pos)
 {
-	float sph = sd_sphere(pos, vec3(0, 0.5, 0.), 0.5);
+	float sph = sd_sphere(pos, vec3(2., 0.5, -2.), 0.5);
 	float m = min(sd_silver_horn(pos, vec3(0, 3, 0)), sph);
-	return m;
-	//return sd_plane(pos, vec3(1, 0, 0), 0.5);
+	#ifndef DEV
+	for (uint i = 0; i < 10; i++) {
+		switch (gameobjects[i].type) {
+			case 1:
+			{
+				m = min(m, sd_sphere(pos, gameobjects[i].position, 0.5));
+			}
+			break;
+			default:
+			break;
+		}
+	}
+	#endif
+	return min(m, sd_plane(pos, vec3(0, 1, 0), 0));
 }
 
 vec3 get_normal(vec3 pos)
