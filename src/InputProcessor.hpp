@@ -14,21 +14,20 @@ enum class PressedState {
     Released
 };
 
-enum class ActionKey
-{
+enum class ActionKey {
     MoveForward,
     MoveBackward,
     MoveLeft,
     MoveRight,
     Run,
+    Jump,
     Crouch,
     ExitGame,
 
     NumKeys
 };
 
-class InputProcessor
-{
+class InputProcessor {
 public:
     InputProcessor();
     ~InputProcessor();

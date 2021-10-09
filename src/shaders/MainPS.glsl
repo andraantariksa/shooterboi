@@ -6,12 +6,12 @@
 struct GameObject {
 	uint type;
 	vec3 position;
-	vec4 rotation;
+	//vec4 rotation;
 };
 
-layout(std140, binding = 0) readonly buffer gameobjectsz
+layout(std430, binding = 0) buffer gameobjectsz
 {
-	readonly GameObject gameobjects[10];
+	GameObject gameobjects[100];
 };
 
 uniform vec2 uResolution;
@@ -120,7 +120,7 @@ float scene_dist(vec3 pos)
 	sph = min(sph, sd_sphere(pos, vec3(-2., 0.5, 2.), 0.5));
 	float m = min(sd_silver_horn(pos, vec3(0, 3, 0)), sph);
 #ifndef DEV
-	for (uint i = 0; i < 10; i++) {
+	for (uint i = 0; i < 100; i++) {
 		if (gameobjects[i].type == 1) {
 			// gameobjects[i].position
 			m = min(m, sd_sphere(pos, gameobjects[i].position, 0.5));
@@ -213,7 +213,7 @@ void main()
 	//uv *= 0.5;
 
 	vec3 light_pos = vec3(sin(uTime) * 8, 8.0, -cos(uTime) * 8);
-	vec3 cam_pos = uCameraPosition + vec3(1.); // vec3(sin(uTime) * 8, 3.0, -cos(uTime) * 8);
+	vec3 cam_pos = uCameraPosition; // vec3(sin(uTime) * 8, 3.0, -cos(uTime) * 8);
 	//vec3 cam_pos = vec3(0, 10, 0.1);
 	vec3 cam_dir = uCameraDirection;
 	vec3 cam_up = vec3(0.0, 1.0, 0.0);

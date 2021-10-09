@@ -1,7 +1,7 @@
 #ifndef _SRC_RENDEROBJECTDATA_HPP
 #define _SRC_RENDEROBJECTDATA_HPP
 
-#include "Common.h"
+#include "Common.hpp"
 #include "logic/components/Transform.hpp"
 
 enum class RenderObjectDataType: uint32_t {
@@ -9,11 +9,16 @@ enum class RenderObjectDataType: uint32_t {
     Enemy = 1
 };
 
+// 16 byte alignment
 class RenderObjectData {
 public:
     RenderObjectDataType m_type;
+    float _pad[3];
     union RenderObjectUnion {
-        Transform enemies;
+        struct {
+            Transform transform;
+            float _pad;
+        } enemies;
 
         RenderObjectUnion() {
         }

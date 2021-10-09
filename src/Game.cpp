@@ -16,9 +16,10 @@
 
 #include "RenderObjectData.hpp"
 #include "logic/systems/Systems.hpp"
-#include "Game.h"
+#include "Game.hpp"
 #include "shaders/generated/mainPS.hpp"
 #include "Camera.hpp"
+#include "RenderObjects.hpp"
 
 Game::Game() :
     m_window(nullptr) {
@@ -79,6 +80,15 @@ Game::Game() :
     ImGui_ImplOpenGL3_Init(glsl_version);
 
     m_physics_world = m_physics_common.createPhysicsWorld();
+    m_physics_world->setIsGravityEnabled(true);
+    m_physics_world->setGravity(reactphysics3d::Vector3(0, -9.81, 0));
+    /*m_physics_world->setIsDebugRenderingEnabled(true);
+    
+    reactphysics3d::DebugRenderer& debugRenderer = m_physics_world->getDebugRenderer();
+
+    debugRenderer.setIsDebugItemDisplayed(reactphysics3d::DebugRenderer::DebugItem::COLLISION_SHAPE, true);
+    debugRenderer.setIsDebugItemDisplayed(reactphysics3d::DebugRenderer::DebugItem::CONTACT_POINT, true);
+    debugRenderer.setIsDebugItemDisplayed(reactphysics3d::DebugRenderer::DebugItem::CONTACT_NORMAL, true);*/
 
     m_soloud.init();
 }
@@ -103,9 +113,11 @@ int Game::run()
         1.f, 1.f, 0.f,
     };
 
-    std::array<RenderObjectData, 1000> renderobjectdata_buffer;
-    renderobjectdata_buffer[0].m_type = RenderObjectDataType::Enemy;
-    renderobjectdata_buffer[0].m_data.enemies.m_position = glm::vec3(-2.0f, 0.5f, -2.0f);
+    //std::array<RenderObjectData, 100> renderobjectdata_buffer;
+    //renderobjectdata_buffer[0].m_type = RenderObjectDataType::Enemy;
+    //renderobjectdata_buffer[0].m_data.enemies.enemies.m_position = glm::vec3(-2.0f, 0.5f, -2.0f);
+    //renderobjectdata_buffer[1].m_type = RenderObjectDataType::Enemy;
+    //renderobjectdata_buffer[1].m_data.enemies.enemies.m_position = glm::vec3(-4.0f, 1.5f, -4.0f);
 
     GLuint fragment_shader_id = glCreateShader(GL_FRAGMENT_SHADER);
     glShaderSource(fragment_shader_id, 1, &MAINPS, nullptr);
@@ -129,12 +141,11 @@ int Game::run()
     glGenBuffers(1, &ssbo_handle);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo_handle);
     glBufferData(GL_SHADER_STORAGE_BUFFER,
-        renderobjectdata_buffer.size() * sizeof(RenderObjectData),
-        renderobjectdata_buffer.data(),
+        m_render_objects.size() * sizeof(RenderObjectData),
+        m_render_objects.data(),
         GL_DYNAMIC_COPY);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, ssbo_handle);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-    
     
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), nullptr);
     glEnableVertexAttribArray(0);
@@ -155,7 +166,7 @@ int Game::run()
     GLint uniform_location_uCameraDirection = glGetUniformLocation(shader_program_handle, "uCameraDirection");
 
     glm::vec2 reso = m_window_size;
-    init(m_registry, m_soloud);
+    init(m_registry, m_soloud, m_physics_world, m_physics_common, m_render_objects);
 
     bool running = true;
     while (running) {
@@ -186,7 +197,6 @@ int Game::run()
         if (m_input_processor.is_action_key_down(ActionKey::ExitGame)) {
             running = false;
         }
-
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
 
@@ -195,10 +205,20 @@ int Game::run()
         delta_time = current_time - system_time;
         system_time = current_time;
 
-        update(m_registry, delta_time, m_input_processor, camera, m_soloud);
-        m_physics_world->update(delta_time);
+        // Update
+        update(m_registry, delta_time, m_input_processor, camera, m_soloud, m_physics_world, m_physics_common, m_render_objects);
         m_soloud.update3dAudio();
+        m_physics_world->update(delta_time);
 
+        SDL_SetWindowTitle(m_window, (std::string("FPS") + std::to_string(delta_time)).c_str());
+
+        // Copy to SSBO
+        glBindBuffer(GL_UNIFORM_BUFFER, ssbo_handle);
+        void* buff_ptr = glMapBuffer(GL_UNIFORM_BUFFER, GL_WRITE_ONLY);
+        std::memcpy(buff_ptr, m_render_objects.data(), m_render_objects.size());
+        glUnmapBuffer(GL_UNIFORM_BUFFER);
+
+        // Render
         glViewport(0, 0, m_window_size.x, m_window_size.y);
         glUseProgram(shader_program_handle);
         glUniform2fv(uniform_location_uResolution, 1, glm::value_ptr(reso));

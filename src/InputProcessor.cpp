@@ -1,4 +1,4 @@
-#include "InputProcessor.h"
+#include "InputProcessor.hpp"
 
 InputProcessor::InputProcessor() :
     m_keyboard_state(nullptr),
@@ -75,6 +75,7 @@ SDL_Scancode InputProcessor::g_action_key_tbl[InputProcessor::g_num_action_key] 
     SDL_SCANCODE_A,
     SDL_SCANCODE_D,
     SDL_SCANCODE_LSHIFT,
+    SDL_SCANCODE_SPACE,
     SDL_SCANCODE_LCTRL,
     SDL_SCANCODE_ESCAPE
 };

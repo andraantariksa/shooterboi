@@ -8,12 +8,12 @@ const char* MAINPS = "#version 450\n"\
 "struct GameObject {\n"\
 "	uint type;\n"\
 "	vec3 position;\n"\
-"	vec4 rotation;\n"\
+"	//vec4 rotation;\n"\
 "};\n"\
 "\n"\
-"layout(std140, binding = 0) readonly buffer gameobjectsz\n"\
+"layout(std430, binding = 0) buffer gameobjectsz\n"\
 "{\n"\
-"	readonly GameObject gameobjects[10];\n"\
+"	GameObject gameobjects[100];\n"\
 "};\n"\
 "\n"\
 "uniform vec2 uResolution;\n"\
@@ -122,7 +122,7 @@ const char* MAINPS = "#version 450\n"\
 "	sph = min(sph, sd_sphere(pos, vec3(-2., 0.5, 2.), 0.5));\n"\
 "	float m = min(sd_silver_horn(pos, vec3(0, 3, 0)), sph);\n"\
 "#ifndef DEV\n"\
-"	for (uint i = 0; i < 10; i++) {\n"\
+"	for (uint i = 0; i < 100; i++) {\n"\
 "		if (gameobjects[i].type == 1) {\n"\
 "			// gameobjects[i].position\n"\
 "			m = min(m, sd_sphere(pos, gameobjects[i].position, 0.5));\n"\
@@ -215,7 +215,7 @@ const char* MAINPS = "#version 450\n"\
 "	//uv *= 0.5;\n"\
 "\n"\
 "	vec3 light_pos = vec3(sin(uTime) * 8, 8.0, -cos(uTime) * 8);\n"\
-"	vec3 cam_pos = uCameraPosition + vec3(1.); // vec3(sin(uTime) * 8, 3.0, -cos(uTime) * 8);\n"\
+"	vec3 cam_pos = uCameraPosition; // vec3(sin(uTime) * 8, 3.0, -cos(uTime) * 8);\n"\
 "	//vec3 cam_pos = vec3(0, 10, 0.1);\n"\
 "	vec3 cam_dir = uCameraDirection;\n"\
 "	vec3 cam_up = vec3(0.0, 1.0, 0.0);\n"\

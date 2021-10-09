@@ -7,8 +7,9 @@
 #include <reactphysics3d/reactphysics3d.h>
 #include <soloud.h>
 
-#include "Common.h"
-#include "InputProcessor.h"
+#include "Common.hpp"
+#include "InputProcessor.hpp"
+#include "RenderObjects.hpp"
 
 class Game
 {
@@ -28,8 +29,8 @@ private:
     reactphysics3d::PhysicsCommon m_physics_common;
     reactphysics3d::PhysicsWorld* m_physics_world;
 
+    RenderObjects<100> m_render_objects;
+
     SoLoud::Soloud m_soloud;
     entt::registry m_registry;
-    float m_yaw = 0.0f;
-    float m_pitch = 0.0f;
 };
