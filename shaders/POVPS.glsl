@@ -3,6 +3,17 @@
 #define DEV
 #define EPS 0.001
 
+struct GameObject {
+	uint type;
+	vec3 position;
+	vec4 rotation;
+};
+
+layout(std430, binding = 0) readonly buffer gameobjectsz
+{
+	restrict GameObject gameobjects[];
+};
+
 uniform vec2 uResolution;
 uniform float uTime;
 uniform vec3 uCameraPosition;
@@ -105,10 +116,22 @@ vec3 repeat(vec3 pos, vec3 c)
 
 float scene_dist(vec3 pos)
 {
-	float sph = sd_sphere(pos, vec3(0, 0.5, 0.), 0.5);
+	float sph = sd_sphere(pos, vec3(2., 0.5, -2.), 0.5);
 	float m = min(sd_silver_horn(pos, vec3(0, 3, 0)), sph);
-	return min(m, sd_plane(pos, vec3(0, 1, 0),0));
-	//return sd_plane(pos, vec3(1, 0, 0), 0.5);
+	#ifndef DEV
+	for (uint i = 0; i < 10; i++) {
+		switch (gameobjects[i].type) {
+			case 1:
+			{
+				m = min(m, sd_sphere(pos, gameobjects[i].position, 0.5));
+			}
+			break;
+			default:
+			break;
+		}
+	}
+	#endif
+	return min(m, sd_plane(pos, vec3(0, 1, 0), 0));
 }
 
 vec3 get_normal(vec3 pos)
@@ -180,11 +203,7 @@ float light(vec3 n, vec3 lp, vec3 l)
 
 vec3 lookat(vec2 uv, vec3 pos, vec3 dir, vec3 up)
 {
-	#ifdef DEV
 	vec3 cam_dir = normalize(dir - pos);
-	#else
-	vec3 cam_dir = dir;
-	#endif	
 	vec3 right = normalize(cross(up, cam_dir));
 	vec3 cam_up = normalize(cross(cam_dir, right));
 	return normalize(uv.x * right + uv.y * cam_up + cam_dir * 2.0);
@@ -198,15 +217,21 @@ void main()
     //uv *= 0.5;
     
     vec3 light_pos = vec3(sin(uTime) * 8, 8.0, -cos(uTime) * 8);
-    vec3 cam_pos = uCameraPosition; // vec3(sin(uTime) * 8, 3.0, -cos(uTime) * 8);
+    vec3 cam_pos = uCameraPosition + vec3(1.); // vec3(sin(uTime) * 8, 3.0, -cos(uTime) * 8);
     //vec3 cam_pos = vec3(0, 10, 0.1);
     vec3 cam_dir = uCameraDirection;
     vec3 cam_up = vec3(0.0, 1.0, 0.0);
-    vec3 dir = lookat(uv, cam_pos, cam_dir, cam_up);
+    vec3 dir = lookat(uv, cam_pos, cam_pos + cam_dir, cam_up);
     //vec3 cam_dir = normalize(vec3(sin(uTime), 2.0, cos(uTime)) - cam_pos);
     vec3 ray_dir = dir;
     
     float d = ray_march(cam_pos, ray_dir);
+    
+    if (d > 1000.0f) {
+    	outColor = vec4(0.);
+    	return;
+    }
+    
     vec3 lp = cam_pos + d * ray_dir;
     vec3 normal = get_normal(lp);
     float lv = 0.;

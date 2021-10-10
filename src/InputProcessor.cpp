@@ -1,4 +1,4 @@
-#include "InputProcessor.h"
+#include "InputProcessor.hpp"
 
 InputProcessor::InputProcessor() :
     m_keyboard_state(nullptr),
@@ -16,8 +16,19 @@ void InputProcessor::init()
     m_keyboard_state = SDL_GetKeyboardState(&m_num_keys);
 }
 
+bool InputProcessor::is_mouse_pressed(MouseButton mouse_button) const {
+    return m_mouse_pressed_state[static_cast<uint8_t>(mouse_button)];
+}
+
 void InputProcessor::process(const SDL_Event& event)
 {
+    if (event.type == SDL_MOUSEBUTTONDOWN) {
+        m_mouse_pressed_state[event.button.button] = static_cast<uint8_t>(true);
+    }
+    else if (event.type == SDL_MOUSEBUTTONUP) {
+        m_mouse_pressed_state[event.button.button] = static_cast<uint8_t>(false);
+    }
+
     m_mouse_acc = glm::vec2(0.0f);
 
     if (event.type == SDL_MOUSEMOTION) {
@@ -64,6 +75,7 @@ SDL_Scancode InputProcessor::g_action_key_tbl[InputProcessor::g_num_action_key] 
     SDL_SCANCODE_A,
     SDL_SCANCODE_D,
     SDL_SCANCODE_LSHIFT,
+    SDL_SCANCODE_SPACE,
     SDL_SCANCODE_LCTRL,
     SDL_SCANCODE_ESCAPE
 };

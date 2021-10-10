@@ -1,0 +1,7 @@
+#ifndef _SRC_LOGIC_COMPONENTS_PLAYER_HPP
+#define _SRC_LOGIC_COMPONENTS_PLAYER_HPP
+
+class Player {
+};
+
+#endif
