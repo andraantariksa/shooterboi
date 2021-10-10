@@ -13,7 +13,9 @@ add_executable(fps-raymarch
     src/Game.h
     src/InputProcessor.cpp
     src/InputProcessor.h
-    src/Main.cpp)
+    src/Main.cpp
+    src/Renderer.cpp
+    src/Renderer.h)
 
 target_include_directories(fps-raymarch PUBLIC
     extern/glm)

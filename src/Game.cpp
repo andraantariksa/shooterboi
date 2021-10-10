@@ -231,6 +231,9 @@ int Game::run()
         SDL_GL_SwapWindow(m_window);
     }
 
+    glDeleteBuffers(1, &ssbo_handle);
+    glDeleteBuffers(1, &vertex_buffer_handle);
+    glDeleteBuffers(1, &vertex_array_handle);
     glDeleteProgram(shader_program_handle);
     glDeleteShader(fragment_shader_id);
 
