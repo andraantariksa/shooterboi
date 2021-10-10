@@ -246,7 +246,7 @@ const char* MAINPS = "#version 450\n"\
 "	vec3 normal = get_normal(lp);\n"\
 "	float lv = 0.;\n"\
 "\n"\
-"	lv += light(normal, lp, light_pos) * 0.7;\n"\
+"	lv += light(normal, lp, cam_pos) * 0.7;\n"\
 "\n"\
 "	lv *= ambient_ocl(lp, normal);\n"\
 "\n"\

@@ -244,7 +244,7 @@ void main()
 	vec3 normal = get_normal(lp);
 	float lv = 0.;
 
-	lv += light(normal, lp, light_pos) * 0.7;
+	lv += light(normal, lp, cam_pos) * 0.7;
 
 	lv *= ambient_ocl(lp, normal);
 
@@ -262,8 +262,7 @@ void main()
 		col = vec3(46., 209., 162.) / 255.;
 		break;
 	case 3:
-		col = texture(uTextureGround, lp.xz).rgb;
-		//col = vec3(0.8, 0., 0.);
+		col = texture(uTextureGround, lp.xz * 0.5 + 0.5).rgb;
 		break;
 	}
 
