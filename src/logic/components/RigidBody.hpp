@@ -18,6 +18,9 @@ public:
 		for (const auto& collider : colliders) {
 			m_rigidbody->addCollider(collider.first, collider.second);
 		}
+
+		m_rigidbody->setLinearDamping(0.0f);
+		m_rigidbody->setAngularDamping(0.0f);
 	}
 	
 	inline void destroy(reactphysics3d::PhysicsWorld* world) { world->destroyRigidBody(m_rigidbody); };

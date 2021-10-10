@@ -18,3 +18,6 @@
 [submodule "extern/soloud"]
 	path = extern/soloud
 	url = https://github.com/jarikomppa/soloud.git
+[submodule "extern/stb"]
+	path = extern/stb
+	url = https://github.com/nothings/stb

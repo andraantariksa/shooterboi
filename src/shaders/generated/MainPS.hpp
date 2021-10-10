@@ -16,6 +16,7 @@ const char* MAINPS = "#version 450\n"\
 "	GameObject gameobjects[100];\n"\
 "};\n"\
 "\n"\
+"uniform sampler2D uTextureGround;\n"\
 "uniform vec2 uResolution;\n"\
 "uniform float uTime;\n"\
 "uniform vec3 uCameraPosition;\n"\
@@ -32,6 +33,17 @@ const char* MAINPS = "#version 450\n"\
 "	vec3 pos;\n"\
 "	float dist;\n"\
 "};\n"\
+"\n"\
+"struct Distance\n"\
+"{\n"\
+"	float distance;\n"\
+"	uint materialId;\n"\
+"};\n"\
+"\n"\
+"Distance sd_union(Distance d1, Distance d2)\n"\
+"{\n"\
+"	return d1.distance > d2.distance ? d2 : d1;\n"\
+"}\n"\
 "\n"\
 "float sd_plane(vec3 pos, vec3 n, float h)\n"\
 "{\n"\
@@ -108,7 +120,7 @@ const char* MAINPS = "#version 450\n"\
 "	//pos.z *= 1.5;\n"\
 "\n"\
 "	return min(main_part, max(trigger_frame, -trigger_hole)); //length(pos.xz) - 0.2;\n"\
-"	//return length(pos.xz) - 0.2;\n"\
+"	//return length(pos.xz) - 0.2;cd	\n"\
 "}\n"\
 "\n"\
 "vec3 repeat(vec3 pos, vec3 c)\n"\
@@ -116,45 +128,45 @@ const char* MAINPS = "#version 450\n"\
 "	return mod(pos + 0.5 * c, c) - 0.5 * c;\n"\
 "}\n"\
 "\n"\
-"float scene_dist(vec3 pos)\n"\
+"Distance scene_dist(vec3 pos)\n"\
 "{\n"\
-"	float sph = sd_sphere(pos, vec3(2., 0.5, -2.), 0.5);\n"\
-"	sph = min(sph, sd_sphere(pos, vec3(-2., 0.5, 2.), 0.5));\n"\
-"	float m = min(sd_silver_horn(pos, vec3(0, 3, 0)), sph);\n"\
+"	Distance sph = Distance(sd_sphere(pos, vec3(2., 0.5, -2.), 0.5), 2);\n"\
+"	sph = sd_union(sph, Distance(sd_sphere(pos, vec3(-2., 0.5, 2.), 0.5), 2));\n"\
+"	Distance m = sd_union(Distance(sd_silver_horn(pos, vec3(0, 3, 0)), 1), sph);\n"\
 "#ifndef DEV\n"\
-"	for (uint i = 0; i < 100; i++) {\n"\
+"	for (uint i = 0u; i < 100u; i++) {\n"\
 "		if (gameobjects[i].type == 1) {\n"\
-"			// gameobjects[i].position\n"\
-"			m = min(m, sd_sphere(pos, gameobjects[i].position, 0.5));\n"\
+"			m = sd_union(m, Distance(sd_sphere(pos, gameobjects[i].position, 0.5), 2));\n"\
 "		}\n"\
 "	}\n"\
 "#endif\n"\
-"	return min(m, sd_plane(pos, vec3(0, 1, 0), 0));\n"\
+"	return sd_union(m, Distance(sd_plane(pos, vec3(0, 1, 0), 0), 3));\n"\
 "}\n"\
 "\n"\
 "vec3 get_normal(vec3 pos)\n"\
 "{\n"\
-"	float center_dist = scene_dist(pos);\n"\
-"	float dfx = scene_dist(vec3(pos.x - EPS, pos.y, pos.z));\n"\
-"	float dfy = scene_dist(vec3(pos.x, pos.y - EPS, pos.z));\n"\
-"	float dfz = scene_dist(vec3(pos.x, pos.y, pos.z - EPS));\n"\
-"	vec3 normal = (center_dist - vec3(dfx, dfy, dfz)) / EPS;\n"\
+"	Distance center_dist = scene_dist(pos);\n"\
+"	Distance dfx = scene_dist(vec3(pos.x - EPS, pos.y, pos.z));\n"\
+"	Distance dfy = scene_dist(vec3(pos.x, pos.y - EPS, pos.z));\n"\
+"	Distance dfz = scene_dist(vec3(pos.x, pos.y, pos.z - EPS));\n"\
+"	vec3 normal = (center_dist.distance - vec3(dfx.distance, dfy.distance, dfz.distance)) / EPS;\n"\
 "\n"\
 "	return normal;\n"\
 "}\n"\
 "\n"\
-"float ray_march(vec3 ray_origin, vec3 ray_dir)\n"\
+"Distance ray_march(vec3 ray_origin, vec3 ray_dir)\n"\
 "{\n"\
-"	float dist_traveled = 0.0;\n"\
+"	Distance dist_traveled = Distance(0.0, 0);\n"\
 "	vec3 current_pos = vec3(0);\n"\
 "\n"\
 "	for (uint i = 0u; i < 100u; i++) {\n"\
-"		current_pos = ray_origin + dist_traveled * ray_dir;\n"\
-"		float closest_distance = scene_dist(current_pos);\n"\
+"		current_pos = ray_origin + dist_traveled.distance * ray_dir;\n"\
+"		Distance closest_distance = scene_dist(current_pos);\n"\
 "\n"\
-"		dist_traveled += closest_distance;\n"\
+"		dist_traveled.distance += closest_distance.distance;\n"\
+"		dist_traveled.materialId = closest_distance.materialId;\n"\
 "\n"\
-"		if (abs(closest_distance) < 0.00001 || dist_traveled > 1000.0f) {\n"\
+"		if (abs(closest_distance.distance) < 0.00001 || dist_traveled.distance > 1000.0) {\n"\
 "			break;\n"\
 "		}\n"\
 "	}\n"\
@@ -168,14 +180,14 @@ const char* MAINPS = "#version 450\n"\
 "	float ph = 1e10;\n"\
 "	for (float t = mint; t < maxt; )\n"\
 "	{\n"\
-"		float h = scene_dist(ro + rd * t);\n"\
-"		if (h < 0.001)\n"\
+"		Distance h = scene_dist(ro + rd * t);\n"\
+"		if (h.distance < 0.001)\n"\
 "			return 0.0;\n"\
-"		float y = h * h / (2.0 * ph);\n"\
-"		float d = sqrt(h * h - y * y);\n"\
+"		float y = h.distance * h.distance / (2.0 * ph);\n"\
+"		float d = sqrt(h.distance * h.distance - y * y);\n"\
 "		res = min(res, k * d / max(0.0, t - y));\n"\
-"		ph = h;\n"\
-"		t += h;\n"\
+"		ph = h.distance;\n"\
+"		t += h.distance;\n"\
 "	}\n"\
 "	return res;\n"\
 "}\n"\
@@ -187,8 +199,8 @@ const char* MAINPS = "#version 450\n"\
 "	for (int i = 0; i < 5; i++)\n"\
 "	{\n"\
 "		float h = 0.001 + 0.15 * float(i) / 4.0;\n"\
-"		float d = scene_dist(pos + h * nor);\n"\
-"		occ += (h - d) * sca;\n"\
+"		Distance d = scene_dist(pos + h * nor);\n"\
+"		occ += (h - d.distance) * sca;\n"\
 "		sca *= 0.95;\n"\
 "	}\n"\
 "	return clamp(1.0 - 1.5 * occ, 0.0, 1.0);\n"\
@@ -223,14 +235,14 @@ const char* MAINPS = "#version 450\n"\
 "	//vec3 cam_dir = normalize(vec3(sin(uTime), 2.0, cos(uTime)) - cam_pos);\n"\
 "	vec3 ray_dir = dir;\n"\
 "\n"\
-"	float d = ray_march(cam_pos, ray_dir);\n"\
+"	Distance d = ray_march(cam_pos, ray_dir);\n"\
 "\n"\
-"	if (d > 1000.0f) {\n"\
+"	if (d.distance > 1000.0) {\n"\
 "		outColor = vec4(0.);\n"\
 "		return;\n"\
 "	}\n"\
 "\n"\
-"	vec3 lp = cam_pos + d * ray_dir;\n"\
+"	vec3 lp = cam_pos + d.distance * ray_dir;\n"\
 "	vec3 normal = get_normal(lp);\n"\
 "	float lv = 0.;\n"\
 "\n"\
@@ -240,7 +252,24 @@ const char* MAINPS = "#version 450\n"\
 "\n"\
 "	lv += 0.05;\n"\
 "\n"\
-"	outColor = vec4(clamp(pow(vec3(0.8, 0.9, 1.0) * lv, 1. / vec3(2.2)), 0, 1), 1.0);\n"\
+"	vec3 col = vec3(0.);\n"\
+"	switch (d.materialId) {\n"\
+"	case 0:\n"\
+"		col = vec3(0.);\n"\
+"		break;\n"\
+"	case 1:\n"\
+"		col = vec3(192. / 255.);\n"\
+"		break;\n"\
+"	case 2:\n"\
+"		col = vec3(46., 209., 162.) / 255.;\n"\
+"		break;\n"\
+"	case 3:\n"\
+"		col = texture(uTextureGround, lp.xz).rgb;\n"\
+"		//col = vec3(0.8, 0., 0.);\n"\
+"		break;\n"\
+"	}\n"\
+"\n"\
+"	outColor = vec4(clamp(pow(col * lv, 1. / vec3(2.2)), 0, 1), 1.0);\n"\
 "	//outColor = vec4(ray_dir, 1.0);\n"\
 "}"; 
 #endif

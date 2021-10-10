@@ -14,6 +14,7 @@ layout(std430, binding = 0) buffer gameobjectsz
 	GameObject gameobjects[100];
 };
 
+uniform sampler2D uTextureGround;
 uniform vec2 uResolution;
 uniform float uTime;
 uniform vec3 uCameraPosition;
@@ -30,6 +31,17 @@ struct RayHit
 	vec3 pos;
 	float dist;
 };
+
+struct Distance
+{
+	float distance;
+	uint materialId;
+};
+
+Distance sd_union(Distance d1, Distance d2)
+{
+	return d1.distance > d2.distance ? d2 : d1;
+}
 
 float sd_plane(vec3 pos, vec3 n, float h)
 {
@@ -106,7 +118,7 @@ float sd_silver_horn(vec3 pos, vec3 c)
 	//pos.z *= 1.5;
 
 	return min(main_part, max(trigger_frame, -trigger_hole)); //length(pos.xz) - 0.2;
-	//return length(pos.xz) - 0.2;
+	//return length(pos.xz) - 0.2;cd	
 }
 
 vec3 repeat(vec3 pos, vec3 c)
@@ -114,45 +126,45 @@ vec3 repeat(vec3 pos, vec3 c)
 	return mod(pos + 0.5 * c, c) - 0.5 * c;
 }
 
-float scene_dist(vec3 pos)
+Distance scene_dist(vec3 pos)
 {
-	float sph = sd_sphere(pos, vec3(2., 0.5, -2.), 0.5);
-	sph = min(sph, sd_sphere(pos, vec3(-2., 0.5, 2.), 0.5));
-	float m = min(sd_silver_horn(pos, vec3(0, 3, 0)), sph);
+	Distance sph = Distance(sd_sphere(pos, vec3(2., 0.5, -2.), 0.5), 2);
+	sph = sd_union(sph, Distance(sd_sphere(pos, vec3(-2., 0.5, 2.), 0.5), 2));
+	Distance m = sd_union(Distance(sd_silver_horn(pos, vec3(0, 3, 0)), 1), sph);
 #ifndef DEV
-	for (uint i = 0; i < 100; i++) {
+	for (uint i = 0u; i < 100u; i++) {
 		if (gameobjects[i].type == 1) {
-			// gameobjects[i].position
-			m = min(m, sd_sphere(pos, gameobjects[i].position, 0.5));
+			m = sd_union(m, Distance(sd_sphere(pos, gameobjects[i].position, 0.5), 2));
 		}
 	}
 #endif
-	return min(m, sd_plane(pos, vec3(0, 1, 0), 0));
+	return sd_union(m, Distance(sd_plane(pos, vec3(0, 1, 0), 0), 3));
 }
 
 vec3 get_normal(vec3 pos)
 {
-	float center_dist = scene_dist(pos);
-	float dfx = scene_dist(vec3(pos.x - EPS, pos.y, pos.z));
-	float dfy = scene_dist(vec3(pos.x, pos.y - EPS, pos.z));
-	float dfz = scene_dist(vec3(pos.x, pos.y, pos.z - EPS));
-	vec3 normal = (center_dist - vec3(dfx, dfy, dfz)) / EPS;
+	Distance center_dist = scene_dist(pos);
+	Distance dfx = scene_dist(vec3(pos.x - EPS, pos.y, pos.z));
+	Distance dfy = scene_dist(vec3(pos.x, pos.y - EPS, pos.z));
+	Distance dfz = scene_dist(vec3(pos.x, pos.y, pos.z - EPS));
+	vec3 normal = (center_dist.distance - vec3(dfx.distance, dfy.distance, dfz.distance)) / EPS;
 
 	return normal;
 }
 
-float ray_march(vec3 ray_origin, vec3 ray_dir)
+Distance ray_march(vec3 ray_origin, vec3 ray_dir)
 {
-	float dist_traveled = 0.0;
+	Distance dist_traveled = Distance(0.0, 0);
 	vec3 current_pos = vec3(0);
 
 	for (uint i = 0u; i < 100u; i++) {
-		current_pos = ray_origin + dist_traveled * ray_dir;
-		float closest_distance = scene_dist(current_pos);
+		current_pos = ray_origin + dist_traveled.distance * ray_dir;
+		Distance closest_distance = scene_dist(current_pos);
 
-		dist_traveled += closest_distance;
+		dist_traveled.distance += closest_distance.distance;
+		dist_traveled.materialId = closest_distance.materialId;
 
-		if (abs(closest_distance) < 0.00001 || dist_traveled > 1000.0f) {
+		if (abs(closest_distance.distance) < 0.00001 || dist_traveled.distance > 1000.0) {
 			break;
 		}
 	}
@@ -166,14 +178,14 @@ float soft_shadow(in vec3 ro, in vec3 rd, float mint, float maxt, float k)
 	float ph = 1e10;
 	for (float t = mint; t < maxt; )
 	{
-		float h = scene_dist(ro + rd * t);
-		if (h < 0.001)
+		Distance h = scene_dist(ro + rd * t);
+		if (h.distance < 0.001)
 			return 0.0;
-		float y = h * h / (2.0 * ph);
-		float d = sqrt(h * h - y * y);
+		float y = h.distance * h.distance / (2.0 * ph);
+		float d = sqrt(h.distance * h.distance - y * y);
 		res = min(res, k * d / max(0.0, t - y));
-		ph = h;
-		t += h;
+		ph = h.distance;
+		t += h.distance;
 	}
 	return res;
 }
@@ -185,8 +197,8 @@ float ambient_ocl(in vec3 pos, in vec3 nor)
 	for (int i = 0; i < 5; i++)
 	{
 		float h = 0.001 + 0.15 * float(i) / 4.0;
-		float d = scene_dist(pos + h * nor);
-		occ += (h - d) * sca;
+		Distance d = scene_dist(pos + h * nor);
+		occ += (h - d.distance) * sca;
 		sca *= 0.95;
 	}
 	return clamp(1.0 - 1.5 * occ, 0.0, 1.0);
@@ -221,14 +233,14 @@ void main()
 	//vec3 cam_dir = normalize(vec3(sin(uTime), 2.0, cos(uTime)) - cam_pos);
 	vec3 ray_dir = dir;
 
-	float d = ray_march(cam_pos, ray_dir);
+	Distance d = ray_march(cam_pos, ray_dir);
 
-	if (d > 1000.0f) {
+	if (d.distance > 1000.0) {
 		outColor = vec4(0.);
 		return;
 	}
 
-	vec3 lp = cam_pos + d * ray_dir;
+	vec3 lp = cam_pos + d.distance * ray_dir;
 	vec3 normal = get_normal(lp);
 	float lv = 0.;
 
@@ -238,6 +250,23 @@ void main()
 
 	lv += 0.05;
 
-	outColor = vec4(clamp(pow(vec3(0.8, 0.9, 1.0) * lv, 1. / vec3(2.2)), 0, 1), 1.0);
+	vec3 col = vec3(0.);
+	switch (d.materialId) {
+	case 0:
+		col = vec3(0.);
+		break;
+	case 1:
+		col = vec3(192. / 255.);
+		break;
+	case 2:
+		col = vec3(46., 209., 162.) / 255.;
+		break;
+	case 3:
+		col = texture(uTextureGround, lp.xz).rgb;
+		//col = vec3(0.8, 0., 0.);
+		break;
+	}
+
+	outColor = vec4(clamp(pow(col * lv, 1. / vec3(2.2)), 0, 1), 1.0);
 	//outColor = vec4(ray_dir, 1.0);
 }

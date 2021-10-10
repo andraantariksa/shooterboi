@@ -37,6 +37,7 @@ target_include_directories(fps-raymarch PUBLIC
     "extern/glm"
     "extern/entt/single_include"
     "extern/reactphysics3d/include"
+    "extern/stb"
     "extern/soloud/include")
 
 target_link_libraries(fps-raymarch PUBLIC
@@ -47,4 +48,3 @@ target_link_libraries(fps-raymarch PUBLIC
     soloud)
 
 convert_file_to_header_directory("src/shaders" "src/shaders/generated")
-

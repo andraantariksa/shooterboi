@@ -35,7 +35,11 @@ void init(
         registry.get<Transform>(player_entity),
         reactphysics3d::BodyType::DYNAMIC,
         std::vector<std::pair<reactphysics3d::CollisionShape*, reactphysics3d::Transform>> {
-            std::make_pair(physic_common.createCapsuleShape(0.5f, 1.0f), reactphysics3d::Transform()) }
+            std::make_pair(physic_common.createBoxShape(reactphysics3d::Vector3(
+                0.5f,
+                0.5f,
+                0.5f)),
+                reactphysics3d::Transform()) }
     );
 
     auto base_terrain_entity = registry.create();

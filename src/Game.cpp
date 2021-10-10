@@ -13,6 +13,8 @@
 #include <reactphysics3d/reactphysics3d.h>
 #include <soloud.h>
 #include <soloud_wav.h>
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb_image.h>
 
 #include "RenderObjectData.hpp"
 #include "logic/systems/Systems.hpp"
@@ -34,7 +36,8 @@ Game::Game() :
         SDL_WINDOWPOS_CENTERED,
         m_window_size.x,
         m_window_size.y,
-        SDL_WINDOW_OPENGL);
+        SDL_WINDOW_OPENGL |
+        SDL_WINDOW_INPUT_GRABBED);
 
     if (m_window == nullptr) {
         assert(false && "Cannot create window");
@@ -95,9 +98,18 @@ Game::Game() :
 
 Game::~Game()
 {
+    m_registry.each([&](auto& entity) {
+        m_registry.remove_all(entity);
+        m_registry.destroy(entity);
+    });
+
     m_soloud.deinit();
 
     m_physics_common.destroyPhysicsWorld(m_physics_world);
+
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplSDL2_Shutdown();
+    ImGui::DestroyContext();
 
     SDL_GL_DeleteContext(m_window);
     SDL_DestroyWindow(m_window);
@@ -118,6 +130,24 @@ int Game::run()
     //renderobjectdata_buffer[0].m_data.enemies.enemies.m_position = glm::vec3(-2.0f, 0.5f, -2.0f);
     //renderobjectdata_buffer[1].m_type = RenderObjectDataType::Enemy;
     //renderobjectdata_buffer[1].m_data.enemies.enemies.m_position = glm::vec3(-4.0f, 1.5f, -4.0f);
+
+    int width, height, nrChannels;
+    GLuint textures[1];
+    uint8_t* texture_data = stbi_load("../../../assets/texture/ground.jpg", &width, &height, &nrChannels, 0);
+    if (texture_data) {
+        std::cout << "Image loaded\n";
+
+        glGenTextures(1, textures);
+        glBindTexture(GL_TEXTURE_2D, textures[0]);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, texture_data);
+
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glGenerateMipmap(GL_TEXTURE_2D);
+    }
+    stbi_image_free(texture_data);
 
     GLuint fragment_shader_id = glCreateShader(GL_FRAGMENT_SHADER);
     glShaderSource(fragment_shader_id, 1, &MAINPS, nullptr);
@@ -160,6 +190,7 @@ int Game::run()
     float delta_time = 0.f;
     auto start_time = std::chrono::high_resolution_clock::now();
 
+    GLint uniform_location_uTextureGround = glGetUniformLocation(shader_program_handle, "uTextureGround");
     GLint uniform_location_uTime = glGetUniformLocation(shader_program_handle, "uTime");
     GLint uniform_location_uResolution = glGetUniformLocation(shader_program_handle, "uResolution");
     GLint uniform_location_uCameraPosition = glGetUniformLocation(shader_program_handle, "uCameraPosition");
@@ -210,7 +241,13 @@ int Game::run()
         m_soloud.update3dAudio();
         m_physics_world->update(delta_time);
 
-        SDL_SetWindowTitle(m_window, (std::string("FPS") + std::to_string(delta_time)).c_str());
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplSDL2_NewFrame();
+        ImGui::NewFrame();
+
+        ImGui::Begin("Demo window");
+        ImGui::Text("FPS: %f", 1.0f / delta_time);
+        ImGui::End();
 
         // Copy to SSBO
         glBindBuffer(GL_UNIFORM_BUFFER, ssbo_handle);
@@ -219,13 +256,21 @@ int Game::run()
         glUnmapBuffer(GL_UNIFORM_BUFFER);
 
         // Render
+        ImGui::Render();
         glViewport(0, 0, m_window_size.x, m_window_size.y);
         glUseProgram(shader_program_handle);
+        glUniform1i(uniform_location_uTextureGround, 0);
         glUniform2fv(uniform_location_uResolution, 1, glm::value_ptr(reso));
         glUniform3fv(uniform_location_uCameraPosition, 1, glm::value_ptr(camera.m_position));
         glUniform3fv(uniform_location_uCameraDirection, 1, glm::value_ptr(camera.get_direction()));
         glUniform1f(uniform_location_uTime, current_time);
+
+        glActiveTexture(GL_TEXTURE0 + 0);
+        glBindTexture(GL_TEXTURE_2D, textures[0]);
+
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
         SDL_GL_SwapWindow(m_window);
     }
