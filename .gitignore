@@ -33,3 +33,7 @@
 
 .vs/
 out/
+
+# Doxygen generated
+html/
+latex/
