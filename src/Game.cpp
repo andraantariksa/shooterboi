@@ -127,8 +127,6 @@ int Game::run()
     GLuint textures[1];
     uint8_t* texture_data = stbi_load("../../../assets/texture/ground.jpg", &width, &height, &nrChannels, 0);
     if (texture_data) {
-        std::cout << "Image loaded\n";
-
         glGenTextures(1, textures);
         glBindTexture(GL_TEXTURE_2D, textures[0]);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, texture_data);

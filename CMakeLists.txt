@@ -56,3 +56,4 @@ target_link_libraries(fps-raymarch PUBLIC
     soloud)
 
 convert_file_to_header_directory("src/shaders" "src/shaders/generated")
+
