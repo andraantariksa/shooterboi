@@ -19,7 +19,6 @@
 #include "RenderObjectData.hpp"
 #include "logic/systems/Systems.hpp"
 #include "Game.hpp"
-#include "shaders/generated/mainPS.hpp"
 #include "Camera.hpp"
 #include "RenderObjects.hpp"
 
@@ -82,9 +81,9 @@ Game::Game() :
     ImGui_ImplSDL2_InitForOpenGL(m_window, m_ogl_context);
     ImGui_ImplOpenGL3_Init(glsl_version);
 
-    m_physics_world = m_physics_common.createPhysicsWorld();
-    m_physics_world->setIsGravityEnabled(true);
-    m_physics_world->setGravity(reactphysics3d::Vector3(0, -9.81, 0));
+    m_engine.init();
+
+    
     /*m_physics_world->setIsDebugRenderingEnabled(true);
     
     reactphysics3d::DebugRenderer& debugRenderer = m_physics_world->getDebugRenderer();
@@ -92,20 +91,11 @@ Game::Game() :
     debugRenderer.setIsDebugItemDisplayed(reactphysics3d::DebugRenderer::DebugItem::COLLISION_SHAPE, true);
     debugRenderer.setIsDebugItemDisplayed(reactphysics3d::DebugRenderer::DebugItem::CONTACT_POINT, true);
     debugRenderer.setIsDebugItemDisplayed(reactphysics3d::DebugRenderer::DebugItem::CONTACT_NORMAL, true);*/
-
-    m_soloud.init();
 }
 
 Game::~Game()
 {
-    m_registry.each([&](auto& entity) {
-        m_registry.remove_all(entity);
-        m_registry.destroy(entity);
-    });
-
-    m_soloud.deinit();
-
-    m_physics_common.destroyPhysicsWorld(m_physics_world);
+    m_engine.shutdown();
 
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplSDL2_Shutdown();
@@ -124,6 +114,8 @@ int Game::run()
         1.f, -1.f, 0.f,
         1.f, 1.f, 0.f,
     };
+
+
 
     //std::array<RenderObjectData, 100> renderobjectdata_buffer;
     //renderobjectdata_buffer[0].m_type = RenderObjectDataType::Enemy;
@@ -149,13 +141,13 @@ int Game::run()
     }
     stbi_image_free(texture_data);
 
-    GLuint fragment_shader_id = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(fragment_shader_id, 1, &MAINPS, nullptr);
-    glCompileShader(fragment_shader_id);
-
-    GLuint shader_program_handle = glCreateProgram();
-    glAttachShader(shader_program_handle, fragment_shader_id);
-    glLinkProgram(shader_program_handle);
+    //GLuint fragment_shader_id = glCreateShader(GL_FRAGMENT_SHADER);
+    //glShaderSource(fragment_shader_id, 1, &MAINPS, nullptr);
+    //glCompileShader(fragment_shader_id);
+    //
+    //GLuint shader_program_handle = glCreateProgram();
+    //glAttachShader(shader_program_handle, fragment_shader_id);
+    //glLinkProgram(shader_program_handle);
 
     GLuint vertex_array_handle;
     glGenVertexArrays(1, &vertex_array_handle);
@@ -167,6 +159,7 @@ int Game::run()
     glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
     //glBindBuffer(GL_ARRAY_BUFFER, 0);
 
+    /*
     GLuint ssbo_handle;
     glGenBuffers(1, &ssbo_handle);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo_handle);
@@ -176,6 +169,7 @@ int Game::run()
         GL_DYNAMIC_COPY);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, ssbo_handle);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+    */
     
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), nullptr);
     glEnableVertexAttribArray(0);
@@ -190,44 +184,51 @@ int Game::run()
     float delta_time = 0.f;
     auto start_time = std::chrono::high_resolution_clock::now();
 
-    GLint uniform_location_uTextureGround = glGetUniformLocation(shader_program_handle, "uTextureGround");
-    GLint uniform_location_uTime = glGetUniformLocation(shader_program_handle, "uTime");
-    GLint uniform_location_uResolution = glGetUniformLocation(shader_program_handle, "uResolution");
-    GLint uniform_location_uCameraPosition = glGetUniformLocation(shader_program_handle, "uCameraPosition");
-    GLint uniform_location_uCameraDirection = glGetUniformLocation(shader_program_handle, "uCameraDirection");
-
     glm::vec2 reso = m_window_size;
-    init(m_registry, m_soloud, m_physics_world, m_physics_common, m_render_objects);
+    //init(m_registry, m_soloud, m_physics_world, m_physics_common, m_render_objects);
 
     bool running = true;
     while (running) {
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
-            m_input_processor.process(event);
-            if (event.type == SDL_QUIT || (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE)) {
-                running = false;
-            }
-            else if (event.type == SDL_WINDOWEVENT)
-            {
-                if (event.window.type == SDL_WINDOWEVENT_RESIZED)
-                {
+            if (event.type == SDL_WINDOWEVENT) {
+                if (event.window.type == SDL_WINDOWEVENT_RESIZED) {
                     m_window_size.x = event.window.data1;
                     m_window_size.y = event.window.data2;
 
                     reso = m_window_size;
                 }
             }
+            /*
             else if (event.type == SDL_MOUSEMOTION) {
                 float y_offset = event.motion.yrel;
                 float x_offset = event.motion.xrel;
 
                 camera.move_direction(glm::vec2(x_offset, y_offset));
-            }
+            }*/
         }
+        
+        m_input_processor.process(event);
+
+        /*
+        std::cout
+            << m_input_processor.get_mouse_acc().x
+            << " , "
+            << m_input_processor.get_mouse_acc().y
+            << std::endl;
+        */
 
         if (m_input_processor.is_action_key_down(ActionKey::ExitGame)) {
             running = false;
         }
+
+        auto new_time = std::chrono::high_resolution_clock::now();
+        float current_time = std::chrono::duration_cast<std::chrono::duration<float>>(new_time - start_time).count();
+        delta_time = current_time - system_time;
+        system_time = current_time;
+
+
+        /*
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
 
@@ -237,9 +238,9 @@ int Game::run()
         system_time = current_time;
 
         // Update
-        update(m_registry, delta_time, m_input_processor, camera, m_soloud, m_physics_world, m_physics_common, m_render_objects);
-        m_soloud.update3dAudio();
-        m_physics_world->update(delta_time);
+        //update(m_registry, delta_time, m_input_processor, camera, m_soloud, m_physics_world, m_physics_common, m_render_objects);
+        //m_soloud.update3dAudio();
+        //m_physics_world->update(delta_time);
 
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplSDL2_NewFrame();
@@ -250,10 +251,10 @@ int Game::run()
         ImGui::End();
 
         // Copy to SSBO
-        glBindBuffer(GL_UNIFORM_BUFFER, ssbo_handle);
-        void* buff_ptr = glMapBuffer(GL_UNIFORM_BUFFER, GL_WRITE_ONLY);
-        std::memcpy(buff_ptr, m_render_objects.data(), m_render_objects.size());
-        glUnmapBuffer(GL_UNIFORM_BUFFER);
+        //glBindBuffer(GL_UNIFORM_BUFFER, ssbo_handle);
+        //void* buff_ptr = glMapBuffer(GL_UNIFORM_BUFFER, GL_WRITE_ONLY);
+        //std::memcpy(buff_ptr, m_render_objects.data(), m_render_objects.size());
+        //glUnmapBuffer(GL_UNIFORM_BUFFER);
 
         // Render
         ImGui::Render();
@@ -272,14 +273,72 @@ int Game::run()
 
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
+        */
+
+        m_engine.update(delta_time, m_input_processor);
+        m_engine.render_scene(reso);
+        
         SDL_GL_SwapWindow(m_window);
     }
 
-    glDeleteBuffers(1, &ssbo_handle);
+    //glDeleteBuffers(1, &ssbo_handle);
     glDeleteBuffers(1, &vertex_buffer_handle);
     glDeleteBuffers(1, &vertex_array_handle);
-    glDeleteProgram(shader_program_handle);
-    glDeleteShader(fragment_shader_id);
 
     return 0;
+}
+
+void Game::init()
+{
+    /*
+    auto* sound_shoot = new SoLoud::Wav;
+    sound_shoot->load("../../../assets/audio/shoot.wav");
+
+    auto player_entity = registry.create();
+    registry.emplace<Player>(player_entity);
+    registry.emplace<Transform>(player_entity, glm::vec3(-5.0f, 10.0f, -5.0f));
+    registry.emplace<AudioSourceShoot>(player_entity, soloud, std::unique_ptr<SoLoud::AudioSource>(sound_shoot));
+    registry.emplace<AudioSourceShooted>(player_entity, soloud, std::unique_ptr<SoLoud::AudioSource>(sound_shoot));
+    registry.emplace<RigidBody>(
+        player_entity,
+        physic_world,
+        registry.get<Transform>(player_entity),
+        reactphysics3d::BodyType::DYNAMIC,
+        std::vector<std::pair<reactphysics3d::CollisionShape*, reactphysics3d::Transform>> {
+        std::make_pair(physic_common.createBoxShape(reactphysics3d::Vector3(
+            0.5f,
+            0.5f,
+            0.5f)),
+            reactphysics3d::Transform()) }
+    );
+
+    auto base_terrain_entity = registry.create();
+    registry.emplace<Transform>(base_terrain_entity, glm::vec3(0.0f));
+    registry.emplace<RigidBody>(
+        base_terrain_entity,
+        physic_world,
+        registry.get<Transform>(base_terrain_entity),
+        reactphysics3d::BodyType::STATIC,
+        std::vector<std::pair<reactphysics3d::CollisionShape*, reactphysics3d::Transform>> {
+        std::make_pair(
+            physic_common.createBoxShape(reactphysics3d::Vector3(
+                100.0f,
+                0.0001f,
+                100.0f)),
+            reactphysics3d::Transform()) }
+    );
+
+    auto enemy_entity = registry.create();
+    registry.emplace<Transform>(enemy_entity, glm::vec3(0.0f, 5.0f, 0.0f));
+    registry.emplace<RigidBody>(
+        enemy_entity,
+        physic_world,
+        registry.get<Transform>(enemy_entity),
+        reactphysics3d::BodyType::DYNAMIC,
+        std::vector<std::pair<reactphysics3d::CollisionShape*, reactphysics3d::Transform>> {
+        std::make_pair(
+            physic_common.createSphereShape(0.5f),
+            reactphysics3d::Transform()) }
+    );
+    render_objects.create(registry, enemy_entity, RenderObjectDataType::Enemy);*/
 }

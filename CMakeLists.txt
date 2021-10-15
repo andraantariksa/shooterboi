@@ -9,6 +9,7 @@ add_subdirectory(extern/SDL)
 set(SDL2_LIBRARY SDL2::SDL2-static)
 set(SDL2_INCLUDE_DIR "extern/SDL/include")
 
+add_subdirectory(extern/entt)
 add_subdirectory(extern/glad)
 add_subdirectory(extern/reactphysics3d)
 add_subdirectory(extern/soloud/contrib)
@@ -16,34 +17,39 @@ include(cmake/file_to_header.cmake)
 include(cmake/ImGui.cmake)
 
 add_executable(fps-raymarch
+    "src/Camera.hpp"
+    "src/Common.hpp"
+    "src/Engine.cpp"
+    "src/Engine.hpp"
     "src/Game.cpp"
     "src/Game.hpp"
     "src/InputProcessor.cpp"
     "src/InputProcessor.hpp"
-    "src/Main.cpp"
-    "src/logic/systems/Systems.hpp"
-    "src/logic/systems/Systems.cpp"
-    "src/logic/components/Player.hpp"
-    "src/Camera.hpp"
-    "src/Common.hpp"
-    "src/logic/components/RigidBody.hpp"
     "src/logic/components/AudioSource.hpp"
     "src/logic/components/AudioSource3D.hpp"
+    "src/logic/components/Player.hpp"
+    "src/logic/components/RigidBody.hpp"
+    "src/logic/components/Renderable.hpp"
+    "src/logic/components/RenderObject.hpp"
+    "src/logic/custom-components/player/AudioSourceShooted.hpp"
+    "src/logic/systems/Systems.hpp"
+    "src/logic/systems/Systems.cpp"
+    "src/Main.cpp"
     "src/RenderObjectData.hpp"
     "src/RenderObjects.hpp"
-    "src/logic/components/RenderObject.hpp" "src/logic/custom-components/player/AudioSourceShooted.hpp" "src/utils/Converter.hpp"
     "src/Renderer.cpp"
-    "src/Renderer.h")
+    "src/Renderer.hpp"
+    "src/utils/Converter.hpp")
 
+# Some projects don't need to re-add include directories
 target_include_directories(fps-raymarch PUBLIC
     "extern/glm"
-    "extern/entt/single_include"
-    "extern/reactphysics3d/include"
-    "extern/stb"
-    "extern/soloud/include")
+    "extern/soloud/include"
+    "extern/stb")
 
 target_link_libraries(fps-raymarch PUBLIC
     SDL2::SDL2-static
+    EnTT::EnTT
     glad
     imgui
     reactphysics3d

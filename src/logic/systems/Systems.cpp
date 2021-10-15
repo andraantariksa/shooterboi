@@ -21,56 +21,7 @@ void init(
     reactphysics3d::PhysicsWorld* physic_world,
     reactphysics3d::PhysicsCommon& physic_common,
     RenderObjects<100>& render_objects) {
-    auto* sound_shoot = new SoLoud::Wav;
-    sound_shoot->load("../../../assets/audio/shoot.wav");
-
-    auto player_entity = registry.create();
-    registry.emplace<Player>(player_entity);
-    registry.emplace<Transform>(player_entity, glm::vec3(-5.0f, 10.0f, -5.0f));
-    registry.emplace<AudioSourceShoot>(player_entity, soloud, std::unique_ptr<SoLoud::AudioSource>(sound_shoot));
-    registry.emplace<AudioSourceShooted>(player_entity, soloud, std::unique_ptr<SoLoud::AudioSource>(sound_shoot));
-    registry.emplace<RigidBody>(
-        player_entity,
-        physic_world,
-        registry.get<Transform>(player_entity),
-        reactphysics3d::BodyType::DYNAMIC,
-        std::vector<std::pair<reactphysics3d::CollisionShape*, reactphysics3d::Transform>> {
-            std::make_pair(physic_common.createBoxShape(reactphysics3d::Vector3(
-                0.5f,
-                0.5f,
-                0.5f)),
-                reactphysics3d::Transform()) }
-    );
-
-    auto base_terrain_entity = registry.create();
-    registry.emplace<Transform>(base_terrain_entity, glm::vec3(0.0f));
-    registry.emplace<RigidBody>(
-        base_terrain_entity,
-        physic_world,
-        registry.get<Transform>(base_terrain_entity),
-        reactphysics3d::BodyType::STATIC,
-        std::vector<std::pair<reactphysics3d::CollisionShape*, reactphysics3d::Transform>> {
-        std::make_pair(
-            physic_common.createBoxShape(reactphysics3d::Vector3(
-                100.0f,
-                0.0001f,
-                100.0f)),
-            reactphysics3d::Transform()) }
-    );
-
-    auto enemy_entity = registry.create();
-    registry.emplace<Transform>(enemy_entity, glm::vec3(0.0f, 5.0f, 0.0f));
-    registry.emplace<RigidBody>(
-        enemy_entity,
-        physic_world,
-        registry.get<Transform>(enemy_entity),
-        reactphysics3d::BodyType::DYNAMIC,
-        std::vector<std::pair<reactphysics3d::CollisionShape*, reactphysics3d::Transform>> {
-        std::make_pair(
-            physic_common.createSphereShape(0.5f),
-            reactphysics3d::Transform()) }
-    );
-    render_objects.create(registry, enemy_entity, RenderObjectDataType::Enemy);
+    
 }
 
 void update(

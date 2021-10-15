@@ -3,7 +3,8 @@
 
 #include <glm/glm.hpp>
 
-class Camera {
+class Camera
+{
 public:
     const float sensitivity = 0.3f;
 
@@ -15,10 +16,12 @@ public:
     Camera(glm::vec3& position = glm::vec3(0.0f), float yaw = 0.0f, float pitch = 0.0f):
         m_position(position),
         m_yaw(yaw),
-        m_pitch(pitch) {
+        m_pitch(pitch)
+    {
     }
 
-    void move_direction(glm::vec2& offset) {
+    void move_direction(glm::vec2& offset)
+    {
         offset *= sensitivity;
         m_yaw -= offset.x;
         m_pitch -= offset.y;
@@ -26,7 +29,8 @@ public:
         m_pitch = glm::clamp(m_pitch, -89.0f, 89.0f);
     }
 
-    glm::vec3 get_direction_without_pitch() {
+    glm::vec3 get_direction_without_pitch()
+    {
         glm::vec3 direction;
         direction.x = std::cos(glm::radians(m_yaw));
         direction.y = 0.0f;
@@ -35,7 +39,8 @@ public:
         return glm::normalize(direction);
     }
 
-    glm::vec3 get_direction() {
+    glm::vec3 get_direction()
+    {
         glm::vec3 direction;
         direction.x = std::cos(glm::radians(m_yaw)) * std::cos(glm::radians(m_pitch));
         direction.y = std::sin(glm::radians(m_pitch));

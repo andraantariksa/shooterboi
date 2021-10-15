@@ -10,6 +10,7 @@
 #include "Common.hpp"
 #include "InputProcessor.hpp"
 #include "RenderObjects.hpp"
+#include "Engine.hpp"
 
 class Game
 {
@@ -25,12 +26,7 @@ private:
     SDL_GLContext m_ogl_context;
 
     InputProcessor m_input_processor;
+    Engine m_engine;
 
-    reactphysics3d::PhysicsCommon m_physics_common;
-    reactphysics3d::PhysicsWorld* m_physics_world;
-
-    RenderObjects<100> m_render_objects;
-
-    SoLoud::Soloud m_soloud;
-    entt::registry m_registry;
+    void init();
 };

@@ -1,9 +1,11 @@
 #include "InputProcessor.hpp"
+#include <iostream>
 
 InputProcessor::InputProcessor() :
     m_keyboard_state(nullptr),
     m_num_keys(0),
-    m_mouse_moving(false)
+    m_mouse_moving(false),
+    m_mouse_btn_state(0)
 {
 }
 
@@ -16,27 +18,21 @@ void InputProcessor::init()
     m_keyboard_state = SDL_GetKeyboardState(&m_num_keys);
 }
 
-bool InputProcessor::is_mouse_pressed(MouseButton mouse_button) const {
-    return m_mouse_pressed_state[static_cast<uint8_t>(mouse_button)];
+bool InputProcessor::is_mouse_pressed(uint32_t mouse_button) const {
+    return (m_mouse_btn_state & mouse_button) > 0;
 }
 
 void InputProcessor::process(const SDL_Event& event)
 {
-    if (event.type == SDL_MOUSEBUTTONDOWN) {
-        m_mouse_pressed_state[event.button.button] = static_cast<uint8_t>(true);
-    }
-    else if (event.type == SDL_MOUSEBUTTONUP) {
-        m_mouse_pressed_state[event.button.button] = static_cast<uint8_t>(false);
-    }
+    static constexpr float smoothness = 0.6f;
+    int x, y;
+    glm::vec2 old_acc = m_mouse_acc;
 
-    m_mouse_acc = glm::vec2(0.0f);
-
-    if (event.type == SDL_MOUSEMOTION) {
-        glm::vec2 old(m_mouse_pos);
-        m_mouse_pos.x = (float)event.motion.x;
-        m_mouse_pos.y = (float)event.motion.y;
-        m_mouse_acc = m_mouse_pos - old;
-    }
+    m_mouse_btn_state = SDL_GetRelativeMouseState(&x, &y);
+    
+    // Add low-pass filter for smooth movement
+    m_mouse_acc.x = (std::abs((float)x - old_acc.x) > 0.001f) ? ((float)x * smoothness + old_acc.x * smoothness) : 0.0f;
+    m_mouse_acc.y = (std::abs((float)y - old_acc.y) > 0.001f) ? ((float)y * smoothness + old_acc.y * smoothness) : 0.0f;
 }
 
 bool InputProcessor::is_action_key_down(ActionKey action_key) const
@@ -49,24 +45,9 @@ bool InputProcessor::is_action_key_down(ActionKey action_key) const
     return m_keyboard_state[g_action_key_tbl[action_key_id]];
 }
 
-bool InputProcessor::is_any_mousebtn_clicked(uint8_t mouse_btn) const
-{
-    return false;
-}
-
-bool InputProcessor::is_any_mousebtn_down(uint8_t mouse_btn) const
-{
-    return false;
-}
-
-bool InputProcessor::is_any_mousebtn_up(uint8_t mouse_btn) const
-{
-    return false;
-}
-
 bool InputProcessor::is_mouse_moving() const
 {
-    return false;
+    return (std::abs(m_mouse_acc.x) > 0) || (std::abs(m_mouse_acc.y) > 0);
 }
 
 SDL_Scancode InputProcessor::g_action_key_tbl[InputProcessor::g_num_action_key] = {
