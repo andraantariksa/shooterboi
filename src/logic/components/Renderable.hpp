@@ -15,21 +15,14 @@ enum class ShapeType
     None,
     Sphere,
     Box,
-    Gun
-};
-
-enum class ShapeOperator
-{
-    Union,
-    Intersect,
-    Subtract
+    Gun,
+    CapsuleLine
 };
 
 struct Renderable
 {
     RenderObjectType type;
     ShapeType shape_type;
-    ShapeOperator shape_op;
     glm::vec3 color;
 
     union
@@ -37,22 +30,27 @@ struct Renderable
         struct
         {
             float radius;
-        } sh_sphere;
+        } shape_sphere;
+
+        struct
+        {
+            float radius;
+            glm::vec3 from;
+            glm::vec3 to;
+        } shape_capsule_line;
 
         struct
         {
             glm::vec3 size;
-        } sh_box;
+        } shape_box;
     };
 
     Renderable(
         RenderObjectType type,
         ShapeType shape_type,
-        ShapeOperator shape_op,
         const glm::vec3& color) :
         type(type),
         shape_type(shape_type),
-        shape_op(shape_op),
         color(color)
     {
     }

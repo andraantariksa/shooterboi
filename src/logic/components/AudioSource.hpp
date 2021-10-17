@@ -5,18 +5,23 @@
 #include <soloud_wav.h>
 #include <memory>
 
+#include "../../Engine.hpp"
+
 class AudioSource {
-protected:
-    std::unique_ptr<SoLoud::AudioSource> m_source;
+private:
+    AudioResourceID m_resource_id;
 public:
-    AudioSource(SoLoud::Soloud& soloud, std::unique_ptr<SoLoud::AudioSource>& source, bool play_on_start = false) :
-        m_source(std::move(source)) {
+    AudioSource(Engine& engine, AudioResourceID resource_id, bool play_on_start = false) :
+        m_resource_id(resource_id) {
         if (play_on_start) {
-            soloud.play(*m_source);
+            engine.get_soloud().play(*engine.get_audio_resources(m_resource_id));
         }
     }
 
-    inline void play(SoLoud::Soloud& soloud) { soloud.play(*m_source); }
+    inline void play(Engine& engine)
+    {
+        engine.get_soloud().play(*engine.get_audio_resources(m_resource_id));
+    }
 };
 
 #endif

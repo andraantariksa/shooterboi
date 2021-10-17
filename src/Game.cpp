@@ -22,8 +22,7 @@
 #include "Camera.hpp"
 #include "RenderObjects.hpp"
 
-Game::Game() :
-    m_window(nullptr) {
+Game::Game() {
     if (SDL_Init(SDL_INIT_EVERYTHING) < 0) {
         std::cout << SDL_GetError() << '\n';
         assert(false && "Cannot initialize SDL");
@@ -35,8 +34,7 @@ Game::Game() :
         SDL_WINDOWPOS_CENTERED,
         m_window_size.x,
         m_window_size.y,
-        SDL_WINDOW_OPENGL |
-        SDL_WINDOW_INPUT_GRABBED);
+        SDL_WINDOW_OPENGL);
 
     if (m_window == nullptr) {
         assert(false && "Cannot create window");
@@ -74,9 +72,8 @@ Game::Game() :
 
     SDL_GL_SetSwapInterval(1);
 
+    IMGUI_CHECKVERSION();
     ImGui::CreateContext();
-    ImGuiIO& io = ImGui::GetIO();
-    (void)io;
 
     ImGui_ImplSDL2_InitForOpenGL(m_window, m_ogl_context);
     ImGui_ImplOpenGL3_Init(glsl_version);
@@ -174,8 +171,6 @@ int Game::run()
 
     glBindVertexArray(vertex_array_handle);
 
-    SDL_SetRelativeMouseMode(SDL_TRUE);
-
     Camera camera(glm::vec3(8.0f, 3.0f, -8.0f));
 
     float system_time = 0.f;
@@ -225,56 +220,18 @@ int Game::run()
         delta_time = current_time - system_time;
         system_time = current_time;
 
-
-        /*
-        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT);
-
-        auto new_time = std::chrono::high_resolution_clock::now();
-        float current_time = std::chrono::duration_cast<std::chrono::duration<float>>(new_time - start_time).count();
-        delta_time = current_time - system_time;
-        system_time = current_time;
-
-        // Update
-        //update(m_registry, delta_time, m_input_processor, camera, m_soloud, m_physics_world, m_physics_common, m_render_objects);
-        //m_soloud.update3dAudio();
-        //m_physics_world->update(delta_time);
-
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplSDL2_NewFrame();
         ImGui::NewFrame();
 
-        ImGui::Begin("Demo window");
+        ImGui::Begin("Demo window", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
         ImGui::Text("FPS: %f", 1.0f / delta_time);
         ImGui::End();
 
-        // Copy to SSBO
-        //glBindBuffer(GL_UNIFORM_BUFFER, ssbo_handle);
-        //void* buff_ptr = glMapBuffer(GL_UNIFORM_BUFFER, GL_WRITE_ONLY);
-        //std::memcpy(buff_ptr, m_render_objects.data(), m_render_objects.size());
-        //glUnmapBuffer(GL_UNIFORM_BUFFER);
-
-        // Render
-        ImGui::Render();
-        glViewport(0, 0, m_window_size.x, m_window_size.y);
-        glUseProgram(shader_program_handle);
-        glUniform1i(uniform_location_uTextureGround, 0);
-        glUniform2fv(uniform_location_uResolution, 1, glm::value_ptr(reso));
-        glUniform3fv(uniform_location_uCameraPosition, 1, glm::value_ptr(camera.m_position));
-        glUniform3fv(uniform_location_uCameraDirection, 1, glm::value_ptr(camera.get_direction()));
-        glUniform1f(uniform_location_uTime, current_time);
-
-        glActiveTexture(GL_TEXTURE0 + 0);
-        glBindTexture(GL_TEXTURE_2D, textures[0]);
-
-        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+        m_engine.update(delta_time, m_input_processor, running, m_window);
+        m_engine.render_scene(delta_time, reso);
 
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-
-        */
-
-        m_engine.update(delta_time, m_input_processor);
-        m_engine.render_scene(reso);
         
         SDL_GL_SwapWindow(m_window);
     }

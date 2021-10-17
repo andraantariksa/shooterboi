@@ -22,7 +22,7 @@ public:
 
 private:
     glm::ivec2 m_window_size{ 1280, 720 };
-    SDL_Window* m_window;
+    SDL_Window* m_window = nullptr;
     SDL_GLContext m_ogl_context;
 
     InputProcessor m_input_processor;

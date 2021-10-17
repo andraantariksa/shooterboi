@@ -15,9 +15,9 @@ struct alignas(16) RenderQueueData
     alignas(16) glm::vec3 rotation;
     alignas(16) glm::vec3 color;
     alignas(16) glm::vec4 shape_data;
+    alignas(16) glm::vec4 shape_data2;
     RenderObjectType type;
     ShapeType shape_type;
-    ShapeOperator shape_op;
 };
 
 struct alignas(16) RenderingInfo
@@ -50,12 +50,15 @@ public:
         float time,
         const glm::vec2& resolution,
         const glm::vec3& cam_pos,
-        const glm::vec3& cam_dir);
+        const glm::vec3& cam_dir,
+        bool render_game);
 
     void shutdown();
 
 private:
-    GLuint m_program                            = 0;
+    bool m_render_game = false;
+    GLuint m_main_program                       = 0;
+    GLuint m_player_view_program                = 0;
     GLuint m_render_queue_ssbo                  = 0;
     GLuint m_rendering_info_ubo                 = 0;
 

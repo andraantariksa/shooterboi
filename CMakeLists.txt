@@ -39,7 +39,7 @@ add_executable(fps-raymarch
     "src/RenderObjects.hpp"
     "src/Renderer.cpp"
     "src/Renderer.hpp"
-    "src/utils/Converter.hpp")
+    "src/utils/Converter.hpp" "src/logic/components/Enemy.hpp" "src/logic/components/GameMusic.hpp" "src/ShootRaycast.hpp" "src/logic/components/SelfDestruct.hpp")
 
 # Some projects don't need to re-add include directories
 target_include_directories(fps-raymarch PUBLIC
@@ -56,4 +56,3 @@ target_link_libraries(fps-raymarch PUBLIC
     soloud)
 
 convert_file_to_header_directory("src/shaders" "src/shaders/generated")
-

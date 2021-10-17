@@ -5,10 +5,17 @@
 #include <soloud.h>
 #include <soloud_wav.h>
 #include <vector>
+#include <imgui.h>
 
 #include "RenderObjects.hpp"
 #include "InputProcessor.hpp"
 #include "Renderer.hpp"
+
+enum class GameState
+{
+    MainMenu,
+    Game
+};
 
 using AudioResourceID = uint32_t;
 
@@ -20,10 +27,11 @@ public:
 
     void init();
     AudioResourceID load_audio_resource(const char* path);
-    void update(float dt, const InputProcessor& input_processor);
-    void render_scene(const glm::vec2& resolution);
+    void update(float delta_time, const InputProcessor& input_processor, bool& running, SDL_Window* window);
+    void render_scene(float delta_time, const glm::vec2& resolution);
     void shutdown();
-
+    SoLoud::Soloud& get_soloud() { return m_soloud; }
+    SoLoud::AudioSource* get_audio_resources(AudioResourceID id) { return m_audio_resources[id]; }
 private:
     reactphysics3d::PhysicsCommon m_physics_common;
     reactphysics3d::PhysicsWorld* m_physics_world;
@@ -38,4 +46,6 @@ private:
     Renderer m_renderer;
 
     RenderObjects<100> m_render_objects{};
+
+    GameState m_game_state = GameState::Game;
 };

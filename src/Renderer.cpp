@@ -1,5 +1,9 @@
+#include <imgui.h>
+
 #include "Renderer.hpp"
-#include "shaders/generated/mainPS.hpp"
+#include "shaders/generated/MainPS.hpp"
+#include "shaders/generated/PlayerViewPS.hpp"
+
 
 static const char* vs_shader_source =
 R"(
@@ -86,30 +90,75 @@ void Renderer::init()
         assert(false);
     }
 
-    // create program
-    m_program = glCreateProgram();
-    glAttachShader(m_program, full_screen_vs);
-    glAttachShader(m_program, full_screen_fs);
-    glLinkProgram(m_program);
-    glGetProgramiv(m_program, GL_LINK_STATUS, &status);
+    GLuint full_screen_fs_2 = glCreateShader(GL_FRAGMENT_SHADER);
+    glShaderSource(full_screen_fs_2, 1, &PLAYERVIEWPS, nullptr);
+    glCompileShader(full_screen_fs_2);
+    glGetShaderiv(full_screen_fs_2, GL_COMPILE_STATUS, &status);
 
+    // check errors
     if (status == GL_FALSE) {
         GLint info_length;
         GLint ret_length;
-        glGetProgramiv(full_screen_fs, GL_INFO_LOG_LENGTH, &info_length);
+        glGetShaderiv(full_screen_fs_2, GL_INFO_LOG_LENGTH, &info_length);
 
         char* err = new char[info_length];
         assert(err != nullptr);
 
-        glGetProgramInfoLog(full_screen_fs, info_length, &ret_length, err);
+        glGetShaderInfoLog(full_screen_fs_2, info_length, &ret_length, err);
         std::cout << err << std::endl;
-        delete err;
+        delete[] err;
         assert(false);
+    }
+
+    // create program
+    m_main_program = glCreateProgram();
+    glAttachShader(m_main_program, full_screen_vs);
+    glAttachShader(m_main_program, full_screen_fs);
+    glLinkProgram(m_main_program);
+    glGetProgramiv(m_main_program, GL_LINK_STATUS, &status);
+
+    if (status == GL_FALSE) {
+        GLint info_length;
+        GLint ret_length;
+
+        glGetProgramiv(full_screen_fs, GL_INFO_LOG_LENGTH, &info_length);
+        if (info_length > 0) {
+            char* err = new char[info_length];
+            assert(err != nullptr);
+
+            glGetProgramInfoLog(full_screen_fs, info_length, &ret_length, err);
+            std::cout << err << std::endl;
+            delete err;
+            assert(false);
+        }
+    }
+
+    m_player_view_program = glCreateProgram();
+    glAttachShader(m_player_view_program, full_screen_vs);
+    glAttachShader(m_player_view_program, full_screen_fs_2);
+    glLinkProgram(m_player_view_program);
+    glGetProgramiv(m_player_view_program, GL_LINK_STATUS, &status);
+
+    if (status == GL_FALSE) {
+        GLint info_length;
+        GLint ret_length;
+
+        glGetProgramiv(full_screen_fs_2, GL_INFO_LOG_LENGTH, &info_length);
+        if (info_length > 0) {
+            char* err = new char[info_length];
+            assert(err != nullptr);
+
+            glGetProgramInfoLog(full_screen_fs_2, info_length, &ret_length, err);
+            std::cout << err << std::endl;
+            delete err;
+            assert(false);
+        }
     }
 
     // we don't need these anymore
     glDeleteShader(full_screen_vs);
     glDeleteShader(full_screen_fs);
+    glDeleteShader(full_screen_fs_2);
 
     // initialize render queue SSBO
     glGenBuffers(1, &m_render_queue_ssbo);
@@ -146,12 +195,21 @@ void Renderer::submit(const Transform& transform, const Renderable& renderable)
     current_data->position = transform.m_position;
     current_data->type = renderable.type;
     current_data->shape_type = renderable.shape_type;
-    current_data->shape_op = renderable.shape_op;
     current_data->color = renderable.color;
     
     switch (renderable.shape_type) {
         case ShapeType::Sphere:
-            current_data->shape_data.x = renderable.sh_sphere.radius;
+            current_data->shape_data.x = renderable.shape_sphere.radius;
+            break;
+        case ShapeType::CapsuleLine:
+            current_data->shape_data.x = renderable.shape_capsule_line.from.x;
+            current_data->shape_data.y = renderable.shape_capsule_line.from.y;
+            current_data->shape_data.z = renderable.shape_capsule_line.from.z;
+            current_data->shape_data.w = renderable.shape_capsule_line.radius;
+
+            current_data->shape_data2.x = renderable.shape_capsule_line.to.x;
+            current_data->shape_data2.y = renderable.shape_capsule_line.to.y;
+            current_data->shape_data2.z = renderable.shape_capsule_line.to.z;
             break;
         default:
             assert(false);
@@ -169,32 +227,40 @@ void Renderer::render(
     float time,
     const glm::vec2& resolution,
     const glm::vec3& cam_pos,
-    const glm::vec3& cam_dir)
+    const glm::vec3& cam_dir,
+    bool render_game)
 {
-    glBindBuffer(GL_UNIFORM_BUFFER, m_rendering_info_ubo);
-    RenderingInfo* rendering_info = (RenderingInfo*)glMapBuffer(GL_UNIFORM_BUFFER, GL_WRITE_ONLY);
-    rendering_info->reso_time.x = resolution.x;
-    rendering_info->reso_time.y = resolution.y;
-    rendering_info->reso_time.z = time;
-    rendering_info->cam_pos.x = cam_pos.x;
-    rendering_info->cam_pos.y = cam_pos.y;
-    rendering_info->cam_pos.z = cam_pos.z;
-    rendering_info->cam_dir.x = cam_dir.x;
-    rendering_info->cam_dir.y = cam_dir.y;
-    rendering_info->cam_dir.z = cam_dir.z;
-    rendering_info->queue_count = m_render_queue_pos;
-    glUnmapBuffer(GL_UNIFORM_BUFFER);
+    if (render_game) {
+        glBindBuffer(GL_UNIFORM_BUFFER, m_rendering_info_ubo);
+        RenderingInfo* rendering_info = (RenderingInfo*)glMapBuffer(GL_UNIFORM_BUFFER, GL_WRITE_ONLY);
+        rendering_info->reso_time.x = resolution.x;
+        rendering_info->reso_time.y = resolution.y;
+        rendering_info->reso_time.z = time;
+        rendering_info->cam_pos.x = cam_pos.x;
+        rendering_info->cam_pos.y = cam_pos.y;
+        rendering_info->cam_pos.z = cam_pos.z;
+        rendering_info->cam_dir.x = cam_dir.x;
+        rendering_info->cam_dir.y = cam_dir.y;
+        rendering_info->cam_dir.z = cam_dir.z;
+        rendering_info->queue_count = m_render_queue_pos;
+        glUnmapBuffer(GL_UNIFORM_BUFFER);
+    }
 
+    ImGui::Render();
     glViewport(0, 0, (GLint)resolution.x, (GLint)resolution.y);
-    glClearColor(1.0f, 0.0f, 0.0f, 1.0f);
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
-    glUseProgram(m_program);
-    glDrawArrays(GL_TRIANGLES, 0, 3);
+    if (render_game) {
+        glUseProgram(m_main_program);
+        glDrawArrays(GL_TRIANGLES, 0, 3);
+        glUseProgram(m_player_view_program);
+        glDrawArrays(GL_TRIANGLES, 0, 3);
+    }
 }
 
 void Renderer::shutdown()
 {
     glDeleteBuffers(1, &m_render_queue_ssbo);
     glDeleteBuffers(1, &m_rendering_info_ubo);
-    glDeleteProgram(m_program);
+    glDeleteProgram(m_main_program);
 }

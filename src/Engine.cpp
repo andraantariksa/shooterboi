@@ -5,14 +5,21 @@
 #include "logic/components/Player.hpp"
 #include "logic/components/Collider.hpp"
 #include "logic/components/RigidBody.hpp"
+#include "logic/components/Enemy.hpp"
 #include "logic/custom-components/player/AudioSourceShoot.hpp"
 #include "logic/custom-components/player/AudioSourceShooted.hpp"
 #include "utils/Converter.hpp"
+#include "logic/components/GameMusic.hpp"
+#include "logic/components/SelfDestruct.hpp"
+#include "ShootRaycast.hpp"
 
+#include <imgui.h>
 #include <random>
+#include "Game.hpp"
 
 Engine::Engine() :
-    m_physics_world(nullptr)
+    m_physics_world(nullptr),
+    m_audio_res_id_counter(0)
 {
 }
 
@@ -32,58 +39,105 @@ void Engine::init()
     //auto* sound_shoot = new SoLoud::Wav;
     //sound_shoot->load("../../../assets/audio/shoot.wav");
 
-    m_player_entity = m_registry.create();
-    m_registry.emplace<Player>(m_player_entity);
-    m_registry.emplace<Transform>(m_player_entity, glm::vec3(0.0f, 3.0f, -3.0f));
-    //m_registry.emplace<AudioSourceShoot>(m_player_entity, m_soloud, std::unique_ptr<SoLoud::AudioSource>(sound_shoot));
-    //m_registry.emplace<AudioSourceShooted>(m_player_entity, m_soloud, std::unique_ptr<SoLoud::AudioSource>(sound_shoot));
-    m_registry.emplace<RigidBody>(
-        m_player_entity,
-        m_physics_world,
-        m_registry.get<Transform>(m_player_entity),
-        reactphysics3d::BodyType::DYNAMIC,
-        std::vector<std::pair<reactphysics3d::CollisionShape*, reactphysics3d::Transform>> {
-        std::make_pair(m_physics_common.createBoxShape(reactphysics3d::Vector3(
-            0.5f,
-            0.5f,
-            0.5f)),
-            reactphysics3d::Transform()) }
-    );
+    auto game_manager_entity = m_registry.create();
+    m_registry.emplace<GameMusic>(
+        game_manager_entity,
+        *this,
+        load_audio_resource("../../../assets/audio/deadship.ogg"),
+        load_audio_resource("../../../assets/audio/deadship.ogg"));
 
-    /*
-    auto base_terrain_entity = m_registry.create();
-    m_registry.emplace<Transform>(base_terrain_entity, glm::vec3(0.0f));
+    {
+        m_player_entity = m_registry.create();
+        m_registry.emplace<Player>(m_player_entity);
+        m_registry.emplace<Transform>(m_player_entity, glm::vec3(0.0f, 3.0f, -3.0f));
+        //m_registry.emplace<AudioSourceShoot>(m_player_entity, m_soloud, std::unique_ptr<SoLoud::AudioSource>(sound_shoot));
+        //m_registry.emplace<AudioSourceShooted>(m_player_entity, m_soloud, std::unique_ptr<SoLoud::AudioSource>(sound_shoot));
+        m_registry.emplace<RigidBody>(
+            m_player_entity,
+            m_physics_world,
+            m_registry.get<Transform>(m_player_entity),
+            reactphysics3d::BodyType::DYNAMIC,
+            std::vector<std::pair<reactphysics3d::CollisionShape*, reactphysics3d::Transform>> {
+            std::make_pair(m_physics_common.createBoxShape(reactphysics3d::Vector3(
+                0.5f,
+                0.5f,
+                0.5f)),
+                reactphysics3d::Transform()) }
+        );
+        m_registry.emplace<AudioSourceShoot>(m_player_entity, *this, load_audio_resource("../../../assets/audio/shoot.wav"));
+
+        auto& player_rigidbody = m_registry.get<RigidBody>(m_player_entity);
+        player_rigidbody.getCollider(0)->getMaterial().setBounciness(0.0f);
+    }
+
+    auto ground_entity = m_registry.create();
+    m_registry.emplace<Transform>(ground_entity, glm::vec3(0.0f));
     m_registry.emplace<RigidBody>(
-        base_terrain_entity,
+        ground_entity,
         m_physics_world,
-        m_registry.get<Transform>(base_terrain_entity),
+        m_registry.get<Transform>(ground_entity),
         reactphysics3d::BodyType::STATIC,
         std::vector<std::pair<reactphysics3d::CollisionShape*, reactphysics3d::Transform>> {
-        std::make_pair(
-            m_physics_common.createBoxShape(reactphysics3d::Vector3(
-                100.0f,
-                0.0001f,
-                100.0f)),
+        std::make_pair(m_physics_common.createBoxShape(reactphysics3d::Vector3(
+            100.0f,
+            0.0001f,
+            100.0f)),
             reactphysics3d::Transform()) }
     );
-    */
+
+    {
+        auto enemy_entity = m_registry.create();
+        m_registry.emplace<Enemy>(enemy_entity);
+        m_registry.emplace<Transform>(enemy_entity, glm::vec3(0.0f, 3.0f, 0.0f));
+        m_registry.emplace<Renderable>(
+            enemy_entity,
+            RenderObjectType::Object,
+            ShapeType::Sphere,
+            glm::vec3(glm::vec3(46.f, 209.f, 162.f) / 255.f));
+        m_registry.emplace<RigidBody>(
+            enemy_entity,
+            m_physics_world,
+            m_registry.get<Transform>(enemy_entity),
+            reactphysics3d::BodyType::DYNAMIC,
+            std::vector<std::pair<reactphysics3d::CollisionShape*, reactphysics3d::Transform>> {
+            std::make_pair(m_physics_common.createBoxShape(reactphysics3d::Vector3(
+                0.5f,
+                0.5f,
+                0.5f)),
+                reactphysics3d::Transform()) }
+        );
+
+        auto& rigid_body = m_registry.get<RigidBody>(enemy_entity);
+        rigid_body.getRigidBody()->setUserData(new RigidBodyData{ RigidBodyType::Enemy, enemy_entity });
+
+        auto& enemy_renderable = m_registry.get<Renderable>(enemy_entity);
+        enemy_renderable.shape_sphere.radius = 0.5f;
+    }
+
 
     std::mt19937 gen;
-    std::uniform_real_distribution<float> dis(1.0f, 10.0f);
-
+    std::uniform_real_distribution<float> dis(1.0f, 5.0f);
     for (uint32_t i = 0; i < 10; i++) {
         auto test_sphere = m_registry.create();
-        m_registry.emplace<Transform>(test_sphere, glm::vec3(dis(gen), dis(gen), dis(gen)));
+        m_registry.emplace<Transform>(test_sphere, glm::vec3(dis(gen), 2.0f, dis(gen)));
         m_registry.emplace<Renderable>(
             test_sphere,
             RenderObjectType::Object,
             ShapeType::Sphere,
-            ShapeOperator::Union,
             glm::vec3(glm::vec3(46.f, 209.f, 162.f) / 255.f));
+        m_registry.emplace<RigidBody>(
+            test_sphere,
+            m_physics_world,
+            m_registry.get<Transform>(test_sphere),
+            reactphysics3d::BodyType::DYNAMIC,
+            std::vector<std::pair<reactphysics3d::CollisionShape*, reactphysics3d::Transform>> {
+            std::make_pair(m_physics_common.createSphereShape(0.5f),
+                reactphysics3d::Transform()) }
+        );
 
         // set shape data
         auto& test_sphere_renderable = m_registry.get<Renderable>(test_sphere);
-        test_sphere_renderable.sh_sphere.radius = 0.5f;
+        test_sphere_renderable.shape_sphere.radius = 0.5f;
     }
     
     /*
@@ -99,6 +153,11 @@ void Engine::init()
             m_physics_common.createSphereShape(0.5f),
             reactphysics3d::Transform()) }
     );*/
+
+    auto& imgui_io = ImGui::GetIO();
+    imgui_io.FontGlobalScale = 2.0f;
+    auto& imgui_style = ImGui::GetStyle();
+    imgui_style.ScaleAllSizes(2.0f);
 }
 
 AudioResourceID Engine::load_audio_resource(const char* path)
@@ -109,181 +168,199 @@ AudioResourceID Engine::load_audio_resource(const char* path)
     return m_audio_res_id_counter++;
 }
 
-void Engine::update(float dt, const InputProcessor& input_processor)
+void Engine::update(float delta_time, const InputProcessor& input_processor, bool& running, SDL_Window* window)
 {
-    //auto camera_direction = camera.get_direction();
+    ImGuiIO& imgui_io = ImGui::GetIO();
+    switch (m_game_state) {
+    case GameState::Game:
+    {
+        SDL_SetRelativeMouseMode(SDL_TRUE);
+        //auto camera_direction = camera.get_direction();
     //auto camera_direction_horizontal = camera.get_direction_without_pitch();
 
-    // update player movement
-    {
-        auto& transform = m_registry.get<Transform>(m_player_entity);
-        auto& rigid_body = m_registry.get<RigidBody>(m_player_entity);
-        auto& player = m_registry.get<Player>(m_player_entity);
+        {
+            auto collider_view = m_registry.view<RigidBody, Transform>();
+            for (const auto& entity : collider_view) {
+                auto& transform = collider_view.get<Transform>(entity);
+                auto& collider = collider_view.get<RigidBody>(entity);
 
-        if (input_processor.is_mouse_moving()) {
-            player.move_direction(input_processor.get_mouse_acc());
-        }
-
-        auto camera_direction_horizontal = player.get_direction();
-
-        if (input_processor.is_action_key_down(ActionKey::MoveForward)) {
-            transform.m_position += camera_direction_horizontal * 3.0f * dt;
-        }
-        else if (input_processor.is_action_key_down(ActionKey::MoveBackward)) {
-            transform.m_position -= camera_direction_horizontal * 3.0f * dt;
-        }
-
-        if (input_processor.is_action_key_down(ActionKey::MoveRight)) {
-            transform.m_position += glm::normalize(glm::cross(glm::vec3(0.0f, 1.0f, 0.0f), camera_direction_horizontal)) * 3.0f * dt;
-        }
-        else if (input_processor.is_action_key_down(ActionKey::MoveLeft)) {
-            transform.m_position -= glm::normalize(glm::cross(glm::vec3(0.0f, 1.0f, 0.0f), camera_direction_horizontal)) * 3.0f * dt;
-        }
-    }
-
-    /*
-    auto player_view = m_registry.view<Player, Transform, RigidBody>();
-    for (const auto& entity : player_view) {
-        auto& transform = player_view.get<Transform>(entity);
-        auto& rigid_body = player_view.get<RigidBody>(entity);
-        auto& player = player_view.get<Player>(entity);
-
-        auto camera_direction_horizontal = player.get_direction_without_pitch();
-
-        if (input_processor.is_action_key_down(ActionKey::MoveForward)) {
-            transform.m_position += camera_direction_horizontal * 3.0f * dt;
-        }
-        else if (input_processor.is_action_key_down(ActionKey::MoveBackward)) {
-            transform.m_position -= camera_direction_horizontal * 3.0f * dt;
-        }
-
-        if (input_processor.is_action_key_down(ActionKey::MoveRight)) {
-            transform.m_position += glm::cross(glm::vec3(0.0f, 1.0f, 0.0f), camera_direction_horizontal) * 3.0f * dt;
-        }
-        else if (input_processor.is_action_key_down(ActionKey::MoveLeft)) {
-            transform.m_position -= glm::cross(glm::vec3(0.0f, 1.0f, 0.0f), camera_direction_horizontal) * 3.0f * dt;
-        }
-
-        if (input_processor.is_action_key_down(ActionKey::Jump)) {
-            rigid_body.getRigidBody()->setLinearVelocity(reactphysics3d::Vector3(0.0f, 5.0f, 0.0f));
-        }
-
-        //camera.m_position = transform.m_position;
-    }*/
-
-    /*
-    {
-        auto collider_view = m_registry.view<RigidBody, Transform>();
-        for (const auto& entity : collider_view) {
-            auto& transform = collider_view.get<Transform>(entity);
-            auto& collider = collider_view.get<RigidBody>(entity);
-
-            const auto& collider_transform = collider.getTransform();
-            const auto& collider_position = collider_transform.getPosition();
-            transform.m_position = glm::vec3(collider_position.x, collider_position.y, collider_position.z);
-        }
-    }
-
-    {
-        auto collider_view = m_registry.view<Collider, Transform>();
-        for (const auto& entity : collider_view) {
-            auto& transform = collider_view.get<Transform>(entity);
-            auto& collider = collider_view.get<Collider>(entity);
-
-            const auto& collider_transform = collider.getTransform();
-            const auto& collider_position = collider_transform.getPosition();
-            transform.m_position = glm::vec3(collider_position.x, collider_position.y, collider_position.z);
-        }
-    }
-
-    auto player_shoot_audio_view = m_registry.view<Player, Transform, AudioSourceShoot, AudioSourceShooted>();
-    for (const auto& entity : player_shoot_audio_view) {
-        auto& audio_shoot = player_shoot_audio_view.get<AudioSourceShoot>(entity);
-        auto& audio_shooted = player_shoot_audio_view.get<AudioSourceShooted>(entity);
-        auto& transform = player_shoot_audio_view.get<Transform>(entity);
-        if (input_processor.is_mouse_pressed(MouseButton::Left)) {
-            audio_shoot.play(m_soloud);
-
-            glm::vec3 ray_from = transform.m_position;
-
-            class MyCallbackClass : public reactphysics3d::RaycastCallback {
-            public:
-                virtual reactphysics3d::decimal notifyRaycastHit(const reactphysics3d::RaycastInfo& info) {
-                    // Display the world hit point coordinates 
-                    std::cout << "Hit point : " <<
-                        info.worldPoint.x <<
-                        info.worldPoint.y <<
-                        info.worldPoint.z <<
-                        std::endl;
-
-                    std::cout << "Object pos " <<
-                        info.body->getTransform().getPosition().x <<
-                        info.body->getTransform().getPosition().y <<
-                        info.body->getTransform().getPosition().z << std::endl;
-
-                    // Return a fraction of 1.0 to gather all hits 
-                    return reactphysics3d::decimal(1.0);
-                }
-            };
-            MyCallbackClass a;
-
-            reactphysics3d::Ray shoot_ray(to_react(ray_from), to_react(ray_from + camera_direction * 10.0f));
-            physic_world->raycast(shoot_ray, &a);
-        }
-    }
-
-    auto render_object_view = m_registry.view<RenderObject>();
-    for (const auto& entity : render_object_view) {
-        auto& render_object = render_object_view.get<RenderObject>(entity);
-        const uint32_t index = render_object.get_render_objects_index();
-        RenderObjectData& render_object_data = render_objects.get(index);
-        switch (render_object_data.m_type) {
-            case RenderObjectDataType::Enemy: {
-                auto& transform = m_registry.get<Transform>(entity);
-                render_object_data.m_data.enemies.transform.m_position.x = transform.m_position.x;
-                render_object_data.m_data.enemies.transform.m_position.y = transform.m_position.y;
-                render_object_data.m_data.enemies.transform.m_position.z = transform.m_position.z;
+                const auto& collider_transform = collider.getTransform();
+                const auto& collider_position = collider_transform.getPosition();
+                transform.m_position = glm::vec3(collider_position.x, collider_position.y, collider_position.z);
             }
-            break;
-            default:
-                break;
+        }
+
+        // update player movement
+        {
+            auto& transform = m_registry.get<Transform>(m_player_entity);
+            auto& rigid_body = m_registry.get<RigidBody>(m_player_entity);
+            auto& player = m_registry.get<Player>(m_player_entity);
+            auto& audio_shoot = m_registry.get<AudioSourceShoot>(m_player_entity);
+
+            if (input_processor.is_mouse_moving()) {
+                player.move_direction(input_processor.get_mouse_acc());
+            }
+
+            auto camera_direction_horizontal = player.get_direction();
+
+            if (input_processor.is_action_key_down(ActionKey::MoveForward)) {
+                transform.m_position += camera_direction_horizontal * 3.0f * delta_time;
+            }
+            else if (input_processor.is_action_key_down(ActionKey::MoveBackward)) {
+                transform.m_position -= camera_direction_horizontal * 3.0f * delta_time;
+            }
+
+            if (input_processor.is_action_key_down(ActionKey::MoveRight)) {
+                transform.m_position += glm::normalize(glm::cross(glm::vec3(0.0f, 1.0f, 0.0f), camera_direction_horizontal)) * 3.0f * delta_time;
+            }
+            else if (input_processor.is_action_key_down(ActionKey::MoveLeft)) {
+                transform.m_position -= glm::normalize(glm::cross(glm::vec3(0.0f, 1.0f, 0.0f), camera_direction_horizontal)) * 3.0f * delta_time;
+            }
+
+            if (input_processor.is_action_key_down(ActionKey::Jump)) {
+                rigid_body.getRigidBody()->setLinearVelocity(reactphysics3d::Vector3(0.0f, 5.0f, 0.0f));
+            }
+
+            if (input_processor.is_mouse_pressed(MouseButton::Left) && player.is_ready_to_shoot_and_refresh()) {
+                audio_shoot.play(*this);
+
+                auto ray_from = transform.m_position + player.get_direction() * 0.0f + player.get_direction_right() * 0.008f;
+                auto ray_to = ray_from + player.get_direction() * 999.0f;
+
+                auto laser_ray_entity = m_registry.create();
+                m_registry.emplace<Transform>(laser_ray_entity);
+                auto& laser_ray_renderable = m_registry.emplace<Renderable>(
+                    laser_ray_entity,
+                    RenderObjectType::Object,
+                    ShapeType::CapsuleLine,
+                    glm::vec3(glm::vec3(46.f, 209.f, 162.f) / 255.f));
+                laser_ray_renderable.shape_capsule_line.from = ray_from;
+                laser_ray_renderable.shape_capsule_line.to = ray_to;
+                laser_ray_renderable.shape_capsule_line.radius = 0.001f;
+                m_registry.emplace<SelfDestruct>(laser_ray_entity, 0.05f);
+
+                ShootRaycast shoot_raycast(&m_registry, m_physics_world);
+
+                reactphysics3d::Ray shoot_ray(to_react(ray_from), to_react(ray_to));
+                m_physics_world->raycast(shoot_ray, &shoot_raycast);
+            }
+        }
+
+        {
+            auto& enemies_view = m_registry.view<Enemy, Transform>();
+            for (const auto& entity : enemies_view) {
+                auto& enemy = enemies_view.get<Enemy>(entity);
+                auto& player_transform = m_registry.get<Transform>(m_player_entity);
+                auto& this_transform = enemies_view.get<Transform>(entity);
+                if (true)
+                {
+                    this_transform.m_position += glm::normalize(player_transform.m_position - this_transform.m_position) * enemy.speed * delta_time;
+                }
+            }
+        }
+
+        {
+            auto collider_view = m_registry.view<SelfDestruct>();
+            for (const auto& entity : collider_view) {
+                auto& transform = collider_view.get<SelfDestruct>(entity);
+                if (transform.update_and_is_ready_to_delete()) {
+                    m_registry.destroy(entity);
+                }
+            }
+        }
+
+        {
+            auto collider_view = m_registry.view<RigidBody, Transform>();
+            for (const auto& entity : collider_view) {
+                auto& transform = collider_view.get<Transform>(entity);
+                auto& collider = collider_view.get<RigidBody>(entity);
+
+                collider.setTransform(transform);
+            }
+        }
+
+        m_physics_world->update(delta_time);
+        m_soloud.update3dAudio();
+
+        ImGui::SetNextWindowPos(ImVec2(imgui_io.DisplaySize.x / 2.0f, imgui_io.DisplaySize.y / 2.0f), 0, ImVec2(0.5f, 0.5f));
+        ImGui::Begin("#Pause Menu", nullptr, ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize);
+        ImGui::Button("Resume");
+        ImGui::Button("Settings");
+        ImGui::Button("Quit");
+        ImGui::End();
+
+        ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f), 0, ImVec2(0.0f, 0.0f));
+        ImGui::Begin("#Quest", nullptr, ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize);
+        ImGui::Text("Quest");
+        ImGui::Text("8/8");
+        ImGui::End();
+
+        ImGui::SetNextWindowPos(ImVec2(imgui_io.DisplaySize.x, imgui_io.DisplaySize.y), 0, ImVec2(1.0f, 1.0f));
+        ImGui::Begin("#Health", nullptr, ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize);
+        float health = 100.0f;
+        ImGui::DragFloat("Health", &health);
+        ImGui::End();
+    }
+    break;
+    case GameState::MainMenu:
+    {
+        static bool open_window_settings = false;
+
+        ImGui::SetNextWindowPos(ImVec2(0.0f, imgui_io.DisplaySize.y), 0, ImVec2(0.0f, 1.0f));
+        {
+            ImGui::Begin("#Main Menu", nullptr, ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize);
+            if (ImGui::Button("Start")) {
+                m_game_state = GameState::Game;
+            }
+            if (ImGui::Button("Settings")) {
+                open_window_settings = true;
+            }
+            ImGui::Button("Guide");
+            if (ImGui::Button("Quit")) {
+                running = false;
+            }
+        }
+        ImGui::End();
+
+        if (open_window_settings) {
+            ImGui::SetNextWindowPos(ImVec2(imgui_io.DisplaySize.x / 2.0f, imgui_io.DisplaySize.y / 2.0f), 0, ImVec2(0.5f, 0.5f));
+            ImGui::Begin("Settings", &open_window_settings, ImGuiWindowFlags_AlwaysAutoResize);
+            int v = 0;
+            ImGui::SliderInt("March maximum step", &v, 100, 1000);
+            ImGui::SliderInt("Ambient occlusion sample", &v, 1, 50);
+            ImGui::End();
         }
     }
-
-    {
-        auto collider_view = m_registry.view<RigidBody, Transform>();
-        for (const auto& entity : collider_view) {
-            auto& transform = collider_view.get<Transform>(entity);
-            auto& collider = collider_view.get<RigidBody>(entity);
-
-            collider.setTransform(transform);
-        }
-    }*/
+    break;
+    }
 }
 
-void Engine::render_scene(const glm::vec2& resolution)
+void Engine::render_scene(float delta_time, const glm::vec2& resolution)
 {
-    m_renderer.begin();
-    
-    auto renderable_view = m_registry.view<Renderable, Transform>();
-    for (const auto& entity : renderable_view) {
-        // TODO: Add frustum culling
-        m_renderer.submit(
-            renderable_view.get<Transform>(entity),
-            renderable_view.get<Renderable>(entity));
-    }
+    if (m_game_state == GameState::Game) {
+        m_renderer.begin();
 
-    m_renderer.end();
+        auto renderable_view = m_registry.view<Renderable, Transform>();
+        for (const auto& entity : renderable_view) {
+            // TODO: Add frustum culling
+            m_renderer.submit(
+                renderable_view.get<Transform>(entity),
+                renderable_view.get<Renderable>(entity));
+        }
+
+        m_renderer.end();
+    }
 
     auto& player_transform = m_registry.get<Transform>(m_player_entity);
     auto& player = m_registry.get<Player>(m_player_entity);
     auto player_dir = player.get_direction();
 
     m_renderer.render(
-        0.0f,
+        delta_time,
         resolution,
         player_transform.m_position,
-        player_dir);
+        player_dir,
+        m_game_state == GameState::Game);
 }
 
 void Engine::shutdown()

@@ -91,7 +91,7 @@ void update(
         auto& audio_shooted = player_shoot_audio_view.get<AudioSourceShooted>(entity);
         auto& transform = player_shoot_audio_view.get<Transform>(entity);
         if (input_processor.is_mouse_pressed(MouseButton::Left)) {
-            audio_shoot.play(soloud);
+            //audio_shoot.play(soloud);
 
             glm::vec3 ray_from = transform.m_position;
 

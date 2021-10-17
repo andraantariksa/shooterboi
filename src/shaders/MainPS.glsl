@@ -9,10 +9,7 @@
 #define SHAPE_TYPE_SPHERE 1
 #define SHAPE_TYPE_BOX 2
 #define SHAPE_TYPE_GUN 3
-
-#define SHAPE_OP_UNION 0
-#define SHAPE_OP_INTERSECT 1
-#define SHAPE_OP_SUBTRACT 2
+#define SHAPE_TYPE_CAPSULE_LINE 4
 
 struct RenderQueue
 {
@@ -21,12 +18,12 @@ struct RenderQueue
     vec3 rotation;
     vec3 color;
     vec4 shape_data;
+    vec4 shape_data2;
     uint type;
     uint shape_type;
-    uint shape_op;
 };
 
-layout(std140, binding = 0) uniform rendering_info {
+layout(std140, binding = 0) uniform rendering_info{
     vec3 reso_time;
     vec3 cam_pos;
     vec3 cam_dir;
@@ -69,6 +66,13 @@ Distance sd_union(Distance d1, Distance d2)
 Distance sd_intersect(Distance d1, Distance d2)
 {
     return d1.distance > d2.distance ? d1 : d2;
+}
+
+float sd_capsule_line(vec3 p, vec3 a, vec3 b, float r)
+{
+    vec3 pa = p - a, ba = b - a;
+    float h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0);
+    return length(pa - ba * h) - r;
 }
 
 float sd_plane(vec3 pos, vec3 n, float h)
@@ -156,35 +160,26 @@ vec3 repeat(vec3 pos, vec3 c)
 
 Distance scene_dist(vec3 pos)
 {
-    Distance sph = Distance(sd_sphere(pos - vec3(2., 0.5, -2.), 0.5), 2);
-    sph = sd_union(sph, Distance(sd_sphere(pos - vec3(-2., 0.5, 2.), 0.5), 2));
-    Distance m = sd_union(Distance(sd_silver_horn(pos, vec3(0, 3, 0)), 1), sph);
+    Distance m = Distance(sd_plane(pos, vec3(0, 1, 0), 0), 3);
 
     for (uint i = 0u; i < queue_count; i++) {
-        Distance d = m;
-
         switch (queue[i].shape_type) {
-            case SHAPE_TYPE_SPHERE:
-                d = Distance(sd_sphere(pos - queue[i].position, queue[i].shape_data.x), 2);
-                break;
-            default:
-                continue;
+        case SHAPE_TYPE_SPHERE:
+            m = sd_union(m, Distance(sd_sphere(pos - queue[i].position, queue[i].shape_data.x), 2));
+            break;
+        case SHAPE_TYPE_CAPSULE_LINE:
+            m = sd_union(
+                m,
+                Distance(
+                    sd_capsule_line(pos - queue[i].position, queue[i].shape_data.xyz, queue[i].shape_data2.xyz, queue[i].shape_data.w),
+                    4));
+        default:
+            continue;
         }
 
-        switch (queue[i].shape_op) {
-            case SHAPE_OP_UNION:
-                m = sd_union(m, d);
-                break;
-            case SHAPE_OP_SUBTRACT:
-                d.distance = -d.distance;
-                m = sd_intersect(m, d);
-                break;
-            default:
-                continue;
-        }
     }
 
-    return sd_union(m, Distance(sd_plane(pos, vec3(0, 1, 0), 0), 3));
+    return m;
 }
 
 vec3 get_normal(vec3 pos)
@@ -206,7 +201,7 @@ Distance ray_march(vec3 ray_origin, vec3 ray_dir)
     for (uint i = 0u; i < 100u; i++) {
         current_pos = ray_origin + dist_traveled.distance * ray_dir;
         Distance closest_distance = scene_dist(current_pos);
-        
+
         if (abs(closest_distance.distance) < EPS) {
             break;
         }
@@ -302,7 +297,7 @@ void main()
     lv += 0.05;
 
     vec3 col = vec3(46., 209., 162.) / 255.;
-    //switch (d.materialId) {
+    switch (d.materialId) {
     //case 0:
     //	col = vec3(0.);
     //	break;
@@ -316,7 +311,9 @@ void main()
     //	col = texture(uTextureGround, lp.xz * 0.5 + 0.5).rgb;
     //	//col = vec3(0.8, 0., 0.);
     //	break;
-    //}
+    case 4:
+        col = vec3(1., 0., 0.);
+    }
 
     outColor = vec4(clamp(pow(col * lv, 1. / vec3(2.2)), 0, 1), 1.0);
     //outColor = vec4(ray_dir, 1.0);

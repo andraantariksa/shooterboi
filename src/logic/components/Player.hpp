@@ -1,9 +1,15 @@
 #ifndef _SRC_LOGIC_COMPONENTS_PLAYER_HPP
 #define _SRC_LOGIC_COMPONENTS_PLAYER_HPP
 
+#include <glm/glm.hpp>
+
 class Player
 {
-    static constexpr float sensitivity = 0.3f;
+    static constexpr float sensitivity = 0.5f;
+    static constexpr glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);
+    static constexpr float shoot_interval = 1.0f;
+
+    std::chrono::steady_clock::time_point m_last_time_shoot;
 
     float m_yaw;
     float m_pitch;
@@ -13,7 +19,8 @@ public:
     Player() :
         m_yaw(90.0f),
         m_pitch(0.0f),
-        m_health(10)
+        m_health(10),
+        m_last_time_shoot(std::chrono::high_resolution_clock::now())
     {
     }
 
@@ -44,6 +51,23 @@ public:
         direction.z = std::sin(glm::radians(m_yaw)) * std::cos(glm::radians(m_pitch));
 
         return glm::normalize(direction);
+    }
+
+    inline glm::vec3 get_direction_right()
+    {
+        return glm::cross(up, get_direction());
+    }
+
+    bool is_ready_to_shoot_and_refresh()
+    {
+        auto time_now = std::chrono::high_resolution_clock::now();
+        float time_diff = std::chrono::duration_cast<std::chrono::duration<float>>(time_now - m_last_time_shoot).count();
+        if (time_diff > shoot_interval)
+        {
+            m_last_time_shoot = time_now;
+            return true;
+        }
+        return false;
     }
 };
 

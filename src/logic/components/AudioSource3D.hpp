@@ -5,18 +5,23 @@
 #include <soloud_wav.h>
 #include <memory>
 
+#include "../../Engine.hpp"
+
 class AudioSource3D {
-protected:
-    std::unique_ptr<SoLoud::AudioSource> m_source;
+private:
+    AudioResourceID m_resource_id;
 public:
-    AudioSource3D(SoLoud::Soloud& soloud, std::unique_ptr<SoLoud::AudioSource>& source, bool play_on_start = false, glm::vec3& pos = glm::vec3(0.0f)) :
-        m_source(std::move(source)) {
+    AudioSource3D(Engine& engine, AudioResourceID resource_id, bool play_on_start = false, glm::vec3& pos = glm::vec3(0.0f)) :
+        m_resource_id(resource_id) {
         if (play_on_start) {
-            soloud.play3d(*m_source, pos.x, pos.y, pos.z);
+            engine.get_soloud().play3d(*engine.get_audio_resources(m_resource_id), pos.x, pos.y, pos.z);
         }
     }
 
-    inline void play(SoLoud::Soloud& soloud, glm::vec3& pos = glm::vec3(0.0f)) { soloud.play3d(*m_source, pos.x, pos.y, pos.z); }
+    inline void play(Engine& engine, glm::vec3& pos = glm::vec3(0.0f))
+    {
+        engine.get_soloud().play3d(*engine.get_audio_resources(m_resource_id), pos.x, pos.y, pos.z);
+    }
 };
 
 #endif
