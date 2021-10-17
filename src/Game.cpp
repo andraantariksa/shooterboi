@@ -72,7 +72,7 @@ Game::Game() :
         assert(false && "Cannot create load OpenGL");
     }
 
-    SDL_GL_SetSwapInterval(1);
+    //SDL_GL_SetSwapInterval(1);
 
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();

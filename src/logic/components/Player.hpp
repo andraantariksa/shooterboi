@@ -2,12 +2,17 @@
 #define _SRC_LOGIC_COMPONENTS_PLAYER_HPP
 
 #include <glm/glm.hpp>
+#include "Frustum.hpp"
 
 class Player
 {
     static constexpr float sensitivity = 0.5f;
     static constexpr glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);
     static constexpr float shoot_interval = 1.0f;
+    static constexpr float field_of_view = glm::radians(90.0f);
+    static constexpr float z_far = 1000.0f;
+    static constexpr float z_near = 0.1f;
+    static constexpr float m_aspect_ratio = 1.0f;
 
     std::chrono::steady_clock::time_point m_last_time_shoot;
 
@@ -55,7 +60,7 @@ public:
 
     inline glm::vec3 get_direction_right()
     {
-        return glm::cross(up, get_direction());
+        return glm::normalize(glm::cross(get_direction(), up));
     }
 
     bool is_ready_to_shoot_and_refresh()
@@ -68,6 +73,32 @@ public:
             return true;
         }
         return false;
+    }
+
+    Frustum get_frustum(Transform transform)
+    {
+        auto direction = get_direction();
+        auto right = get_direction_right();
+        //      /| B
+        //   c / | a
+        //    /__| C
+        //   A  b
+        // tan(A) = a / b
+        // a = plane width
+        // b = distance to plane
+        const float half_y_side = z_far * std::tanf(field_of_view * .5f);
+        const float half_x_side = half_y_side * m_aspect_ratio;
+        const glm::vec3 z_far_plane_pos = z_far * direction;
+
+        Frustum frustum;
+        frustum.near_plane = { transform.m_position + z_near * direction, direction };
+        frustum.far_plane = { transform.m_position + z_far_plane_pos    , direction * -1.0f };
+        frustum.right_plane = { transform.m_position                    , glm::cross(up, z_far_plane_pos + right * half_y_side) };
+        frustum.left_plane = { transform.m_position                     , glm::cross(z_far_plane_pos - right * half_y_side, up) };
+        frustum.top_plane = { transform.m_position                      , glm::cross(right, z_far_plane_pos - up * half_x_side) };
+        frustum.bottom_plane = { transform.m_position                   , glm::cross(z_far_plane_pos + up * half_x_side, right) };
+
+        return frustum;
     }
 };
 

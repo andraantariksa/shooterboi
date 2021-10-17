@@ -5,6 +5,7 @@
 #include "logic/components/Player.hpp"
 #include "logic/components/Collider.hpp"
 #include "logic/components/RigidBody.hpp"
+#include "logic/components/FrustumCullObject.hpp"
 #include "logic/components/Enemy.hpp"
 #include "logic/custom-components/player/AudioSourceShoot.hpp"
 #include "logic/custom-components/player/AudioSourceShooted.hpp"
@@ -17,6 +18,7 @@
 #include <random>
 #include "Game.hpp"
 #include <limits>
+#include "logic/components/FrustumCullObject.hpp"
 
 Engine::Engine() :
     m_physics_world(nullptr),
@@ -137,6 +139,7 @@ void Engine::init()
             std::make_pair(m_physics_common.createSphereShape(0.5f),
                 reactphysics3d::Transform()) }
         );
+        m_registry.emplace<FrustumCullObject>(test_sphere, 0.5f);
 
         // set shape data
         auto& test_sphere_renderable = m_registry.get<Renderable>(test_sphere);
@@ -343,13 +346,30 @@ void Engine::render_scene(float delta_time, const glm::vec2& resolution)
     if (m_game_state == GameState::Game) {
         m_renderer.begin();
 
-        auto renderable_view = m_registry.view<Renderable, Transform>();
+        auto renderable_view = m_registry.view<Renderable, Transform>(entt::exclude<FrustumCullObject>);
         for (const auto& entity : renderable_view) {
-            // TODO: Add frustum culling
             m_renderer.submit(
                 renderable_view.get<Transform>(entity),
                 renderable_view.get<Renderable>(entity));
         }
+
+        const auto& player_transform = m_registry.get<Transform>(m_player_entity);
+        auto& player = m_registry.get<Player>(m_player_entity);
+        auto frustum = player.get_frustum(player_transform);
+
+        auto renderable_view_with_frustum = m_registry.view<Renderable, Transform, FrustumCullObject>();
+        int i = 0;
+        for (const auto& entity : renderable_view_with_frustum) {
+            auto& frustum_cull_object = renderable_view_with_frustum.get<FrustumCullObject>(entity);
+            auto& transform = renderable_view_with_frustum.get<Transform>(entity);
+            if (frustum_cull_object.is_inside_frustum(transform.m_position, frustum)) {
+                m_renderer.submit(
+                    transform,
+                    renderable_view_with_frustum.get<Renderable>(entity));
+                i++;
+            }
+        }
+        std::cout << i << '\n';
 
         m_renderer.end();
     }

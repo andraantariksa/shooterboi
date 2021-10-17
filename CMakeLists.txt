@@ -39,7 +39,7 @@ add_executable(fps-raymarch
     "src/RenderObjects.hpp"
     "src/Renderer.cpp"
     "src/Renderer.hpp"
-    "src/utils/Converter.hpp" "src/logic/components/Enemy.hpp" "src/logic/components/GameMusic.hpp" "src/ShootRaycast.hpp" "src/logic/components/SelfDestruct.hpp")
+    "src/utils/Converter.hpp" "src/logic/components/Enemy.hpp" "src/logic/components/GameMusic.hpp" "src/ShootRaycast.hpp" "src/logic/components/SelfDestruct.hpp" "src/logic/components/FrustumCullObject.hpp" "src/logic/components/Frustum.hpp")
 
 # Some projects don't need to re-add include directories
 target_include_directories(fps-raymarch PUBLIC
