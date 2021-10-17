@@ -10,9 +10,11 @@
 #include "utils/Converter.hpp"
 
 #include <random>
+#include <limits>
 
 Engine::Engine() :
-    m_physics_world(nullptr)
+    m_physics_world(nullptr),
+    m_audio_res_id_counter(0)
 {
 }
 
@@ -31,6 +33,8 @@ void Engine::init()
 
     //auto* sound_shoot = new SoLoud::Wav;
     //sound_shoot->load("../../../assets/audio/shoot.wav");
+
+    generate_map();
 
     m_player_entity = m_registry.create();
     m_registry.emplace<Player>(m_player_entity);
@@ -295,4 +299,60 @@ void Engine::shutdown()
     m_physics_common.destroyPhysicsWorld(m_physics_world);
     m_soloud.deinit();
     m_renderer.shutdown();
+}
+
+void Engine::generate_map()
+{
+    char* map_data = new char[64 * 64];
+    std::mt19937 gen;
+    std::uniform_real_distribution<float> dist(0.f, 1.f);
+    auto random = [](const glm::vec2& seed) {
+        return glm::fract(glm::sin(glm::dot(seed, glm::vec2(12.9898, 78.233))) * 43758.5453);
+    };
+
+    std::cout << "Generating level..." << std::endl;
+
+    for (uint32_t y = 0; y < 64; y++) {
+        for (uint32_t x = 0; x < 64; x++) {
+            glm::vec2 pos = glm::vec2((float)x, (float)y) / 64.f;
+            glm::vec2 tile_id = floor(pos);
+            glm::vec2 tile_pos = glm::smoothstep(0.0f, 1.0f, fract(pos)); // make the interpolation smoother
+
+            // get random values at four corners
+            // c0 ------- c1
+            //  |		  |
+            //  |   	  |
+            //  |		  |
+            // c2 ------- c3
+            float c0 = random(tile_id);
+            float c1 = random(tile_id + glm::vec2(1.0, 0.0));
+            float c2 = random(tile_id + glm::vec2(0.0, 1.0));
+            float c3 = random(tile_id + glm::vec2(1.0, 1.0));
+
+            // sample value between four corners with bilinear interpolation
+            // c0 ------- c1
+            //  | \	/     |
+            //  |  x	  |    x: sample point
+            //  | /	\     |
+            // c2 ------- c3
+            float m0_x = glm::mix(c0, c1, tile_pos.x);
+            float m1_x = glm::mix(c2, c3, tile_pos.x);
+            float m = glm::mix(m0_x, m1_x, tile_pos.y);
+
+            static constexpr float threshold = 0.5f;
+            map_data[y * 64 + x] = (char)(glm::step(threshold, m) * 255.f);
+
+            /*
+            Alternate version for smooth transition
+
+            static constexpr float threshold_a = 0.3f;
+            static constexpr float threshold_b = 0.7f;
+            map_data[y * 64 + x] = (char)(glm::smoothstep(threshold_a, threshold_b, m) * 255.f);
+            */
+        }
+    }
+
+    m_renderer.set_map_data(map_data, 64, 64);
+
+    delete[] map_data;
 }

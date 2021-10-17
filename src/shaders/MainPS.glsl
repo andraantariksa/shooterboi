@@ -37,16 +37,6 @@ layout(std430, binding = 1) buffer render_queue {
     RenderQueue queue[100];
 };
 
-//uniform sampler2D uTextureGround;
-//uniform vec2 uResolution;
-//uniform float uTime;
-//uniform vec3 uCameraPosition;
-//#ifdef DEV
-//vec3 uCameraDirection = vec3(0.0, 0.0, -1.0);
-//#else
-//uniform vec3 uCameraDirection;
-//#endif
-
 layout(location = 0) out vec4 outColor;
 
 struct RayHit
@@ -69,6 +59,12 @@ Distance sd_union(Distance d1, Distance d2)
 Distance sd_intersect(Distance d1, Distance d2)
 {
     return d1.distance > d2.distance ? d1 : d2;
+}
+
+float sd_terrain(vec3 pos)
+{
+
+    return 0.0;
 }
 
 float sd_plane(vec3 pos, vec3 n, float h)
@@ -272,16 +268,9 @@ void main()
     vec2 uv = gl_FragCoord.xy / reso_time.xy * 2.0 - 1.0;
     uv.x *= reso_time.x / reso_time.y;
 
-    //uv *= 0.5;
-
-    //vec3 light_pos = vec3(sin(uTime) * 8, 8.0, -cos(uTime) * 8);
     vec3 light_pos = vec3(0.0, 8.0, 0.0);
-    //vec3 cam_pos = uCameraPosition; // vec3(sin(uTime) * 8, 3.0, -cos(uTime) * 8);
-    //vec3 cam_pos = vec3(0, 10, 0.1);
-    //vec3 cam_dir = uCameraDirection;
     vec3 cam_up = vec3(0.0, 1.0, 0.0);
     vec3 dir = lookat(uv, cam_pos, cam_pos + cam_dir, cam_up);
-    //vec3 cam_dir = normalize(vec3(sin(uTime), 2.0, cos(uTime)) - cam_pos);
     vec3 ray_dir = dir;
 
     Distance d = ray_march(cam_pos, ray_dir);

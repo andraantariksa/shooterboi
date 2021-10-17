@@ -23,7 +23,8 @@
 #include "RenderObjects.hpp"
 
 Game::Game() :
-    m_window(nullptr) {
+    m_window(nullptr)
+{
     if (SDL_Init(SDL_INIT_EVERYTHING) < 0) {
         std::cout << SDL_GetError() << '\n';
         assert(false && "Cannot initialize SDL");
