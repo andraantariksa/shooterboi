@@ -46,6 +46,8 @@ public:
 
     void end();
 
+    void set_map_data(char* map_data, uint32_t width, uint32_t height);
+
     void render(
         float time,
         const glm::vec2& resolution,
@@ -61,6 +63,7 @@ private:
     GLuint m_player_view_program                = 0;
     GLuint m_render_queue_ssbo                  = 0;
     GLuint m_rendering_info_ubo                 = 0;
+    GLuint m_map_texture                        = GL_INVALID_INDEX;
 
     RenderQueueData* m_mapped_render_queue      = nullptr;
     uint32_t m_render_queue_pos                 = 0;
@@ -68,4 +71,5 @@ private:
     // the binding is hardcoded in glsl code
     static constexpr GLuint g_rendering_info_binding             = 0;
     static constexpr GLuint g_render_queue_binding               = 1;
+    static constexpr GLuint g_terrain_texture_binding            = 2;
 };

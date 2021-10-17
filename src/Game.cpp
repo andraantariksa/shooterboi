@@ -22,7 +22,9 @@
 #include "Camera.hpp"
 #include "RenderObjects.hpp"
 
-Game::Game() {
+Game::Game() :
+    m_window(nullptr)
+{
     if (SDL_Init(SDL_INIT_EVERYTHING) < 0) {
         std::cout << SDL_GetError() << '\n';
         assert(false && "Cannot initialize SDL");

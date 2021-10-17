@@ -31,10 +31,13 @@ layout(std140, binding = 0) uniform RenderingInfo {
     uint queue_count;
 };
 
+layout(binding = 0) uniform sampler2D tex;
+
 void main()
 {
     vec2 pos = gl_FragCoord.xy/reso_time.xy;
-    o_color = vec4(pos.x, pos.y, 1.0f, 1.0f);
+    float m = texture(tex, pos).r;
+    o_color = vec4(m, 0.0f, 0.0f, 1.0f);
 }
 )";
 
@@ -221,6 +224,24 @@ void Renderer::submit(const Transform& transform, const Renderable& renderable)
 void Renderer::end()
 {
     glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
+}
+
+void Renderer::set_map_data(char* map_data, uint32_t width, uint32_t height)
+{
+    if (m_map_texture != GL_INVALID_INDEX) {
+        glDeleteTextures(1, &m_map_texture);
+    }
+
+    glGenTextures(1, &m_map_texture);
+    glBindTexture(GL_TEXTURE_2D, m_map_texture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_R8UI, width, height, 0, GL_RED, GL_UNSIGNED_BYTE, nullptr);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, m_map_texture);
 }
 
 void Renderer::render(

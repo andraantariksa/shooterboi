@@ -37,7 +37,6 @@ private:
     reactphysics3d::PhysicsWorld* m_physics_world;
     entt::registry m_registry;
     entt::entity m_player_entity{};
-    entt::entity m_terrain_entity{};
     
     SoLoud::Soloud m_soloud;
     std::vector<SoLoud::Wav*> m_audio_resources;
@@ -48,4 +47,6 @@ private:
     RenderObjects<100> m_render_objects{};
 
     GameState m_game_state = GameState::Game;
+
+    void generate_map();
 };
