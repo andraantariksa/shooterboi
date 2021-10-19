@@ -7,12 +7,11 @@
 class Player
 {
     static constexpr float sensitivity = 0.5f;
-    static constexpr glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);
+    static constexpr glm::vec3 world_up = glm::vec3(0.0f, 1.0f, 0.0f);
     static constexpr float shoot_interval = 1.0f;
-    static constexpr float field_of_view = glm::radians(90.0f);
-    static constexpr float z_far = 1000.0f;
-    static constexpr float z_near = 0.1f;
-    static constexpr float m_aspect_ratio = 1.0f;
+    static constexpr glm::vec2 field_of_view = glm::vec2(90.0f);
+    static constexpr float z_far = 100.0f;
+    static constexpr float z_near = 0.001f;
 
     std::chrono::steady_clock::time_point m_last_time_shoot;
 
@@ -48,7 +47,7 @@ public:
         return glm::normalize(direction);
     }
 
-    glm::vec3 get_direction()
+    glm::vec3 get_direction() const
     {
         glm::vec3 direction;
         direction.x = std::cos(glm::radians(m_yaw)) * std::cos(glm::radians(m_pitch));
@@ -58,9 +57,9 @@ public:
         return glm::normalize(direction);
     }
 
-    inline glm::vec3 get_direction_right()
+    inline glm::vec3 get_direction_right() const
     {
-        return glm::normalize(glm::cross(get_direction(), up));
+        return glm::normalize(glm::cross(get_direction(), world_up));
     }
 
     bool is_ready_to_shoot_and_refresh()
@@ -75,10 +74,11 @@ public:
         return false;
     }
 
-    Frustum get_frustum(Transform transform)
+    Frustum get_frustum(const Transform& player_transform) const
     {
-        auto direction = get_direction();
-        auto right = get_direction_right();
+        const auto direction = get_direction();
+        const auto right = get_direction_right();
+        const auto up = glm::normalize(glm::cross(right, direction));
         //      /| B
         //   c / | a
         //    /__| C
@@ -86,17 +86,17 @@ public:
         // tan(A) = a / b
         // a = plane width
         // b = distance to plane
-        const float half_y_side = z_far * std::tanf(field_of_view * .5f);
-        const float half_x_side = half_y_side * m_aspect_ratio;
+        const float half_y_side = z_far * std::tanf(field_of_view.y * .5f);
+        const float half_x_side = z_far * std::tanf(field_of_view.x * .5f);
         const glm::vec3 z_far_plane_pos = z_far * direction;
 
         Frustum frustum;
-        frustum.near_plane = { transform.m_position + z_near * direction, direction };
-        frustum.far_plane = { transform.m_position + z_far_plane_pos    , direction * -1.0f };
-        frustum.right_plane = { transform.m_position                    , glm::cross(up, z_far_plane_pos + right * half_y_side) };
-        frustum.left_plane = { transform.m_position                     , glm::cross(z_far_plane_pos - right * half_y_side, up) };
-        frustum.top_plane = { transform.m_position                      , glm::cross(right, z_far_plane_pos - up * half_x_side) };
-        frustum.bottom_plane = { transform.m_position                   , glm::cross(z_far_plane_pos + up * half_x_side, right) };
+        frustum.near_plane = { player_transform.m_position + z_near * direction, direction };
+        frustum.far_plane = { player_transform.m_position + z_far_plane_pos    , direction * -1.0f };
+        frustum.right_plane = { player_transform.m_position                    , glm::cross(up, z_far_plane_pos + right * half_x_side) };
+        frustum.left_plane = { player_transform.m_position                     , glm::cross(z_far_plane_pos - right * half_x_side, up) };
+        frustum.top_plane = { player_transform.m_position                      , glm::cross(right, z_far_plane_pos - up * half_y_side) };
+        frustum.bottom_plane = { player_transform.m_position                   , glm::cross(z_far_plane_pos + up * half_y_side, right) };
 
         return frustum;
     }

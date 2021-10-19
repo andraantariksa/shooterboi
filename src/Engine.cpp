@@ -122,7 +122,7 @@ void Engine::init()
 
     std::mt19937 gen;
     std::uniform_real_distribution<float> dis(1.0f, 5.0f);
-    for (uint32_t i = 0; i < 10; i++) {
+    for (uint32_t i = 0; i < 1; i++) {
         auto test_sphere = m_registry.create();
         m_registry.emplace<Transform>(test_sphere, glm::vec3(dis(gen), 2.0f, dis(gen)));
         m_registry.emplace<Renderable>(
@@ -217,10 +217,10 @@ void Engine::update(float delta_time, const InputProcessor& input_processor, boo
             }
 
             if (input_processor.is_action_key_down(ActionKey::MoveRight)) {
-                transform.m_position += glm::normalize(glm::cross(glm::vec3(0.0f, 1.0f, 0.0f), camera_direction_horizontal)) * 3.0f * delta_time;
+                transform.m_position += glm::normalize(glm::cross(camera_direction_horizontal, glm::vec3(0.0f, 1.0f, 0.0f))) * 3.0f * delta_time;
             }
             else if (input_processor.is_action_key_down(ActionKey::MoveLeft)) {
-                transform.m_position -= glm::normalize(glm::cross(glm::vec3(0.0f, 1.0f, 0.0f), camera_direction_horizontal)) * 3.0f * delta_time;
+                transform.m_position -= glm::normalize(glm::cross(camera_direction_horizontal, glm::vec3(0.0f, 1.0f, 0.0f))) * 3.0f * delta_time;
             }
 
             if (input_processor.is_action_key_down(ActionKey::Jump)) {
@@ -343,6 +343,9 @@ void Engine::update(float delta_time, const InputProcessor& input_processor, boo
 
 void Engine::render_scene(float delta_time, const glm::vec2& resolution)
 {
+    const auto& player = m_registry.get<Player>(m_player_entity);
+    const auto& player_transform = m_registry.get<Transform>(m_player_entity);
+
     if (m_game_state == GameState::Game) {
         m_renderer.begin();
 
@@ -353,15 +356,13 @@ void Engine::render_scene(float delta_time, const glm::vec2& resolution)
                 renderable_view.get<Renderable>(entity));
         }
 
-        const auto& player_transform = m_registry.get<Transform>(m_player_entity);
-        auto& player = m_registry.get<Player>(m_player_entity);
-        auto frustum = player.get_frustum(player_transform);
+        const auto frustum = player.get_frustum(player_transform);
 
         auto renderable_view_with_frustum = m_registry.view<Renderable, Transform, FrustumCullObject>();
         int i = 0;
         for (const auto& entity : renderable_view_with_frustum) {
-            auto& frustum_cull_object = renderable_view_with_frustum.get<FrustumCullObject>(entity);
-            auto& transform = renderable_view_with_frustum.get<Transform>(entity);
+            const auto& frustum_cull_object = renderable_view_with_frustum.get<FrustumCullObject>(entity);
+            const auto& transform = renderable_view_with_frustum.get<Transform>(entity);
             if (frustum_cull_object.is_inside_frustum(transform.m_position, frustum)) {
                 m_renderer.submit(
                     transform,
@@ -374,8 +375,6 @@ void Engine::render_scene(float delta_time, const glm::vec2& resolution)
         m_renderer.end();
     }
 
-    auto& player_transform = m_registry.get<Transform>(m_player_entity);
-    auto& player = m_registry.get<Player>(m_player_entity);
     auto player_dir = player.get_direction();
 
     m_renderer.render(

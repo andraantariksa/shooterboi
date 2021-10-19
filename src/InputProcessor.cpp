@@ -31,7 +31,7 @@ void InputProcessor::process(const SDL_Event& event)
     m_mouse_btn_state = SDL_GetRelativeMouseState(&x, &y);
     
     // Add low-pass filter for smooth movement
-    m_mouse_acc.x = (std::abs((float)x - old_acc.x) > 0.001f) ? ((float)x * smoothness + old_acc.x * smoothness) : 0.0f;
+    m_mouse_acc.x = (std::abs((float)-x - old_acc.x) > 0.001f) ? ((float)-x * smoothness + old_acc.x * smoothness) : 0.0f;
     m_mouse_acc.y = (std::abs((float)y - old_acc.y) > 0.001f) ? ((float)y * smoothness + old_acc.y * smoothness) : 0.0f;
 }
 

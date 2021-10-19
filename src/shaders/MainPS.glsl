@@ -252,9 +252,9 @@ float light(vec3 n, vec3 lp, vec3 l)
 
 vec3 lookat(vec2 uv, vec3 pos, vec3 dir, vec3 up)
 {
-    vec3 c_dir = normalize(dir - pos);
-    vec3 right = normalize(cross(up, c_dir));
-    vec3 c_up = normalize(cross(c_dir, right));
+    vec3 c_dir = dir;
+    vec3 right = normalize(cross(c_dir, up));
+    vec3 c_up = normalize(cross(right, c_dir));
     return normalize(uv.x * right + uv.y * c_up + c_dir * 2.0);
 }
 
@@ -265,7 +265,7 @@ void main()
 
     vec3 light_pos = vec3(0.0, 8.0, 0.0);
     vec3 cam_up = vec3(0.0, 1.0, 0.0);
-    vec3 dir = lookat(uv, cam_pos, cam_pos + cam_dir, cam_up);
+    vec3 dir = lookat(uv, cam_pos, cam_dir, cam_up);
     vec3 ray_dir = dir;
 
     Distance d = ray_march(cam_pos, ray_dir);
