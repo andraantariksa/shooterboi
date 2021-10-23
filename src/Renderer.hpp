@@ -25,6 +25,7 @@ struct alignas(16) RenderingInfo
     alignas(16) glm::vec3 reso_time;
     alignas(16) glm::vec3 cam_pos;
     alignas(16) glm::vec3 cam_dir;
+    float fov;
     uint32_t queue_count;
 };
 
@@ -53,6 +54,7 @@ public:
         const glm::vec2& resolution,
         const glm::vec3& cam_pos,
         const glm::vec3& cam_dir,
+        float fov,
         bool render_game);
 
     void shutdown();

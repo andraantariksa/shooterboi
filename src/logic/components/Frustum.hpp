@@ -11,9 +11,9 @@ public:
 
     FrustumPlane() = default;
 
-    FrustumPlane(const glm::vec3& p1, const glm::vec3& normal) :
-        m_normal(glm::normalize(normal)),
-        m_distance(glm::dot(normal, p1))
+    FrustumPlane(const glm::vec3& p0, const glm::vec3& p1, const glm::vec3& p2) :
+        m_normal(glm::normalize(glm::cross(p1 - p0, p2 - p0))),
+        m_distance(glm::dot(m_normal, p0))
     {
     }
 
@@ -23,9 +23,8 @@ public:
     }
 };
 
-class Frustum
+struct Frustum
 {
-public:
     FrustumPlane top_plane;
     FrustumPlane bottom_plane;
     FrustumPlane right_plane;

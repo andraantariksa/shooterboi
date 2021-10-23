@@ -25,6 +25,7 @@ layout(std140, binding = 0) uniform rendering_info {
     vec3 reso_time;
     vec3 cam_pos_;
     vec3 cam_dir_;
+    float fov_;
     uint queue_count_;
 };
 
@@ -245,8 +246,9 @@ vec3 cam_dir = vec3(0., 0., -1.);
 
 void main()
 {
-    vec2 uv = gl_FragCoord.xy / reso_time.xy * 2.0 - 1.0;
-    uv.x *= reso_time.x / reso_time.y;
+    vec2 uv = (gl_FragCoord.xy + 0.5) / reso_time.xy * 2.0 - 1.0;
+    uv.x *= (reso_time.x / reso_time.y) * fov_;
+    uv.y *= fov_;
 
     //uv *= 0.5;
 

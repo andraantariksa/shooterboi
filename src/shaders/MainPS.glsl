@@ -23,10 +23,11 @@ struct RenderQueue
     uint shape_type;
 };
 
-layout(std140, binding = 0) uniform rendering_info{
+layout(std140, binding = 0) uniform rendering_info {
     vec3 reso_time;
     vec3 cam_pos;
     vec3 cam_dir;
+    float fov;
     uint queue_count;
 };
 
@@ -169,10 +170,10 @@ Distance scene_dist(vec3 pos)
                 Distance(
                     sd_capsule_line(pos - queue[i].position, queue[i].shape_data.xyz, queue[i].shape_data2.xyz, queue[i].shape_data.w),
                     4));
+            break;
         default:
             continue;
         }
-
     }
 
     return m;
@@ -253,15 +254,16 @@ float light(vec3 n, vec3 lp, vec3 l)
 vec3 lookat(vec2 uv, vec3 pos, vec3 dir, vec3 up)
 {
     vec3 c_dir = dir;
-    vec3 right = normalize(cross(c_dir, up));
-    vec3 c_up = normalize(cross(right, c_dir));
+    vec3 right = normalize(cross(up, c_dir));
+    vec3 c_up = normalize(cross(c_dir, right));
     return normalize(uv.x * right + uv.y * c_up + c_dir * 2.0);
 }
 
 void main()
 {
-    vec2 uv = gl_FragCoord.xy / reso_time.xy * 2.0 - 1.0;
-    uv.x *= reso_time.x / reso_time.y;
+    vec2 uv = (gl_FragCoord.xy + 0.5) / reso_time.xy * 2.0 - 1.0;
+    uv.x *= (reso_time.x / reso_time.y) * fov;
+    uv.y *= fov;
 
     vec3 light_pos = vec3(0.0, 8.0, 0.0);
     vec3 cam_up = vec3(0.0, 1.0, 0.0);
@@ -305,5 +307,5 @@ void main()
     }
 
     outColor = vec4(clamp(pow(col * lv, 1. / vec3(2.2)), 0, 1), 1.0);
-    //outColor = vec4(ray_dir, 1.0);
+    //outColor = vec4(lp, 1.0);
 }

@@ -39,22 +39,22 @@ void Engine::init()
     m_physics_world->setIsGravityEnabled(true);
     m_physics_world->setGravity(reactphysics3d::Vector3(0.0f, -9.81f, 0.0f));
 
-    generate_map();
+    //generate_map();
 
     //auto* sound_shoot = new SoLoud::Wav;
     //sound_shoot->load("../../../assets/audio/shoot.wav");
 
-    auto game_manager_entity = m_registry.create();
-    m_registry.emplace<GameMusic>(
-        game_manager_entity,
-        *this,
-        load_audio_resource("../../../assets/audio/deadship.ogg"),
-        load_audio_resource("../../../assets/audio/deadship.ogg"));
+    //auto game_manager_entity = m_registry.create();
+    //m_registry.emplace<GameMusic>(
+    //    game_manager_entity,
+    //    *this,
+    //    load_audio_resource("../../../assets/audio/deadship.ogg"),
+    //    load_audio_resource("../../../assets/audio/deadship.ogg"));
 
     {
         m_player_entity = m_registry.create();
         m_registry.emplace<Player>(m_player_entity);
-        m_registry.emplace<Transform>(m_player_entity, glm::vec3(0.0f, 3.0f, -3.0f));
+        m_registry.emplace<Transform>(m_player_entity, glm::vec3(0.0f, 2.0f, -2.0f));
         //m_registry.emplace<AudioSourceShoot>(m_player_entity, m_soloud, std::unique_ptr<SoLoud::AudioSource>(sound_shoot));
         //m_registry.emplace<AudioSourceShooted>(m_player_entity, m_soloud, std::unique_ptr<SoLoud::AudioSource>(sound_shoot));
         m_registry.emplace<RigidBody>(
@@ -90,6 +90,7 @@ void Engine::init()
             reactphysics3d::Transform()) }
     );
 
+    /*
     {
         auto enemy_entity = m_registry.create();
         m_registry.emplace<Enemy>(enemy_entity);
@@ -118,11 +119,12 @@ void Engine::init()
         auto& enemy_renderable = m_registry.get<Renderable>(enemy_entity);
         enemy_renderable.shape_sphere.radius = 0.5f;
     }
+    */
 
 
     std::mt19937 gen;
     std::uniform_real_distribution<float> dis(1.0f, 5.0f);
-    for (uint32_t i = 0; i < 1; i++) {
+    for (uint32_t i = 0; i < 6; i++) {
         auto test_sphere = m_registry.create();
         m_registry.emplace<Transform>(test_sphere, glm::vec3(dis(gen), 2.0f, dis(gen)));
         m_registry.emplace<Renderable>(
@@ -161,9 +163,9 @@ void Engine::init()
     );*/
 
     auto& imgui_io = ImGui::GetIO();
-    imgui_io.FontGlobalScale = 2.0f;
+    //imgui_io.FontGlobalScale = 2.0f;
     auto& imgui_style = ImGui::GetStyle();
-    imgui_style.ScaleAllSizes(2.0f);
+    //imgui_style.ScaleAllSizes(2.0f);
 }
 
 AudioResourceID Engine::load_audio_resource(const char* path)
@@ -207,7 +209,7 @@ void Engine::update(float delta_time, const InputProcessor& input_processor, boo
                 player.move_direction(input_processor.get_mouse_acc());
             }
 
-            auto camera_direction_horizontal = player.get_direction();
+            auto camera_direction_horizontal = player.get_direction_without_pitch();
 
             if (input_processor.is_action_key_down(ActionKey::MoveForward)) {
                 transform.m_position += camera_direction_horizontal * 3.0f * delta_time;
@@ -217,14 +219,17 @@ void Engine::update(float delta_time, const InputProcessor& input_processor, boo
             }
 
             if (input_processor.is_action_key_down(ActionKey::MoveRight)) {
-                transform.m_position += glm::normalize(glm::cross(camera_direction_horizontal, glm::vec3(0.0f, 1.0f, 0.0f))) * 3.0f * delta_time;
+                transform.m_position += glm::normalize(glm::cross(glm::vec3(0.0f, 1.0f, 0.0f), camera_direction_horizontal)) * 3.0f * delta_time;
             }
             else if (input_processor.is_action_key_down(ActionKey::MoveLeft)) {
-                transform.m_position -= glm::normalize(glm::cross(camera_direction_horizontal, glm::vec3(0.0f, 1.0f, 0.0f))) * 3.0f * delta_time;
+                transform.m_position -= glm::normalize(glm::cross(glm::vec3(0.0f, 1.0f, 0.0f), camera_direction_horizontal)) * 3.0f * delta_time;
             }
 
             if (input_processor.is_action_key_down(ActionKey::Jump)) {
-                rigid_body.getRigidBody()->setLinearVelocity(reactphysics3d::Vector3(0.0f, 5.0f, 0.0f));
+                reactphysics3d::RigidBody* rbd = rigid_body.getRigidBody();
+                if (std::abs(rbd->getLinearVelocity().y) < 0.01f) {
+                    rigid_body.getRigidBody()->setLinearVelocity(reactphysics3d::Vector3(0.0f, 5.0f, 0.0f));
+                }
             }
 
             if (input_processor.is_mouse_pressed(MouseButton::Left) && player.is_ready_to_shoot_and_refresh()) {
@@ -288,6 +293,7 @@ void Engine::update(float delta_time, const InputProcessor& input_processor, boo
         m_physics_world->update(delta_time);
         m_soloud.update3dAudio();
 
+#if 0
         ImGui::SetNextWindowPos(ImVec2(imgui_io.DisplaySize.x / 2.0f, imgui_io.DisplaySize.y / 2.0f), 0, ImVec2(0.5f, 0.5f));
         ImGui::Begin("#Pause Menu", nullptr, ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize);
         ImGui::Button("Resume");
@@ -306,6 +312,7 @@ void Engine::update(float delta_time, const InputProcessor& input_processor, boo
         float health = 100.0f;
         ImGui::DragFloat("Health", &health);
         ImGui::End();
+#endif
     }
     break;
     case GameState::MainMenu:
@@ -348,16 +355,29 @@ void Engine::render_scene(float delta_time, const glm::vec2& resolution)
 
     if (m_game_state == GameState::Game) {
         m_renderer.begin();
-
-        auto renderable_view = m_registry.view<Renderable, Transform>(entt::exclude<FrustumCullObject>);
+        
+        /*
+        auto renderable_view = m_registry.view<Renderable, Transform>();
         for (const auto& entity : renderable_view) {
             m_renderer.submit(
                 renderable_view.get<Transform>(entity),
                 renderable_view.get<Renderable>(entity));
         }
+        */
+        
+        const auto frustum = player.get_frustum(player_transform, resolution.x / resolution.y);
 
-        const auto frustum = player.get_frustum(player_transform);
+        const auto print_text = [](const char* name, const FrustumPlane& plane) {
+            ImGui::Text(
+                "%s: {normal: %.3f %.3f %.3f, distance: %.3f }",
+                name,
+                plane.m_normal.x,
+                plane.m_normal.y,
+                plane.m_normal.z,
+                plane.m_distance);
+        };
 
+        ImGui::SetNextWindowSize(ImVec2(400, 500), ImGuiCond_Once);
         auto renderable_view_with_frustum = m_registry.view<Renderable, Transform, FrustumCullObject>();
         int i = 0;
         for (const auto& entity : renderable_view_with_frustum) {
@@ -369,19 +389,37 @@ void Engine::render_scene(float delta_time, const glm::vec2& resolution)
                     renderable_view_with_frustum.get<Renderable>(entity));
                 i++;
             }
+            ImGui::Begin("Frustum Check");
+            ImGui::Text("Pos: %.3f %.3f %.3f",
+                transform.m_position.x,
+                transform.m_position.y,
+                transform.m_position.z);
+            ImGui::End();
         }
-        std::cout << i << '\n';
+
+        ImGui::Begin("Frustum Check");
+        print_text("Top", frustum.top_plane);
+        print_text("Bottom", frustum.bottom_plane);
+        print_text("Right", frustum.right_plane);
+        print_text("Left", frustum.left_plane);
+        print_text("Far", frustum.far_plane);
+        print_text("Near", frustum.near_plane);
+        ImGui::End();
+
+        //std::cout << i << '\n';
 
         m_renderer.end();
     }
 
     auto player_dir = player.get_direction();
+    static const float fov = std::tanf(glm::radians(90.0f) / 2.f);
 
     m_renderer.render(
         delta_time,
         resolution,
         player_transform.m_position,
         player_dir,
+        fov,
         m_game_state == GameState::Game);
 }
 

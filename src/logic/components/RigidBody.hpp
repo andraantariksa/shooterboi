@@ -19,13 +19,17 @@ class RigidBody
 {
 private:
 	reactphysics3d::RigidBody* m_rigidbody;
+	reactphysics3d::PhysicsWorld* m_world;
+
 public:
 	RigidBody(
 		reactphysics3d::PhysicsWorld* world,
 		Transform& transform,
 		reactphysics3d::BodyType body_type,
 		std::vector<std::pair<reactphysics3d::CollisionShape*, reactphysics3d::Transform>> colliders = {}) :
-		m_rigidbody(world->createRigidBody(transform.to_react_transform())) {
+		m_world(world),
+		m_rigidbody(world->createRigidBody(transform.to_react_transform()))
+	{
 		m_rigidbody->setType(body_type);
 		for (const auto& collider : colliders) {
 			m_rigidbody->addCollider(collider.first, collider.second);
@@ -36,6 +40,7 @@ public:
 
 	~RigidBody()
 	{
+		destroy(m_world);
 	}
 	
 	inline void destroy(reactphysics3d::PhysicsWorld* world) { world->destroyRigidBody(m_rigidbody); };

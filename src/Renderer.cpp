@@ -249,6 +249,7 @@ void Renderer::render(
     const glm::vec2& resolution,
     const glm::vec3& cam_pos,
     const glm::vec3& cam_dir,
+    float fov,
     bool render_game)
 {
     if (render_game) {
@@ -263,7 +264,8 @@ void Renderer::render(
         rendering_info->cam_dir.x = cam_dir.x;
         rendering_info->cam_dir.y = cam_dir.y;
         rendering_info->cam_dir.z = cam_dir.z;
-        rendering_info->queue_count = m_render_queue_pos;
+        rendering_info->fov = fov;
+        rendering_info->queue_count  = m_render_queue_pos;
         glUnmapBuffer(GL_UNIFORM_BUFFER);
     }
 
