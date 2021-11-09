@@ -1,0 +1,44 @@
+[package]
+name = "shooterboi"
+version = "0.1.0"
+edition = "2018"
+resolver = "2"
+
+[dependencies]
+instant = "0.1"
+pollster = "0.2.4"
+bytemuck = { version = "1.7.2", features = ["derive"] }
+log = "0.4.14"
+#nalgebra = "0.28.0"
+#ambisonic = "0.4"
+ambisonic = { git = "https://github.com/andraantariksa/ambisonic.git" }
+bincode = "1.3.3"
+rapier3d = "0.11.1"
+serde = { version = "1", features = ["derive"] }
+hecs = { path = "extern/hecs" }
+getrandom = { version = "0.2", features = ["js"] }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+#wgpu = { version = "0.11.0", features = ["webgl", "spirv"] }
+wgpu = { git = "https://github.com/gfx-rs/wgpu.git", branch = "gecko", features = ["webgl", "spirv"] }
+#web-sys = { version = "0.3.50", features = ["Document", "Navigator", "Node", "NodeList", "Gpu", "GpuAdapter", "GpuAdapterFeatures", "GpuAdapterLimits", "GpuAddressMode", "GpuBindGroup", "GpuBindGroupDescriptor", "GpuBindGroupEntry", "GpuBindGroupLayout", "GpuBindGroupLayoutDescriptor", "GpuBindGroupLayoutEntry", "GpuBlendComponent", "GpuBlendFactor", "GpuBlendOperation", "GpuBlendState", "GpuBuffer", "GpuBufferBinding", "GpuBufferBindingLayout", "GpuBufferBindingType", "GpuBufferDescriptor", "GpuBufferUsage", "GpuCanvasContext", "GpuColorDict", "GpuColorTargetState", "GpuColorWrite", "GpuCommandBuffer", "GpuCommandBufferDescriptor", "GpuCommandEncoder", "GpuCommandEncoderDescriptor", "GpuCompareFunction", "GpuCompilationInfo", "GpuCompilationMessage", "GpuCompilationMessageType", "GpuComputePassDescriptor", "GpuComputePassEncoder", "GpuComputePipeline", "GpuComputePipelineDescriptor", "GpuCullMode", "GpuDepthStencilState", "GpuDevice", "GpuDeviceDescriptor", "GpuDeviceLostInfo", "GpuDeviceLostReason", "GpuErrorFilter", "GpuExtent3dDict", "GpuFeatureName", "GpuFilterMode", "GpuFragmentState", "GpuFrontFace", "GpuImageCopyBuffer", "GpuImageCopyImageBitmap", "GpuImageCopyTexture", "GpuImageDataLayout", "GpuIndexFormat", "GpuInputStepMode", "GpuLoadOp", "GpuMapMode", "GpuMultisampleState", "GpuObjectDescriptorBase", "GpuOrigin2dDict", "GpuOrigin3dDict", "GpuOutOfMemoryError", "GpuPipelineDescriptorBase", "GpuPipelineLayout", "GpuPipelineLayoutDescriptor", "GpuPipelineStatisticName", "GpuPowerPreference", "GpuPrimitiveState", "GpuPrimitiveTopology", "GpuProgrammableStage", "GpuQuerySet", "GpuQuerySetDescriptor", "GpuQueryType", "GpuQueue", "GpuRenderBundle", "GpuRenderBundleDescriptor", "GpuRenderBundleEncoder", "GpuRenderBundleEncoderDescriptor", "GpuRenderPassColorAttachment", "GpuRenderPassDepthStencilAttachment", "GpuRenderPassDescriptor", "GpuRenderPassEncoder", "GpuRenderPipeline", "GpuRenderPipelineDescriptor", "GpuRequestAdapterOptions", "GpuSampler", "GpuSamplerBindingLayout", "GpuSamplerBindingType", "GpuSamplerDescriptor", "GpuShaderModule", "GpuShaderModuleDescriptor", "GpuShaderStage", "GpuStencilFaceState", "GpuStencilOperation", "GpuStorageTextureAccess", "GpuStorageTextureBindingLayout", "GpuStoreOp", "GpuSwapChain", "GpuSwapChainDescriptor", "GpuTexture", "GpuTextureAspect", "GpuTextureBindingLayout", "GpuTextureDescriptor", "GpuTextureDimension", "GpuTextureFormat", "GpuTextureSampleType", "GpuTextureUsage", "GpuTextureView", "GpuTextureViewDescriptor", "GpuTextureViewDimension", "GpuUncapturedErrorEvent", "GpuUncapturedErrorEventInit", "GpuValidationError", "GpuVertexAttribute", "GpuVertexBufferLayout", "GpuVertexFormat", "GpuVertexState", "HtmlCanvasElement", "Window"] }
+web-sys = "0.3.50"
+image = { version = "0.23.14", default-features = false, features = ["gif", "jpeg", "ico", "png", "pnm", "tga", "tiff", "webp", "bmp", "hdr", "dxt", "dds", "farbfeld"] }
+winit = { version = "0.25.0", features = ["web-sys"] }
+#legion = { version = "0.4.0", default-features = false, features = ["wasm-bindgen", "codegen"] }
+console_log = "0.2.0"
+console_error_panic_hook = "0.1.7"
+
+wasm-bindgen-futures = "0.4.28" #
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+#wgpu = { version = "0.11.0", features = ["spirv"] }
+wgpu = { git = "https://github.com/gfx-rs/wgpu.git", branch = "gecko", features = ["spirv"] }
+image = "0.23.14"
+winit = "0.25.0"
+#legion = { version = "0.4.0", default-features = false, features = ["codegen"] }
+env_logger = "0.9.0"
+
+[build-dependencies]
+shaderc = "0.7.2"
+glob = "0.3.0"
