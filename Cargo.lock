@@ -363,10 +363,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "clipboard_dummy"
+version = "0.3.1"
+source = "git+https://github.com/andraantariksa/window_clipboard.git?rev=0f74d591986c71e0786128827c98f17c0054aadf#0f74d591986c71e0786128827c98f17c0054aadf"
+
+[[package]]
 name = "clipboard_macos"
 version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "145a7f9e9b89453bc0a5e32d166456405d389cea5b578f57f1274b1397588a95"
+source = "git+https://github.com/andraantariksa/window_clipboard.git?rev=0f74d591986c71e0786128827c98f17c0054aadf#0f74d591986c71e0786128827c98f17c0054aadf"
 dependencies = [
  "objc",
  "objc-foundation",
@@ -376,8 +380,7 @@ dependencies = [
 [[package]]
 name = "clipboard_wayland"
 version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6f6364a9f7a66f2ac1a1a098aa1c7f6b686f2496c6ac5e5c0d773445df912747"
+source = "git+https://github.com/andraantariksa/window_clipboard.git?rev=0f74d591986c71e0786128827c98f17c0054aadf#0f74d591986c71e0786128827c98f17c0054aadf"
 dependencies = [
  "smithay-clipboard",
 ]
@@ -385,8 +388,7 @@ dependencies = [
 [[package]]
 name = "clipboard_x11"
 version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "64240d63f1883d87e5637bfcaf9d77e5c8bd24e30fd440ea2dff5c48c0bf0b7a"
+source = "git+https://github.com/andraantariksa/window_clipboard.git?rev=0f74d591986c71e0786128827c98f17c0054aadf#0f74d591986c71e0786128827c98f17c0054aadf"
 dependencies = [
  "thiserror",
  "x11rb",
@@ -1229,6 +1231,8 @@ dependencies = [
 [[package]]
 name = "hecs"
 version = "0.6.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6e1ac53b75ff2c09dc427da621dd99609981f97142e82b4cb1fb25b60a2f6d41"
 dependencies = [
  "hashbrown 0.11.2",
 ]
@@ -2839,7 +2843,7 @@ version = "1.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1f559b464de2e2bdabcac6a210d12e9b5a5973c251e102c44c585c71d51bd78e"
 dependencies = [
- "cfg-if 0.1.10",
+ "cfg-if 1.0.0",
  "rand",
  "static_assertions",
 ]
@@ -3201,10 +3205,10 @@ checksum = "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f"
 [[package]]
 name = "window_clipboard"
 version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "33a4518b538a45ad39d138a8c3bea8f6b4452174aeb38143d1dd643a3a838ccc"
+source = "git+https://github.com/andraantariksa/window_clipboard.git?rev=0f74d591986c71e0786128827c98f17c0054aadf#0f74d591986c71e0786128827c98f17c0054aadf"
 dependencies = [
  "clipboard-win",
+ "clipboard_dummy",
  "clipboard_macos",
  "clipboard_wayland",
  "clipboard_x11",

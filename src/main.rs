@@ -186,6 +186,7 @@ fn main() {
                             // log::error!("play sound");
                         }
                         WindowEvent::CursorMoved { position, .. } => {
+                            cursor_position = position;
                             // #[cfg(not(target_arch = "wasm32"))]
                             // {
                             //     let center = Point2::<f32>::new(

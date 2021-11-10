@@ -15,7 +15,8 @@ serde = { version = "1", features = ["derive"] }
 
 log = "0.4.14"
 # ECS
-hecs = { path = "extern/hecs" }
+hecs = "0.6.5"
+#hecs = { path = "extern/hecs" }
 # Database
 gluesql = "0.8"
 # GUI
@@ -46,3 +47,9 @@ env_logger = "0.9.0"
 [build-dependencies]
 shaderc = "0.7.2"
 glob = "0.3.0"
+
+[patch.crates-io]
+window_clipboard = { git = "https://github.com/andraantariksa/window_clipboard.git", rev = "0f74d591986c71e0786128827c98f17c0054aadf" }
+
+[target.'cfg(target_arch = "wasm32")'.patch.crates-io]
+winit = { version = "0.25.0", features = ["web-sys"] }
