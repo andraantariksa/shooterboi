@@ -267,7 +267,7 @@ vec3 lookat(vec2 uv, vec3 pos, vec3 dir, vec3 w_up)
 
 vec3 rayViewDir(vec2 size, vec2 coord) {
     vec2 xy = coord - size / 2.0;
-    float z = size.y / tan(radians(60.0) / 2.0);
+    float z = size.y / tan(radians(60.) / 2.0);
     return normalize(vec3(xy, z));
 }
 

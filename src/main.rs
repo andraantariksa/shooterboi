@@ -2,6 +2,12 @@ use crate::nalgebra::Point2;
 use crate::nalgebra::Vector3;
 use ambisonic::{rodio, AmbisonicBuilder};
 use hecs::World;
+use iced_wgpu::{Backend, Renderer, Settings, Viewport};
+use iced_winit::futures::task::SpawnExt;
+use iced_winit::{
+    conversion, futures, program, winit::dpi::PhysicalPosition as PhysicalPositionWinit, Clipboard,
+    Debug, Size,
+};
 use instant::Instant;
 use rapier3d::na::Vector2;
 use rapier3d::prelude::*;
@@ -20,14 +26,19 @@ use winit::{
 use crate::audio::AudioContext;
 use crate::camera::Camera;
 use crate::components::{Target, Transform};
+use crate::gui::controls::Controls;
+use crate::gui::scene::Scene;
 use crate::input_manager::InputManager;
 use crate::renderer::rendering_info::RenderingInfo;
 use crate::resources::time::DeltaTime;
 use state::State;
 
+mod Game;
 mod audio;
 mod camera;
 mod components;
+mod gamemodes;
+mod gui;
 mod input_manager;
 mod renderer;
 mod resources;
@@ -44,7 +55,7 @@ fn main() {
         console_log::init_with_level(log::Level::Warn);
     }
     let event_loop = EventLoop::new();
-    let window = WindowBuilder::new().build(&event_loop).unwrap();
+    let mut window = WindowBuilder::new().build(&event_loop).unwrap();
 
     #[cfg(target_arch = "wasm32")]
     {
@@ -85,7 +96,7 @@ fn main() {
     let mut world = World::new();
 
     // Enemy
-    world.spawn((Transform::builder(), Target));
+    // world.spawn((Transform::builder(), Target));
 
     // Player
     let player_rigid_body_handle = rigid_body_set.insert(
@@ -100,9 +111,11 @@ fn main() {
     );
     world.spawn((player_rigid_body_handle,));
 
+    let physical_size = window.inner_size();
+
     let mut audio_context = AudioContext::new();
     let mut input_manager = InputManager::new();
-    let mut rendering_info = RenderingInfo::new(window.inner_size());
+    let mut rendering_info = RenderingInfo::new(physical_size);
 
     let mut state = pollster::block_on(State::new(&window, &rendering_info));
 
@@ -111,17 +124,51 @@ fn main() {
 
     let mut camera = Camera::new();
 
+    let mut staging_belt = wgpu::util::StagingBelt::new(5 * 1024);
+    let mut local_pool = futures::executor::LocalPool::new();
+
     // window.set_cursor_position(PhysicalPosition {
     //     x: state.window_size.width as f32 / 2.0,
     //     y: state.window_size.height as f32 / 2.0
     // });
+    let mut modifiers = ModifiersState::default();
 
-    window.set_cursor_grab(true);
-    window.set_cursor_visible(false);
+    let mut debug = Debug::new();
+    let mut renderer = Renderer::new(Backend::new(
+        &mut state.device,
+        Settings::default(),
+        state.surface_preferred_format,
+    ));
+
+    let mut viewport = Viewport::with_physical_size(
+        Size::new(physical_size.width, physical_size.height),
+        window.scale_factor(),
+    );
+
+    let mut cursor_position = PhysicalPositionWinit::new(-1.0, -1.0);
+
+    let mut clipboard = Clipboard::connect(&window);
+    let scene = Scene::new(&mut state.device);
+    let controls = Controls::new();
+    let mut iced_state = program::State::new(
+        controls,
+        viewport.logical_size(),
+        conversion::cursor_position(cursor_position, viewport.scale_factor()),
+        &mut renderer,
+        &mut debug,
+    );
+
+    // window.set_cursor_grab(true);
+    // window.set_cursor_visible(false);
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Poll;
         match event {
             Event::WindowEvent { event, window_id } if window_id == window.id() => {
+                if let Some(event) =
+                    iced_winit::conversion::window_event(&event, window.scale_factor(), modifiers)
+                {
+                    iced_state.queue_event(event);
+                }
                 input_manager.process(&event);
                 if !state.input(&event) {
                     match event {
@@ -139,22 +186,22 @@ fn main() {
                             // log::error!("play sound");
                         }
                         WindowEvent::CursorMoved { position, .. } => {
-                            #[cfg(not(target_arch = "wasm32"))]
-                            {
-                                let center = Point2::<f32>::new(
-                                    state.window_size.width as f32 / 2.0,
-                                    state.window_size.height as f32 / 2.0,
-                                );
-                                let new_pos =
-                                    Point2::<f32>::new(position.x as f32, position.y as f32);
-
-                                camera.move_direction(center - new_pos);
-                            }
-
-                            window.set_cursor_position(PhysicalPosition {
-                                x: state.window_size.width as f32 / 2.0,
-                                y: state.window_size.height as f32 / 2.0,
-                            });
+                            // #[cfg(not(target_arch = "wasm32"))]
+                            // {
+                            //     let center = Point2::<f32>::new(
+                            //         state.window_size.width as f32 / 2.0,
+                            //         state.window_size.height as f32 / 2.0,
+                            //     );
+                            //     let new_pos =
+                            //         Point2::<f32>::new(position.x as f32, position.y as f32);
+                            //
+                            //     camera.move_direction(center - new_pos);
+                            // }
+                            //
+                            // window.set_cursor_position(PhysicalPosition {
+                            //     x: state.window_size.width as f32 / 2.0,
+                            //     y: state.window_size.height as f32 / 2.0,
+                            // });
                         }
                         WindowEvent::CloseRequested
                         | WindowEvent::KeyboardInput {
@@ -234,6 +281,7 @@ fn main() {
                         player_rigid_body.set_translation(camera.position, false);
                         rendering_info.cam_pos = camera.position;
                         rendering_info.cam_dir = camera.get_direction();
+                        rendering_info.fov = camera.fov.to_radians();
                     }
 
                     // for (id, (transform)) in world.query::<(&Transform)>().iter() {}
@@ -253,10 +301,31 @@ fn main() {
                     &(),
                 );
 
+                if !iced_state.is_queue_empty() {
+                    // We update iced
+                    let _ = iced_state.update(
+                        viewport.logical_size(),
+                        conversion::cursor_position(cursor_position, viewport.scale_factor()),
+                        &mut renderer,
+                        &mut clipboard,
+                        &mut debug,
+                    );
+                }
+
                 let duration = game_starting_time.elapsed();
                 rendering_info.reso_time.z = duration.as_secs_f32();
 
-                match state.render(&rendering_info) {
+                match state.render(
+                    &rendering_info,
+                    &mut staging_belt,
+                    &mut window,
+                    &scene,
+                    iced_state.program(),
+                    &iced_state,
+                    &debug,
+                    &viewport,
+                    &mut renderer,
+                ) {
                     Ok(_) => {}
                     // Reconfigure the surface if lost
                     Err(wgpu::SurfaceError::Lost) => state.resize(state.window_size),
@@ -265,6 +334,15 @@ fn main() {
                     // All other errors (Outdated, Timeout) should be resolved by the next frame
                     Err(e) => eprintln!("{:?}", e),
                 }
+
+                {
+                    local_pool
+                        .spawner()
+                        .spawn(staging_belt.recall())
+                        .expect("Recall staging buffers");
+                    local_pool.run_until_stalled();
+                }
+
                 input_manager.clear();
             }
             // Event::RedrawRequested(_) => {

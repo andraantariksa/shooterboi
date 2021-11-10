@@ -1,7 +1,11 @@
 use crate::nalgebra;
 use core::iter;
+use iced_wgpu::Viewport;
+use iced_winit::{program, Debug, Program};
 
-use wgpu::util::DeviceExt;
+use crate::gui::controls::{Controls, Message};
+use crate::gui::scene::Scene;
+use wgpu::util::{DeviceExt, StagingBelt};
 use wgpu::{BindGroupLayoutDescriptor, ShaderStages};
 use winit::event::WindowEvent;
 use winit::window::Window;
@@ -28,16 +32,19 @@ const QUAD_VERTICES: [Vertex; 4] = [
 
 pub struct State {
     surface: wgpu::Surface,
-    device: wgpu::Device,
+    pub(crate) device: wgpu::Device,
     queue: wgpu::Queue,
     config: wgpu::SurfaceConfiguration,
     pub(crate) window_size: winit::dpi::PhysicalSize<u32>,
-    render_pipeline: wgpu::RenderPipeline,
+    main_render_pipeline: wgpu::RenderPipeline,
+    screen_render_pipeline: wgpu::RenderPipeline,
     vertex_buffer: wgpu::Buffer,
     main_bind_group: wgpu::BindGroup,
     rendering_info_buffer: wgpu::Buffer,
     render_objects: [RenderQueueData; 100],
     render_objects_buffer: wgpu::Buffer,
+    pub(crate) surface_preferred_format: wgpu::TextureFormat,
+    // egui_rpass: egui_wgpu_backend::RenderPass,
 }
 
 impl State {
@@ -72,6 +79,9 @@ impl State {
             .await
             .unwrap();
 
+        let surfae_preferred_format = surface.get_preferred_format(&adapter).unwrap();
+        // let mut egui_rpass = egui_wgpu_backend::RenderPass::new(&device, surface_format, 1);
+
         let config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             format: surface.get_preferred_format(&adapter).unwrap(),
@@ -81,9 +91,14 @@ impl State {
         };
         surface.configure(&device, &config);
 
-        let fragment_shader = device.create_shader_module(&wgpu::ShaderModuleDescriptor {
-            label: Some("Fragment shader"),
+        let main_fragment_shader = device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+            label: Some("Main fragment shader"),
             source: wgpu::include_spirv!("./shaders/main.frag.spv").source,
+        });
+
+        let screen_fragment_shader = device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+            label: Some("Screen fragment shader"),
+            source: wgpu::include_spirv!("./shaders/screen.frag.spv").source,
         });
 
         let vertex_shader = device.create_shader_module(&wgpu::ShaderModuleDescriptor {
@@ -171,7 +186,7 @@ impl State {
             ],
         });
 
-        let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+        let main_render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("Render Pipeline"),
             layout: Some(&render_pipeline_layout),
             vertex: wgpu::VertexState {
@@ -180,7 +195,7 @@ impl State {
                 buffers: &[Vertex::desc()],
             },
             fragment: Some(wgpu::FragmentState {
-                module: &fragment_shader,
+                module: &main_fragment_shader,
                 entry_point: "main",
                 targets: &[wgpu::ColorTargetState {
                     format: config.format,
@@ -205,18 +220,55 @@ impl State {
             },
         });
 
+        let screen_render_pipeline =
+            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                label: Some("Render Pipeline"),
+                layout: Some(&render_pipeline_layout),
+                vertex: wgpu::VertexState {
+                    module: &vertex_shader,
+                    entry_point: "main",
+                    buffers: &[Vertex::desc()],
+                },
+                fragment: Some(wgpu::FragmentState {
+                    module: &screen_fragment_shader,
+                    entry_point: "main",
+                    targets: &[wgpu::ColorTargetState {
+                        format: config.format,
+                        blend: None,
+                        write_mask: wgpu::ColorWrites::ALL,
+                    }],
+                }),
+                primitive: wgpu::PrimitiveState {
+                    topology: wgpu::PrimitiveTopology::TriangleStrip,
+                    strip_index_format: None,
+                    front_face: wgpu::FrontFace::Ccw,
+                    cull_mode: None,
+                    polygon_mode: wgpu::PolygonMode::Fill,
+                    clamp_depth: false,
+                    conservative: false,
+                },
+                depth_stencil: None,
+                multisample: wgpu::MultisampleState {
+                    count: 1,
+                    mask: !0,
+                    alpha_to_coverage_enabled: false,
+                },
+            });
+
         Self {
             surface,
             device,
             queue,
             config,
             window_size,
-            render_pipeline,
+            main_render_pipeline,
+            screen_render_pipeline,
             vertex_buffer,
             main_bind_group,
             rendering_info_buffer,
             render_objects,
             render_objects_buffer,
+            surface_preferred_format: surfae_preferred_format, // egui_rpass,
         }
     }
 
@@ -239,8 +291,26 @@ impl State {
     pub(crate) fn render(
         &mut self,
         rendering_info: &RenderingInfo,
+        staging_belt: &mut StagingBelt,
+        window: &mut Window,
+        scene: &Scene,
+        program: &Controls,
+        state: &program::State<Controls>,
+        debug: &Debug,
+        viewport: &Viewport,
+        renderer: &mut iced_wgpu::Renderer,
     ) -> Result<(), wgpu::SurfaceError> {
         let output = self.surface.get_current_texture()?;
+        let view = output
+            .texture
+            .create_view(&wgpu::TextureViewDescriptor::default());
+
+        self.queue.write_buffer(
+            &self.rendering_info_buffer,
+            0,
+            any_as_u8_slice(rendering_info),
+        );
+
         let view = output
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());
@@ -269,17 +339,52 @@ impl State {
                 depth_stencil_attachment: None,
             });
 
-            render_pass.set_pipeline(&self.render_pipeline);
+            render_pass.set_pipeline(&self.main_render_pipeline);
             render_pass.set_bind_group(0, &self.main_bind_group, &[]);
             render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
             render_pass.draw(0..4, 0..1);
+
+            render_pass.set_pipeline(&self.screen_render_pipeline);
+            // render_pass.set_bind_group(0, &self.main_bind_group, &[]);
+            // render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
+            render_pass.draw(0..4, 0..1);
+        }
+        {
+            let mut render_pass = scene.clear(&view, &mut encoder, program.background_color());
+            // Draw the scene
+            scene.draw(&mut render_pass);
         }
 
-        self.queue.write_buffer(
-            &self.rendering_info_buffer,
-            0,
-            any_as_u8_slice(rendering_info),
+        // self.egui_rpass
+        //     .update_texture(&self.device, &self.queue, &platform.context().texture());
+        // self.egui_rpass.update_user_textures(&device, &self.queue);
+        // self.egui_rpass
+        //     .update_buffers(&self.device, &self.queue, &paint_jobs, &screen_descriptor);
+        // self.egui_rpass
+        //     .execute(
+        //         &mut encoder,
+        //         &output_view,
+        //         &paint_jobs,
+        //         &screen_descriptor,
+        //         Some(wgpu::Color::BLACK),
+        //     )
+        //     .unwrap();
+
+        let mouse_interaction = renderer.backend_mut().draw(
+            &mut self.device,
+            staging_belt,
+            &mut encoder,
+            &view,
+            &viewport,
+            state.primitive(),
+            &debug.overlay(),
         );
+
+        window.set_cursor_icon(iced_winit::conversion::mouse_interaction(mouse_interaction));
+
+        // Then we submit the work
+        staging_belt.finish();
+
         self.queue.submit(iter::once(encoder.finish()));
         output.present();
 

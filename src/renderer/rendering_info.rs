@@ -7,7 +7,7 @@ pub struct RenderingInfo {
     pub(crate) cam_pos: nalgebra::Vector3<f32>,
     _p2: [i32; 1],
     pub(crate) cam_dir: nalgebra::Vector3<f32>,
-    fov: f32,
+    pub(crate) fov: f32,
     pub(crate) queue_count: u32,
     _p3: [i32; 3],
 }
@@ -22,7 +22,7 @@ impl RenderingInfo {
             ),
             cam_pos: nalgebra::Vector3::new(0.0, 0.5, 0.0),
             cam_dir: nalgebra::Vector3::new(0.0, 0.0, -1.0),
-            fov: 30.0,
+            fov: 60.0f32.to_radians(),
             queue_count: 1,
             _p1: [0; 1],
             _p2: [0; 1],

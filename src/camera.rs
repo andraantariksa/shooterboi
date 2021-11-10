@@ -2,11 +2,15 @@ use crate::nalgebra;
 use crate::util::clamp;
 use rapier3d::na::Vector3;
 
+pub struct FrustumPlane {}
+
+pub struct Frustum {}
+
 pub struct Camera {
     pub(crate) position: Vector3<f32>,
     yaw: f32,
     pitch: f32,
-    fov: f32,
+    pub(crate) fov: f32,
     sensitivity: f32,
 }
 
@@ -16,7 +20,7 @@ impl Camera {
             position: Vector3::new(0.0, 0.0, 0.0),
             yaw: 270.0,
             pitch: 0.0,
-            fov: 60.0,
+            fov: 60.0f32.to_radians(),
             sensitivity: 0.5,
         }
     }
@@ -52,4 +56,6 @@ impl Camera {
             .cross(&nalgebra::Vector3::new(0.0, 1.0, 0.0))
             .normalize()
     }
+
+    pub fn get_frustum() {}
 }
