@@ -1,10 +1,9 @@
 use crate::nalgebra;
+use conrod_core::image::Map;
+use conrod_core::Ui;
+use conrod_wgpu::{Image, Renderer};
 use core::iter;
-use iced_wgpu::Viewport;
-use iced_winit::{program, Debug, Program};
 
-use crate::gui::controls::{Controls, Message};
-use crate::gui::scene::Scene;
 use wgpu::util::{DeviceExt, StagingBelt};
 use wgpu::{BindGroupLayoutDescriptor, ShaderStages};
 use winit::event::WindowEvent;
@@ -33,7 +32,7 @@ const QUAD_VERTICES: [Vertex; 4] = [
 pub struct State {
     surface: wgpu::Surface,
     pub(crate) device: wgpu::Device,
-    queue: wgpu::Queue,
+    pub(crate) queue: wgpu::Queue,
     config: wgpu::SurfaceConfiguration,
     pub(crate) window_size: winit::dpi::PhysicalSize<u32>,
     main_render_pipeline: wgpu::RenderPipeline,
@@ -45,6 +44,7 @@ pub struct State {
     render_objects_buffer: wgpu::Buffer,
     pub(crate) surface_preferred_format: wgpu::TextureFormat,
     // egui_rpass: egui_wgpu_backend::RenderPass,
+    conrod_renderer: conrod_wgpu::Renderer,
 }
 
 impl State {
@@ -61,7 +61,6 @@ impl State {
             .request_adapter(&wgpu::RequestAdapterOptions {
                 power_preference: wgpu::PowerPreference::HighPerformance,
                 compatible_surface: Some(&surface),
-                force_fallback_adapter: false,
             })
             .await
             .unwrap();
@@ -71,15 +70,14 @@ impl State {
                 &wgpu::DeviceDescriptor {
                     label: None,
                     features: wgpu::Features::empty(),
-                    limits: wgpu::Limits::downlevel_webgl2_defaults()
-                        .using_resolution(adapter.limits()), // wgpu::Limits::default(),
+                    limits: wgpu::Limits::default(),
                 },
                 None,
             )
             .await
             .unwrap();
 
-        let surfae_preferred_format = surface.get_preferred_format(&adapter).unwrap();
+        let surface_preferred_format = surface.get_preferred_format(&adapter).unwrap();
         // let mut egui_rpass = egui_wgpu_backend::RenderPass::new(&device, surface_format, 1);
 
         let config = wgpu::SurfaceConfiguration {
@@ -156,7 +154,7 @@ impl State {
                 push_constant_ranges: &[],
             });
 
-        let mut render_objects = [RenderQueueData::new(); 100];
+        let mut render_objects = [RenderQueueData::new_none(); 100];
         render_objects[0].shape_type = ShapeType::Sphere;
         render_objects[0].shape_data1.x = 1.0;
         render_objects[0].position = nalgebra::Vector3::new(0.0, 0.0, -3.0);
@@ -255,6 +253,8 @@ impl State {
                 },
             });
 
+        let conrod_renderer = conrod_wgpu::Renderer::new(&device, 1, surface_preferred_format);
+
         Self {
             surface,
             device,
@@ -268,7 +268,8 @@ impl State {
             rendering_info_buffer,
             render_objects,
             render_objects_buffer,
-            surface_preferred_format: surfae_preferred_format, // egui_rpass,
+            surface_preferred_format, // egui_rpass,
+            conrod_renderer,
         }
     }
 
@@ -291,27 +292,19 @@ impl State {
     pub(crate) fn render(
         &mut self,
         rendering_info: &RenderingInfo,
-        staging_belt: &mut StagingBelt,
         window: &mut Window,
-        scene: &Scene,
-        program: &Controls,
-        state: &program::State<Controls>,
-        debug: &Debug,
-        viewport: &Viewport,
-        renderer: &mut iced_wgpu::Renderer,
+        ui: &Ui,
+        image_map: &Map<Image>,
     ) -> Result<(), wgpu::SurfaceError> {
-        let output = self.surface.get_current_texture()?;
-        let view = output
-            .texture
-            .create_view(&wgpu::TextureViewDescriptor::default());
-
         self.queue.write_buffer(
             &self.rendering_info_buffer,
             0,
             any_as_u8_slice(rendering_info),
         );
 
-        let view = output
+        let frame = self.surface.get_current_frame()?;
+        let view = frame
+            .output
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());
 
@@ -320,6 +313,28 @@ impl State {
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("Render encoder"),
             });
+        {
+            let primitives = ui.draw();
+            if let Some(cmd) = self
+                .conrod_renderer
+                .fill(
+                    &image_map,
+                    [
+                        0.0,
+                        0.0,
+                        self.window_size.width as f32,
+                        self.window_size.height as f32,
+                    ],
+                    window.scale_factor(),
+                    primitives,
+                )
+                .unwrap()
+            {
+                cmd.load_buffer_and_encode(&self.device, &mut encoder);
+            }
+        }
+        let render = self.conrod_renderer.render(&self.device, &image_map);
+        let buffer_slice = render.vertex_buffer.slice(..);
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Render pass"),
@@ -345,14 +360,31 @@ impl State {
             render_pass.draw(0..4, 0..1);
 
             render_pass.set_pipeline(&self.screen_render_pipeline);
-            // render_pass.set_bind_group(0, &self.main_bind_group, &[]);
-            // render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
             render_pass.draw(0..4, 0..1);
-        }
-        {
-            let mut render_pass = scene.clear(&view, &mut encoder, program.background_color());
-            // Draw the scene
-            scene.draw(&mut render_pass);
+
+            {
+                let slot = 0;
+                render_pass.set_vertex_buffer(slot, buffer_slice);
+                for cmd in render.commands {
+                    match cmd {
+                        conrod_wgpu::RenderPassCommand::SetPipeline { pipeline } => {
+                            render_pass.set_pipeline(pipeline);
+                        }
+                        conrod_wgpu::RenderPassCommand::SetBindGroup { bind_group } => {
+                            render_pass.set_bind_group(0, bind_group, &[]);
+                        }
+                        conrod_wgpu::RenderPassCommand::SetScissor {
+                            top_left: [x, y],
+                            dimensions: [w, h],
+                        } => {
+                            render_pass.set_scissor_rect(0, 0, w, h);
+                        }
+                        conrod_wgpu::RenderPassCommand::Draw { vertex_range } => {
+                            render_pass.draw(vertex_range, 0..1);
+                        }
+                    }
+                }
+            }
         }
 
         // self.egui_rpass
@@ -370,23 +402,7 @@ impl State {
         //     )
         //     .unwrap();
 
-        let mouse_interaction = renderer.backend_mut().draw(
-            &mut self.device,
-            staging_belt,
-            &mut encoder,
-            &view,
-            &viewport,
-            state.primitive(),
-            &debug.overlay(),
-        );
-
-        window.set_cursor_icon(iced_winit::conversion::mouse_interaction(mouse_interaction));
-
-        // Then we submit the work
-        staging_belt.finish();
-
         self.queue.submit(iter::once(encoder.finish()));
-        output.present();
 
         Ok(())
     }

@@ -1,5 +1,5 @@
-use crate::nalgebra;
 use crate::util::clamp;
+use nalgebra;
 use rapier3d::na::Vector3;
 
 pub struct FrustumPlane {}
@@ -17,7 +17,7 @@ pub struct Camera {
 impl Camera {
     pub fn new() -> Self {
         Self {
-            position: Vector3::new(0.0, 0.0, 0.0),
+            position: Vector3::new(0.0, 1.0, 0.0),
             yaw: 270.0,
             pitch: 0.0,
             fov: 60.0f32.to_radians(),

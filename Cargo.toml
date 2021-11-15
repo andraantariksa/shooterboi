@@ -7,12 +7,12 @@ resolver = "2"
 [dependencies]
 instant = "0.1"
 pollster = "0.2.4"
+nalgebra = "0.29.0"
 bytemuck = { version = "1.7.2", features = ["derive"] }
 ambisonic = { git = "https://github.com/andraantariksa/ambisonic.git" }
 bincode = "1.3.3"
 rapier3d = "0.11.1"
 serde = { version = "1", features = ["derive"] }
-
 log = "0.4.14"
 # ECS
 hecs = "0.6.5"
@@ -20,36 +20,40 @@ hecs = "0.6.5"
 # Database
 gluesql = "0.8"
 # GUI
-egui_wgpu_backend = "0.13"
-egui = "0.14"
-egui_winit_platform = "0.10.0"
-iced_wgpu = { git = "https://github.com/iced-rs/iced.git", rev = "65f690b07559a36fe8bfcba31edd851c5c286704" }
-iced_winit = { git = "https://github.com/iced-rs/iced.git", rev = "65f690b07559a36fe8bfcba31edd851c5c286704" }
+#egui_wgpu_backend = "0.12"
+#egui = "0.14"
+#egui_winit_platform = "0.10.0"
+conrod_winit = "0.75"
+conrod_wgpu = "0.76"
+conrod_core = "0.76"
+conrod_example_shared = "0.75"
+#iced_wgpu = { git = "https://github.com/iced-rs/iced.git", rev = "65f690b07559a36fe8bfcba31edd851c5c286704" }
+#iced_winit = { git = "https://github.com/iced-rs/iced.git", rev = "65f690b07559a36fe8bfcba31edd851c5c286704" }
 # PATCH
 getrandom = { version = "0.2", features = ["js"] }
-winit = { git = "https://github.com/iced-rs/winit.git", rev = "1e6623c4d06d110e5408dcbdf1edebd07e6a200e" }
+#winit = { git = "https://github.com/iced-rs/winit.git", rev = "1e6623c4d06d110e5408dcbdf1edebd07e6a200e" }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-wgpu = { version = "0.11.0", features = ["webgl", "spirv"] }
-web-sys = "0.3.50"
+wgpu = { version = "0.11", features = ["webgl", "spirv"] }
+web-sys = "0.3.55"
 image = { version = "0.23.14", default-features = false, features = ["gif", "jpeg", "ico", "png", "pnm", "tga", "tiff", "webp", "bmp", "hdr", "dxt", "dds", "farbfeld"] }
-#winit = { version = "0.25.0", features = ["web-sys"] }
+winit = { version = "0.25.0", features = ["web-sys"] }
 console_log = "0.2.0"
 console_error_panic_hook = "0.1.7"
 #wasm-bindgen-futures = "0.4.28"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-wgpu = { version = "0.11.0", features = ["spirv"] }
+wgpu = { version = "0.11", features = ["spirv"] }
 image = "0.23.14"
-#winit = "0.25.0"
+winit = "0.25.0"
 env_logger = "0.9.0"
 
 [build-dependencies]
 shaderc = "0.7.2"
 glob = "0.3.0"
 
-[patch.crates-io]
-window_clipboard = { git = "https://github.com/andraantariksa/window_clipboard.git", rev = "0f74d591986c71e0786128827c98f17c0054aadf" }
+#[patch.crates-io]
+#window_clipboard = { git = "https://github.com/andraantariksa/window_clipboard.git", rev = "0f74d591986c71e0786128827c98f17c0054aadf" }
 
-[target.'cfg(target_arch = "wasm32")'.patch.crates-io]
-winit = { version = "0.25.0", features = ["web-sys"] }
+#[target.'cfg(target_arch = "wasm32")'.patch.crates-io]
+#winit = { version = "0.25.0", features = ["web-sys"] }

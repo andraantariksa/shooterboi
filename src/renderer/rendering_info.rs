@@ -1,6 +1,6 @@
-use crate::nalgebra;
 use winit::dpi::PhysicalSize;
 
+#[derive(Debug, Clone)]
 pub struct RenderingInfo {
     pub(crate) reso_time: nalgebra::Vector3<f32>,
     _p1: [i32; 1],
@@ -20,7 +20,7 @@ impl RenderingInfo {
                 window_size.height as f32,
                 0.0,
             ),
-            cam_pos: nalgebra::Vector3::new(0.0, 0.5, 0.0),
+            cam_pos: nalgebra::Vector3::new(0.0, 1.0, 0.0),
             cam_dir: nalgebra::Vector3::new(0.0, 0.0, -1.0),
             fov: 60.0f32.to_radians(),
             queue_count: 1,
@@ -30,20 +30,9 @@ impl RenderingInfo {
         }
     }
 
-    pub fn resize(&mut self, new_size: &nalgebra::Vector2<f32>) {
-        self.reso_time.x = new_size.x;
-        self.reso_time.y = new_size.y;
-    }
-
-    pub fn update(
-        &mut self,
-        time: f32,
-        cam_pos: &nalgebra::Vector3<f32>,
-        cam_dir: &nalgebra::Vector3<f32>,
-    ) {
-        self.reso_time.z = time;
-        self.cam_pos = *cam_pos;
-        self.cam_dir = *cam_dir;
+    pub fn resize(&mut self, new_size: &PhysicalSize<u32>) {
+        self.reso_time.x = new_size.width as f32;
+        self.reso_time.y = new_size.height as f32;
     }
 }
 
