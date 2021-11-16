@@ -1,7 +1,9 @@
 extern crate winit;
 
+mod audio;
 mod camera;
 mod game;
+mod gui;
 mod input_manager;
 mod renderer;
 mod scene;
