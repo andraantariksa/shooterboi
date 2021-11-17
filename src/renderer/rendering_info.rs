@@ -22,7 +22,7 @@ impl RenderingInfo {
             ),
             cam_pos: nalgebra::Vector3::new(0.0, 1.0, 0.0),
             cam_dir: nalgebra::Vector3::new(0.0, 0.0, -1.0),
-            fov: 60.0f32.to_radians(),
+            fov: 90.0f32.to_radians(),
             queue_count: 0,
             _p1: [0; 1],
             _p2: [0; 1],

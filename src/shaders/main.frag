@@ -163,8 +163,8 @@ Distance scene_dist(vec3 pos)
     for (uint i = 0u; i < queue_count; i++) {
         switch (queue[i].shape_type) {
             case SHAPE_TYPE_SPHERE:
-            m = sd_union(m, Distance(sd_sphere(pos - queue[i].position, queue[i].shape_data.x), 2));
-            break;
+                m = sd_union(m, Distance(sd_sphere(pos - queue[i].position, queue[i].shape_data.x), 2));
+                break;
 //            case SHAPE_TYPE_CAPSULE_LINE:
 //            m = sd_union(m,
 //                Distance(
@@ -176,53 +176,55 @@ Distance scene_dist(vec3 pos)
 //                        4));
 //            break;
             case SHAPE_TYPE_BOX:
-            m = sd_union(m,
-                Distance(
-                    sd_box(
-                        pos - queue[i].position,
-                        queue[i].shape_data.xyz),
-                        4));
-            break;
+                m = sd_union(m,
+                    Distance(
+                        sd_box(
+                            pos - queue[i].position,
+                            queue[i].shape_data.xyz),
+                            4));
+                break;
             default:
-            break;
+                break;
         }
     }
+
+    m = sd_union(m, Distance(sd_sphere(pos, 1.0), 2));
 
     return m;
 }
 
-vec3 get_normal(vec3 pos, float center_dist)
+vec3 get_normal(vec3 pos)
 {
-    Distance dfx = scene_dist(vec3(pos.x - EPS, pos.y, pos.z));
-    Distance dfy = scene_dist(vec3(pos.x, pos.y - EPS, pos.z));
-    Distance dfz = scene_dist(vec3(pos.x, pos.y, pos.z - EPS));
-    vec3 normal = (center_dist - vec3(dfx.distance, dfy.distance, dfz.distance)) / EPS;
-
-    return normal;
+    float d = scene_dist(pos).distance;
+    vec2 eps = vec2(EPS, 0.);
+    
+    vec3 normal = vec3(
+        scene_dist(pos + eps.xyy).distance - d,
+        scene_dist(pos + eps.yxy).distance - d,
+        scene_dist(pos + eps.yyx).distance - d);
+    
+    return normalize(normal);
 }
 
 Distance ray_march(vec3 ray_origin, vec3 ray_dir)
 {
-    Distance dist_traveled = Distance(0.0, 0);
+    float d = 0.0;
+    uint mat_id = 0;
     vec3 current_pos = vec3(0);
 
-    for (uint i = 0u; i < 100u; i++) {
-        current_pos = ray_origin + dist_traveled.distance * ray_dir;
+    for (uint i = 0u; i < 128u; i++) {
+        current_pos = ray_origin + d * ray_dir;
         Distance closest_distance = scene_dist(current_pos);
 
-        if (abs(closest_distance.distance) < EPS) {
+        if (abs(closest_distance.distance) < 0.0001 || d >= 100.0) {
             break;
         }
 
-        dist_traveled.distance += closest_distance.distance;
-        dist_traveled.materialId = closest_distance.materialId;
-
-        if (dist_traveled.distance >= MAX_DISTANCE) {
-            break;
-        }
+        d += closest_distance.distance;
+        mat_id = closest_distance.materialId;
     }
 
-    return dist_traveled;
+    return Distance(d, mat_id);
 }
 
 float soft_shadow(in vec3 ro, in vec3 rd, float mint, float maxt, float k)
@@ -247,7 +249,7 @@ float ambient_ocl(in vec3 pos, in vec3 nor)
 {
     float occ = 0.0;
     float sca = 1.0;
-    for (int i = 0; i < 2; i++)
+    for (int i = 0; i < 4; i++)
     {
         float h = 0.001 + 0.15 * float(i) / 4.0;
         Distance d = scene_dist(pos + h * nor);
@@ -330,6 +332,36 @@ vec3 phongContribForLight(
     return lightIntensity * (k_d * dotLN + k_s * pow(dotRV, alpha));
 }
 
+vec3 blinnPhong(
+    vec3 k_d,
+    vec3 k_s,
+    float alpha,
+    vec3 p,
+    vec3 eye,
+    vec3 light_pos,
+    vec3 light_intensity,
+    vec3 n)
+{
+    vec3 l = normalize(light_pos - p);
+    vec3 v = normalize(eye - p);
+    vec3 h = normalize(l + v);
+    float diff = max(dot(l, n), 0.0);
+    float spec = max(dot(h, n), 0.0);
+
+    if (diff < 0.0) {
+        // Light not visible from this point on the surface
+        return vec3(0.0, 0.0, 0.0);
+    }
+
+    if (spec < 0.0) {
+        // Light reflection in opposite direction as viewer, apply only diffuse
+        // component
+        return light_intensity * (k_d * diff);
+    }
+
+    return light_intensity * (k_d * diff + k_s * pow(spec, alpha));
+}
+
 void main()
 {
     vec3 world_up = vec3(0.0, 1.0, 0.0);
@@ -348,7 +380,7 @@ void main()
     }
 
     vec3 ray_hit_pos = cam_pos + d.distance * ray_world_dir;
-    vec3 normal = get_normal(ray_hit_pos, d.distance);
+    vec3 normal = get_normal(ray_hit_pos);
 //    float lv = 0.;
 //
 //    lv += light(normal, lp, cam_pos) * 0.7;
@@ -386,7 +418,9 @@ void main()
     const vec3 ambientLight = 0.5 * vec3(1.0, 1.0, 1.0) * 0.2;
     vec3 color = ambientLight;
 
-    color += phongContribForLight(
+    float ao = ambient_ocl(ray_hit_pos, normal) * 2.0;
+
+    color += blinnPhong(
         col,
         vec3(1.0, 1.0, 1.0),
         10.0,
@@ -397,5 +431,6 @@ void main()
         normal);
     color *= ambient_ocl(ray_hit_pos, normal);
     outColor = vec4(color, 1.0);
+    //outColor = vec4(vec3(ao), 1.0);
 //    outColor = vec4(clamp(pow(col * lv, 1. / vec3(2.2)), 0, 1), 1.0);
 }

@@ -20,7 +20,7 @@ impl Camera {
             position: Vector3::new(0.0, 1.0, 0.0),
             yaw: 270.0,
             pitch: 0.0,
-            fov: 60.0f32.to_radians(),
+            fov: 90.0f32.to_radians(),
             sensitivity: 0.5,
         }
     }

@@ -1,5 +1,6 @@
 use glob::{glob, GlobError, PatternError};
 use shaderc::CompileOptions;
+use shaderc::OptimizationLevel;
 use std::fs::{read_to_string, write};
 use std::path::PathBuf;
 
@@ -55,9 +56,17 @@ fn main() -> BuildScriptResult<()> {
     #[warn(unused_mut)]
     let mut compile_options = CompileOptions::new().unwrap();
     let target = std::env::var("TARGET").unwrap();
+    let profile = std::env::var("PROFILE").unwrap();
+
+    if profile.contains("debug") {
+        compile_options.set_optimization_level(OptimizationLevel::Zero);
+        compile_options.set_generate_debug_info();
+    }
+
     if target.contains("wasm") {
         compile_options.add_macro_definition("IS_WEB", None);
     }
+
     for shader in shaders {
         // println!(
         //     "cargo:rerun-if-changed={}",
