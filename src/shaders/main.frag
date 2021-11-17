@@ -362,6 +362,7 @@ vec3 blinnPhong(
     return light_intensity * (k_d * diff + k_s * pow(spec, alpha));
 }
 
+const vec3 skycolor = vec3(113, 188, 225) / 255.0;
 void main()
 {
     vec3 world_up = vec3(0.0, 1.0, 0.0);
@@ -375,7 +376,7 @@ void main()
     Distance d = ray_march(cam_pos, ray_world_dir);
 
     if (d.distance > MAX_DISTANCE - EPS) {
-        outColor = vec4(0.);
+        outColor = vec4(skycolor, 1.0);
         return;
     }
 
@@ -415,19 +416,19 @@ void main()
             break;
     }
 
-    const vec3 ambientLight = 0.5 * vec3(1.0, 1.0, 1.0) * 0.2;
-    vec3 color = ambientLight;
+    //col *= 0.5;
 
-    float ao = ambient_ocl(ray_hit_pos, normal) * 2.0;
+    const vec3 ambientLight = skycolor * col * 0.5;
+    vec3 color = ambientLight;
 
     color += blinnPhong(
         col,
-        vec3(1.0, 1.0, 1.0),
+        vec3(1.0),
         10.0,
         ray_hit_pos,
         cam_pos,
-        cam_pos,
-        vec3(0.4, 0.4, 0.4),
+        vec3(0.0, 10.0, 0.0),
+        vec3(0.4),
         normal);
     color *= ambient_ocl(ray_hit_pos, normal);
     outColor = vec4(color, 1.0);
