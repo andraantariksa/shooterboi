@@ -8,6 +8,7 @@
 #define SHAPE_TYPE_NONE 0
 #define SHAPE_TYPE_SPHERE 1
 #define SHAPE_TYPE_BOX 2
+#define SHAPE_TYPE_CYLINDER 3
 
 struct RenderQueue
 {
@@ -151,6 +152,20 @@ float sd_silver_horn(vec3 pos, vec3 c)
     //return length(pos.xz) - 0.2;cd
 }
 
+float sd_cylinder(vec3 p, vec3 a, vec3 b, float r)
+{
+    vec3  ba = b - a;
+    vec3  pa = p - a;
+    float baba = dot(ba,ba);
+    float paba = dot(pa,ba);
+    float x = length(pa*baba-ba*paba) - r*baba;
+    float y = abs(paba-baba*0.5)-baba*0.5;
+    float x2 = x*x;
+    float y2 = y*y*baba;
+    float d = (max(x,y)<0.0)?-min(x2,y2):(((x>0.0)?x2:0.0)+((y>0.0)?y2:0.0));
+    return sign(d)*sqrt(abs(d))/baba;
+}
+
 vec3 repeat(vec3 pos, vec3 c)
 {
     return mod(pos + 0.5 * c, c) - 0.5 * c;
@@ -165,16 +180,6 @@ Distance scene_dist(vec3 pos)
             case SHAPE_TYPE_SPHERE:
                 m = sd_union(m, Distance(sd_sphere(pos - queue[i].position, queue[i].shape_data.x), 2));
                 break;
-//            case SHAPE_TYPE_CAPSULE_LINE:
-//            m = sd_union(m,
-//                Distance(
-//                    sd_capsule_line(
-//                        pos - queue[i].position,
-//                        queue[i].shape_data.xyz,
-//                        queue[i].shape_data2.xyz,
-//                        queue[i].shape_data.w),
-//                        4));
-//            break;
             case SHAPE_TYPE_BOX:
                 m = sd_union(m,
                     Distance(
@@ -183,6 +188,26 @@ Distance scene_dist(vec3 pos)
                             queue[i].shape_data.xyz),
                             4));
                 break;
+            case SHAPE_TYPE_CYLINDER:
+                m = sd_union(m,
+                    Distance(
+                        sd_cylinder(
+                            pos - queue[i].position,
+                            queue[i].shape_data.xyz,
+                            queue[i].shape_data2.xyz,
+                            queue[i].shape_data.w),
+                            2));
+                break;
+//            case SHAPE_TYPE_CAPSULE_LINE:
+//            m = sd_union(m,
+//            Distance(
+//            sd_capsule_line(
+//            pos - queue[i].position,
+//            queue[i].shape_data.xyz,
+//            queue[i].shape_data2.xyz,
+//            queue[i].shape_data.w),
+//            4));
+//            break;
             default:
                 break;
         }

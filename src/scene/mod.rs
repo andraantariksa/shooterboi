@@ -55,33 +55,3 @@ pub trait Scene {
 }
 
 pub const MARGIN: conrod_core::Scalar = 30.0;
-
-pub struct GamePhysics {
-    pub gravity: nalgebra::Vector3<f32>,
-    pub rigid_body_set: rapier3d::prelude::RigidBodySet,
-    pub collider_set: rapier3d::prelude::ColliderSet,
-    pub integration_parameters: rapier3d::prelude::IntegrationParameters,
-    pub physics_pipeline: rapier3d::prelude::PhysicsPipeline,
-    pub island_manager: rapier3d::prelude::IslandManager,
-    pub broad_phase: rapier3d::prelude::BroadPhase,
-    pub narrow_phase: rapier3d::prelude::NarrowPhase,
-    pub joint_set: rapier3d::prelude::JointSet,
-    pub ccd_solver: rapier3d::prelude::CCDSolver,
-}
-
-impl GamePhysics {
-    fn new() -> Self {
-        Self {
-            gravity: nalgebra::Vector3::new(0.0, -9.81, 0.0),
-            rigid_body_set: rapier3d::prelude::RigidBodySet::new(),
-            collider_set: rapier3d::prelude::ColliderSet::new(),
-            integration_parameters: rapier3d::prelude::IntegrationParameters::default(),
-            physics_pipeline: rapier3d::prelude::PhysicsPipeline::new(),
-            island_manager: rapier3d::prelude::IslandManager::new(),
-            broad_phase: rapier3d::prelude::BroadPhase::new(),
-            narrow_phase: rapier3d::prelude::NarrowPhase::new(),
-            joint_set: rapier3d::prelude::JointSet::new(),
-            ccd_solver: rapier3d::prelude::CCDSolver::new(),
-        }
-    }
-}

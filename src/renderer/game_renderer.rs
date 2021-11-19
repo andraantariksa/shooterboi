@@ -1,9 +1,10 @@
+use crate::camera::Camera;
 use wgpu::util::DeviceExt;
 
 use crate::gui::ConrodHandle;
 use crate::renderer::rendering_info::RenderingInfo;
 use crate::renderer::vertex::Vertex;
-use crate::renderer::{RenderQueueData, SurfaceAndWindowConfig};
+use crate::renderer::{RenderObjects, RenderQueueData, SurfaceAndWindowConfig};
 use crate::util::any_as_u8_slice;
 
 const QUAD_VERTICES: [Vertex; 4] = [
@@ -35,7 +36,8 @@ impl GameSceneRenderer {
         surface_config: &wgpu::SurfaceConfiguration,
         device: &wgpu::Device,
         rendering_info: &RenderingInfo,
-        render_queue: &[RenderQueueData; 100],
+        render_objects: &mut RenderObjects,
+        camera: &Camera,
     ) -> Self {
         let main_fragment_shader = device.create_shader_module(&wgpu::ShaderModuleDescriptor {
             label: Some("Main fragment shader"),
@@ -98,7 +100,11 @@ impl GameSceneRenderer {
 
         let render_objects_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Rendering objects"),
-            contents: any_as_u8_slice(render_queue),
+            contents: any_as_u8_slice(
+                &render_objects
+                    .get_objects_and_active_len(&camera.get_frustum())
+                    .0,
+            ),
             usage: if cfg!(target_arch = "wasm32") {
                 wgpu::BufferUsages::UNIFORM
             } else {

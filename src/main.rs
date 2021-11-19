@@ -5,6 +5,7 @@ mod camera;
 mod game;
 mod gui;
 mod input_manager;
+mod physics;
 mod renderer;
 mod scene;
 mod util;

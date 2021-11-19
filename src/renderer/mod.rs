@@ -6,7 +6,7 @@ use winit::window::Window;
 use conrod_renderer::ConrodSceneRenderer;
 use game_renderer::GameSceneRenderer;
 
-use crate::camera::Camera;
+use crate::camera::{Camera, Frustum, ObjectBound};
 use crate::gui::ConrodHandle;
 use crate::renderer::rendering_info::RenderingInfo;
 use crate::renderer::vertex::Vertex;
@@ -17,14 +17,15 @@ pub mod game_renderer;
 pub mod rendering_info;
 pub mod vertex;
 
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub enum ShapeType {
-    None,
-    Sphere,
-    Box,
+    None = 0,
+    Sphere = 1,
+    Box = 2,
+    Cylinder = 3,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct RenderQueueData {
     pub position: nalgebra::Vector3<f32>,
     _p1: [i32; 1],
@@ -79,8 +80,73 @@ pub struct SurfaceAndWindowConfig {
     pub window_scale_factor: f64,
 }
 
+pub struct RenderObjects {
+    render_objects: Vec<(RenderQueueData, ObjectBound)>,
+    counter: usize,
+    render_objects_static: Vec<(RenderQueueData, ObjectBound)>,
+}
+
+impl RenderObjects {
+    pub fn new() -> Self {
+        Self {
+            counter: 0,
+            render_objects: Vec::new(),
+            render_objects_static: Vec::new(),
+        }
+    }
+
+    pub fn get_mut(&mut self, index: usize) -> &mut (RenderQueueData, ObjectBound) {
+        self.render_objects.get_mut(index).unwrap()
+    }
+
+    pub fn get_mut_static(&mut self, index: usize) -> &mut (RenderQueueData, ObjectBound) {
+        self.render_objects_static.get_mut(index).unwrap()
+    }
+
+    pub fn next(&mut self) -> &mut (RenderQueueData, ObjectBound) {
+        let length = self.render_objects.len();
+        self.render_objects
+            .push((RenderQueueData::new_none(), ObjectBound::None));
+        self.render_objects.get_mut(length).unwrap()
+    }
+
+    pub fn next_static(&mut self) -> &mut (RenderQueueData, ObjectBound) {
+        let length = self.render_objects_static.len();
+        self.render_objects_static
+            .push((RenderQueueData::new_none(), ObjectBound::None));
+        self.render_objects_static.get_mut(length).unwrap()
+    }
+
+    pub fn clear(&mut self) {
+        self.render_objects.clear();
+        self.render_objects_static.clear();
+    }
+
+    pub fn get_objects_and_active_len(
+        &mut self,
+        frustum: &Frustum,
+    ) -> ([RenderQueueData; 50], usize) {
+        let mut resulted_objects = [RenderQueueData::new_none(); 50];
+        let mut index = 0;
+        for (object, bound) in self.render_objects_static.iter() {
+            if frustum.is_on_frustum(&object.position, bound) {
+                resulted_objects[index] = *object;
+                index += 1;
+            }
+        }
+        for (object, bound) in self.render_objects.iter() {
+            if frustum.is_on_frustum(&object.position, bound) {
+                resulted_objects[index] = *object;
+                index += 1;
+            }
+        }
+        self.render_objects.clear();
+        (resulted_objects, index)
+    }
+}
+
 pub struct Renderer {
-    pub render_objects: [RenderQueueData; 100],
+    pub render_objects: RenderObjects,
     pub rendering_info: RenderingInfo,
     pub camera: Camera,
     pub is_render_game: bool,
@@ -135,22 +201,25 @@ impl Renderer {
         };
         surface.configure(&device, &surface_config);
 
-        let mut render_queue = [RenderQueueData::new_none(); 100];
+        let mut render_objects = RenderObjects::new();
         let rendering_info = RenderingInfo::new(window_size);
+
+        let camera = Camera::new();
 
         Self {
             game_renderer: game_renderer::GameSceneRenderer::new(
                 &surface_config,
                 &device,
                 &rendering_info,
-                &render_queue,
+                &mut render_objects,
+                &camera,
             ),
             gui_renderer: conrod_renderer::ConrodSceneRenderer::new(
                 &surface_config,
                 &device,
                 &mut queue,
             ),
-            render_objects: render_queue,
+            render_objects,
             rendering_info,
             is_render_gui: true,
             is_render_game: false,
@@ -161,7 +230,7 @@ impl Renderer {
             surface,
             device,
             queue,
-            camera: Camera::new(),
+            camera,
         }
     }
 
@@ -182,12 +251,16 @@ impl Renderer {
         conrod_handle: &mut ConrodHandle,
     ) -> Result<(), wgpu::SurfaceError> {
         if self.is_render_game {
+            let (objects, objects_len) = self
+                .render_objects
+                .get_objects_and_active_len(&self.camera.get_frustum());
             self.rendering_info.fov = self.camera.fov;
             self.rendering_info.cam_pos = self.camera.position;
             self.rendering_info.cam_dir = *self.camera.get_direction();
             self.rendering_info.reso_time.x = self.surface_and_window_config.surface.width as f32;
             self.rendering_info.reso_time.y = self.surface_and_window_config.surface.height as f32;
             self.rendering_info.reso_time.z = app_run_time;
+            self.rendering_info.queue_count = objects_len as u32;
             self.queue.write_buffer(
                 &self.game_renderer.rendering_info_buffer,
                 0,
@@ -196,7 +269,7 @@ impl Renderer {
             self.queue.write_buffer(
                 &self.game_renderer.render_objects_buffer,
                 0,
-                any_as_u8_slice(&self.render_objects),
+                any_as_u8_slice(&objects),
             );
         }
 

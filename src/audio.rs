@@ -5,9 +5,9 @@ use std::sync::{Arc, Mutex};
 pub const SINK_ID_MAIN_MENU_BGM: usize = 0;
 
 pub struct AudioContext {
-    driver: rodio::OutputStreamHandle,
-    driver2: rodio::OutputStream,
-    global_sinks: Vec<rodio::Sink>,
+    pub output_stream_handle: rodio::OutputStreamHandle,
+    pub output_stream: rodio::OutputStream,
+    pub global_sinks: Vec<rodio::Sink>,
 }
 
 impl AudioContext {
@@ -24,8 +24,8 @@ impl AudioContext {
 
         Self {
             global_sinks: vec![bgm_sink],
-            driver2: output_stream,
-            driver: output_stream_handle,
+            output_stream: output_stream,
+            output_stream_handle: output_stream_handle,
         }
     }
 
