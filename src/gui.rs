@@ -1,5 +1,5 @@
 use crate::renderer::Renderer;
-use crate::scene;
+
 use conrod_core::image::Id as ImageId;
 use conrod_core::text::font::Id as FontId;
 use std::collections::HashMap;
@@ -162,8 +162,8 @@ fn create_image_texture(
         aspect: wgpu::TextureAspect::All,
     };
     let extent = wgpu::Extent3d {
-        width: width,
-        height: height,
+        width,
+        height,
         depth_or_array_layers: 1,
     };
     queue.write_texture(texture_copy_view, data, data_layout, extent);

@@ -9,7 +9,11 @@ pub struct Window {
 impl Window {
     pub(crate) fn set_is_cursor_grabbed(&mut self, grabbed: bool) {
         self.is_cursor_grabbed = grabbed;
-        self.window_internal.set_cursor_grab(grabbed);
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            self.window_internal.set_cursor_grab(grabbed).unwrap();
+            self.window_internal.set_cursor_visible(!grabbed);
+        }
     }
 
     pub(crate) fn is_cursor_grabbed(&self) -> bool {

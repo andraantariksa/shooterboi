@@ -7,7 +7,7 @@ use crate::gui::ConrodHandle;
 use crate::input_manager::InputManager;
 use crate::renderer::Renderer;
 use crate::scene::settings_scene::SettingsScene;
-use crate::scene::{Scene, SceneOp, MARGIN};
+use crate::scene::{MaybeMessage, Scene, SceneOp, MARGIN};
 use crate::window::Window;
 use conrod_core::widget_ids;
 
@@ -26,7 +26,7 @@ pub struct PauseScene {
 }
 
 impl PauseScene {
-    pub fn new(renderer: &mut Renderer, conrod_handle: &mut ConrodHandle) -> Self {
+    pub fn new(_renderer: &mut Renderer, conrod_handle: &mut ConrodHandle) -> Self {
         Self {
             ids: PauseSceneIds::new(conrod_handle.get_ui_mut().widget_id_generator()),
         }
@@ -36,10 +36,11 @@ impl PauseScene {
 impl Scene for PauseScene {
     fn init(
         &mut self,
-        window: &mut Window,
+        _message: MaybeMessage,
+        _window: &mut Window,
         renderer: &mut Renderer,
-        conrod_handle: &mut ConrodHandle,
-        audio_context: &mut AudioContext,
+        _conrod_handle: &mut ConrodHandle,
+        _audio_context: &mut AudioContext,
     ) {
         renderer.is_render_gui = true;
         renderer.is_render_game = false;
@@ -48,11 +49,11 @@ impl Scene for PauseScene {
     fn update(
         &mut self,
         renderer: &mut Renderer,
-        input_manager: &InputManager,
-        delta_time: f32,
+        _input_manager: &InputManager,
+        _delta_time: f32,
         conrod_handle: &mut ConrodHandle,
-        audio_context: &mut AudioContext,
-        control_flow: &mut ControlFlow,
+        _audio_context: &mut AudioContext,
+        _control_flow: &mut ControlFlow,
     ) -> SceneOp {
         let mut scene_op = SceneOp::None;
 
@@ -79,7 +80,7 @@ impl Scene for PauseScene {
                 .wh(conrod_core::Dimensions::new(100.0, 30.0))
                 .set(self.ids.resume_button, &mut ui_cell)
             {
-                scene_op = SceneOp::Pop(1);
+                scene_op = SceneOp::Pop(1, None);
             }
 
             for _ in conrod_core::widget::Button::new()
@@ -89,12 +90,12 @@ impl Scene for PauseScene {
                 .wh(conrod_core::Dimensions::new(100.0, 30.0))
                 .set(self.ids.quit_buton, &mut ui_cell)
             {
-                scene_op = SceneOp::Pop(2);
+                scene_op = SceneOp::Pop(2, None);
             }
         }
 
         for _ in settings_button {
-            scene_op = SceneOp::Push(Box::new(SettingsScene::new(renderer, conrod_handle)));
+            scene_op = SceneOp::Push(Box::new(SettingsScene::new(renderer, conrod_handle)), None);
         }
 
         scene_op
@@ -102,10 +103,10 @@ impl Scene for PauseScene {
 
     fn deinit(
         &mut self,
-        window: &mut Window,
-        renderer: &mut Renderer,
-        conrod_handle: &mut ConrodHandle,
-        audio_context: &mut AudioContext,
+        _window: &mut Window,
+        _renderer: &mut Renderer,
+        _conrod_handle: &mut ConrodHandle,
+        _audio_context: &mut AudioContext,
     ) {
     }
 }

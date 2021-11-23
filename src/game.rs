@@ -2,24 +2,23 @@ use crate::audio::AudioContext;
 use crate::gui::ConrodHandle;
 use crate::input_manager::InputManager;
 use crate::renderer::Renderer;
-use crate::scene::{
-    classic_game_scene::ClassicGameScene, main_menu_scene::MainMenuScene, Scene, SceneOp,
-};
+use crate::scene::{main_menu_scene::MainMenuScene, Scene, SceneOp};
 use crate::window::Window;
-use instant::Instant;
+use instant::{Duration, Instant};
 use std::collections::VecDeque;
+use std::ops::Sub;
 use winit::dpi::{PhysicalPosition, PhysicalSize};
-use winit::event::{Event, KeyboardInput, VirtualKeyCode, WindowEvent};
-use winit::event_loop::{ControlFlow, EventLoop};
-use winit::window::{Window as WinitWindow, WindowId};
+use winit::event::{Event, VirtualKeyCode, WindowEvent};
+use winit::event_loop::ControlFlow;
+use winit::window::Window as WinitWindow;
 
 conrod_winit::v023_conversion_fns!();
 
 pub struct Game {
     scene_stack: VecDeque<Box<dyn Scene>>,
     renderer: Renderer,
-    delta_time: Instant,
-    app_run_time: Instant,
+    frame_elapsed_time: Instant,
+    running_time: Instant,
     window: Window,
     input_manager: InputManager,
     conrod_handle: ConrodHandle,
@@ -46,6 +45,7 @@ impl Game {
         let mut scene_stack = VecDeque::<Box<dyn Scene>>::new();
         let mut first_scene = MainMenuScene::new(&mut renderer, &mut conrod_handle);
         first_scene.init(
+            None,
             &mut window,
             &mut renderer,
             &mut conrod_handle,
@@ -58,52 +58,43 @@ impl Game {
             conrod_handle,
             renderer,
             input_manager: InputManager::new(),
-            delta_time: Instant::now(),
-            app_run_time: Instant::now(),
+            frame_elapsed_time: Instant::now(),
+            running_time: Instant::now(),
             audio_context,
         }
     }
 
     pub fn update(&mut self, event: &Event<()>, control_flow: &mut ControlFlow) {
-        if let Some(event) = convert_event(&event, &self.window) {
+        if let Some(event) = convert_event(event, &self.window) {
             self.conrod_handle.get_ui_mut().handle_event(event);
         }
         match event {
             Event::WindowEvent { event, window_id } if *window_id == self.window.id() => {
-                self.input_manager.process(&event);
+                self.input_manager.process(event);
                 match event {
-                    // WindowEvent::KeyboardInput {
-                    //     input:
-                    //         KeyboardInput {
-                    //             virtual_keycode: Some(VirtualKeyCode::Escape),
-                    //             ..
-                    //         },
-                    //     ..
-                    // } => {
-                    //     *control_flow = ControlFlow::Exit;
-                    //     return;
-                    // }
                     WindowEvent::CloseRequested => {
                         *control_flow = ControlFlow::Exit;
-                        return;
                     }
                     WindowEvent::CursorMoved { position, .. } => {
                         #[cfg(not(target_arch = "wasm32"))]
                         if self.window.is_cursor_grabbed() {
                             let window_size = self.window.inner_size();
-                            let center = nalgebra::Point2::<f32>::new(
+                            let center = nalgebra::Vector2::<f32>::new(
                                 window_size.width as f32 / 2.0,
                                 window_size.height as f32 / 2.0,
                             );
+
                             let new_pos =
-                                nalgebra::Point2::<f32>::new(position.x as f32, position.y as f32);
+                                nalgebra::Vector2::<f32>::new(position.x as f32, position.y as f32);
 
                             self.input_manager.mouse_movement += center - new_pos;
 
-                            self.window.set_cursor_position(PhysicalPosition {
-                                x: window_size.width as f32 / 2.0,
-                                y: window_size.height as f32 / 2.0,
-                            });
+                            self.window
+                                .set_cursor_position(PhysicalPosition {
+                                    x: center.x,
+                                    y: center.y,
+                                })
+                                .unwrap();
                         }
                     }
                     WindowEvent::Resized(physical_size) => {
@@ -120,7 +111,7 @@ impl Game {
             Event::MainEventsCleared => {
                 // #[cfg(target_arch = "wasm32")]
                 if self.window.is_cursor_grabbed() {
-                    let delta_time = self.delta_time.elapsed().as_secs_f32();
+                    let delta_time = self.frame_elapsed_time.elapsed().as_secs_f32();
                     {
                         let mut dir_diff = nalgebra::Vector2::new(0.0, 0.0);
                         if self.input_manager.is_keyboard_press(&VirtualKeyCode::Left) {
@@ -139,17 +130,87 @@ impl Game {
                     }
                 }
 
-                let delta_time = self.delta_time.elapsed().as_secs_f32();
+                // const MAX_FRAME_TIME: f32 = 0.2;
+                // const FIXED_TIMESTEP: f32 = 1.0 / 20.0;
+
+                let elapsed = self.frame_elapsed_time.elapsed().as_secs_f32();
+
                 let scene_op = self.scene_stack.back_mut().unwrap().update(
                     &mut self.renderer,
                     &self.input_manager,
-                    delta_time,
+                    elapsed,
                     &mut self.conrod_handle,
                     &mut self.audio_context,
                     control_flow,
                 );
+
+                match scene_op {
+                    SceneOp::None => {}
+                    SceneOp::Pop(layer_number, message) => {
+                        for _ in 0..layer_number {
+                            self.scene_stack.back_mut().unwrap().deinit(
+                                &mut self.window,
+                                &mut self.renderer,
+                                &mut self.conrod_handle,
+                                &mut self.audio_context,
+                            );
+                            self.scene_stack.pop_back();
+                        }
+                        self.scene_stack.back_mut().unwrap().init(
+                            message,
+                            &mut self.window,
+                            &mut self.renderer,
+                            &mut self.conrod_handle,
+                            &mut self.audio_context,
+                        );
+                    }
+                    SceneOp::Push(mut new_scene, message) => {
+                        if let Some(prev_scene) = self.scene_stack.back_mut() {
+                            prev_scene.deinit(
+                                &mut self.window,
+                                &mut self.renderer,
+                                &mut self.conrod_handle,
+                                &mut self.audio_context,
+                            );
+                        }
+                        new_scene.init(
+                            message,
+                            &mut self.window,
+                            &mut self.renderer,
+                            &mut self.conrod_handle,
+                            &mut self.audio_context,
+                        );
+                        self.scene_stack.push_back(new_scene);
+                    }
+                    SceneOp::Replace(mut new_scene, message) => {
+                        self.scene_stack.back_mut().unwrap().deinit(
+                            &mut self.window,
+                            &mut self.renderer,
+                            &mut self.conrod_handle,
+                            &mut self.audio_context,
+                        );
+                        self.scene_stack.pop_back();
+                        new_scene.init(
+                            message,
+                            &mut self.window,
+                            &mut self.renderer,
+                            &mut self.conrod_handle,
+                            &mut self.audio_context,
+                        );
+                        self.scene_stack.push_back(new_scene);
+                    }
+                };
+
+                self.scene_stack.back_mut().unwrap().prerender(
+                    &mut self.renderer,
+                    &self.input_manager,
+                    elapsed,
+                    &mut self.conrod_handle,
+                    &mut self.audio_context,
+                );
+
                 match self.renderer.render(
-                    self.app_run_time.elapsed().as_secs_f32(),
+                    self.running_time.elapsed().as_secs_f32(),
                     &mut self.conrod_handle,
                 ) {
                     Ok(_) => {}
@@ -170,60 +231,7 @@ impl Game {
                 self.input_manager.clear();
                 self.audio_context.clear();
 
-                match scene_op {
-                    SceneOp::None => {}
-                    SceneOp::Pop(layer_number) => {
-                        for _ in 0..layer_number {
-                            self.scene_stack.back_mut().unwrap().deinit(
-                                &mut self.window,
-                                &mut self.renderer,
-                                &mut self.conrod_handle,
-                                &mut self.audio_context,
-                            );
-                            self.scene_stack.pop_back();
-                        }
-                        self.scene_stack.back_mut().unwrap().init(
-                            &mut self.window,
-                            &mut self.renderer,
-                            &mut self.conrod_handle,
-                            &mut self.audio_context,
-                        );
-                    }
-                    SceneOp::Push(mut new_scene) => {
-                        if let Some(prev_scene) = self.scene_stack.back_mut() {
-                            prev_scene.deinit(
-                                &mut self.window,
-                                &mut self.renderer,
-                                &mut self.conrod_handle,
-                                &mut self.audio_context,
-                            );
-                        }
-                        new_scene.init(
-                            &mut self.window,
-                            &mut self.renderer,
-                            &mut self.conrod_handle,
-                            &mut self.audio_context,
-                        );
-                        self.scene_stack.push_back(new_scene);
-                    }
-                    SceneOp::Replace(mut new_scene) => {
-                        self.scene_stack.back_mut().unwrap().deinit(
-                            &mut self.window,
-                            &mut self.renderer,
-                            &mut self.conrod_handle,
-                            &mut self.audio_context,
-                        );
-                        self.scene_stack.pop_back();
-                        new_scene.init(
-                            &mut self.window,
-                            &mut self.renderer,
-                            &mut self.conrod_handle,
-                            &mut self.audio_context,
-                        );
-                        self.scene_stack.push_back(new_scene);
-                    }
-                };
-                self.delta_time = Instant::now();
+                self.frame_elapsed_time = Instant::now();
             }
             _ => {}
         };

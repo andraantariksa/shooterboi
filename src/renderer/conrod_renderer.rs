@@ -9,10 +9,10 @@ impl ConrodSceneRenderer {
     pub fn new(
         surface_config: &wgpu::SurfaceConfiguration,
         device: &wgpu::Device,
-        queue: &mut wgpu::Queue,
+        _queue: &mut wgpu::Queue,
     ) -> Self {
         Self {
-            conrod_renderer: conrod_wgpu::Renderer::new(&device, 1, surface_config.format),
+            conrod_renderer: conrod_wgpu::Renderer::new(device, 1, surface_config.format),
         }
     }
 
@@ -30,7 +30,7 @@ impl ConrodSceneRenderer {
             if let Some(cmd) = self
                 .conrod_renderer
                 .fill(
-                    &conrod_handle.get_image_map(),
+                    conrod_handle.get_image_map(),
                     [
                         0.0,
                         0.0,
@@ -47,12 +47,12 @@ impl ConrodSceneRenderer {
         }
         let render = self
             .conrod_renderer
-            .render(&device, &conrod_handle.get_image_map());
+            .render(device, conrod_handle.get_image_map());
         let buffer_slice = render.vertex_buffer.slice(..);
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("Render pass gui"),
             color_attachments: &[wgpu::RenderPassColorAttachment {
-                view: &view,
+                view,
                 resolve_target: None,
                 ops: wgpu::Operations {
                     load: if on_top_of_game {
@@ -81,7 +81,7 @@ impl ConrodSceneRenderer {
                     render_pass.set_bind_group(0, bind_group, &[]);
                 }
                 conrod_wgpu::RenderPassCommand::SetScissor {
-                    top_left: [x, y],
+                    top_left: [_x, _y],
                     dimensions: [w, h],
                 } => {
                     render_pass.set_scissor_rect(0, 0, w, h);

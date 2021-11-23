@@ -13,7 +13,7 @@ mod util;
 mod window;
 
 use crate::game::Game;
-use winit::event::WindowEvent;
+
 use winit::event_loop::{ControlFlow, EventLoop};
 use winit::window::WindowBuilder;
 

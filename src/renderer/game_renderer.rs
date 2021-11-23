@@ -4,7 +4,7 @@ use wgpu::util::DeviceExt;
 use crate::gui::ConrodHandle;
 use crate::renderer::rendering_info::RenderingInfo;
 use crate::renderer::vertex::Vertex;
-use crate::renderer::{RenderObjects, RenderQueueData, SurfaceAndWindowConfig};
+use crate::renderer::{RenderObjects, SurfaceAndWindowConfig};
 use crate::util::any_as_u8_slice;
 
 const QUAD_VERTICES: [Vertex; 4] = [
@@ -216,14 +216,14 @@ impl GameSceneRenderer {
         &mut self,
         view: &wgpu::TextureView,
         encoder: &mut wgpu::CommandEncoder,
-        device: &wgpu::Device,
-        surface_config: &SurfaceAndWindowConfig,
-        conrod_handle: &mut ConrodHandle,
+        _device: &wgpu::Device,
+        _surface_config: &SurfaceAndWindowConfig,
+        _conrod_handle: &mut ConrodHandle,
     ) {
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("Render pass"),
             color_attachments: &[wgpu::RenderPassColorAttachment {
-                view: &view,
+                view,
                 resolve_target: None,
                 ops: wgpu::Operations {
                     load: wgpu::LoadOp::Clear(wgpu::Color {

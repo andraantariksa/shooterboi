@@ -1,5 +1,3 @@
-use ambisonic::rodio::queue::queue;
-use wgpu::util::DeviceExt;
 use winit::dpi::PhysicalSize;
 use winit::window::Window;
 
@@ -9,7 +7,7 @@ use game_renderer::GameSceneRenderer;
 use crate::camera::{Camera, Frustum, ObjectBound};
 use crate::gui::ConrodHandle;
 use crate::renderer::rendering_info::RenderingInfo;
-use crate::renderer::vertex::Vertex;
+
 use crate::util::any_as_u8_slice;
 
 pub mod conrod_renderer;
@@ -174,7 +172,7 @@ impl Renderer {
             })
             .await
             .unwrap();
-        let (mut device, mut queue) = adapter
+        let (device, mut queue) = adapter
             .request_device(
                 &wgpu::DeviceDescriptor {
                     label: None,
@@ -347,8 +345,8 @@ fn create_logo_texture(
         aspect: wgpu::TextureAspect::All,
     };
     let extent = wgpu::Extent3d {
-        width: width,
-        height: height,
+        width,
+        height,
         depth_or_array_layers: 1,
     };
     queue.write_texture(texture_copy_view, data, data_layout, extent);

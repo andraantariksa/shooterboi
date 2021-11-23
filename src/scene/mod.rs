@@ -1,12 +1,6 @@
-use conrod_core::widget::envelope_editor::EnvelopePoint;
-use conrod_core::{widget_ids, Color, Colorable, Labelable, Positionable, Sizeable, Widget};
-use hecs::World;
-use rapier3d::prelude::*;
-use winit::event::VirtualKeyCode;
-use winit::event_loop::ControlFlow;
+use std::collections::HashMap;
 
-use pause_scene::PauseScene;
-use settings_scene::SettingsScene;
+use winit::event_loop::ControlFlow;
 
 use crate::audio::AudioContext;
 use crate::gui::ConrodHandle;
@@ -23,16 +17,26 @@ pub mod pause_scene;
 pub mod score_scene;
 pub mod settings_scene;
 
+pub enum Value {
+    String(String),
+    I32(i32),
+    F32(f32),
+    Bool(bool),
+}
+
+pub type MaybeMessage = Option<HashMap<&'static str, Value>>;
+
 pub enum SceneOp {
     None,
-    Push(Box<dyn Scene>),
-    Pop(u8),
-    Replace(Box<dyn Scene>),
+    Push(Box<dyn Scene>, MaybeMessage),
+    Pop(u8, MaybeMessage),
+    Replace(Box<dyn Scene>, MaybeMessage),
 }
 
 pub trait Scene {
     fn init(
         &mut self,
+        message: MaybeMessage,
         window: &mut Window,
         renderer: &mut Renderer,
         conrod_handle: &mut ConrodHandle,
@@ -48,6 +52,16 @@ pub trait Scene {
         audio_context: &mut AudioContext,
         control_flow: &mut ControlFlow,
     ) -> SceneOp;
+
+    fn prerender(
+        &mut self,
+        renderer: &mut Renderer,
+        input_manager: &InputManager,
+        delta_time: f32,
+        conrod_handle: &mut ConrodHandle,
+        audio_context: &mut AudioContext,
+    ) {
+    }
 
     fn deinit(
         &mut self,

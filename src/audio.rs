@@ -1,7 +1,4 @@
 use std::collections::HashMap;
-use std::convert::TryInto;
-use std::io::{BufReader, Cursor};
-use std::sync::{Arc, Mutex};
 
 pub const AUDIO_FILE_AWESOMENESS: &[u8] = include_bytes!("../assets/audio/awesomeness.wav");
 pub const AUDIO_FILE_SHOOT: &[u8] = include_bytes!("../assets/audio/shoot.wav");
@@ -34,7 +31,7 @@ impl AudioContext {
 
     pub fn set_volume(&mut self, volume: f32) {
         self.volume = volume;
-        for (k, v) in self.global_sinks_map.iter_mut() {
+        for (_k, v) in self.global_sinks_map.iter_mut() {
             v.set_volume(volume);
         }
         for sink in self.global_sinks_array.iter_mut() {
@@ -43,7 +40,7 @@ impl AudioContext {
     }
 
     pub fn clear(&mut self) {
-        self.global_sinks_map.retain(|k, v| !v.empty());
+        self.global_sinks_map.retain(|_k, v| !v.empty());
         self.global_sinks_array.retain(|v| !v.empty());
     }
 }

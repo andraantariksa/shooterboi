@@ -238,7 +238,7 @@ mat3 rot_x(float rad)
 Distance scene_dist(vec3 pos)
 {
     vec3 gun_pos = vec3(1., -0.5, -5.);
-    mat3 rot = rot_x(fov_shootanim.x);
+    mat3 rot = rot_x(fov_shootanim.y);
     Distance m = Distance(sd_silver_horn(pos * rot, gun_pos), 0);
     m = sd_union(m, Distance(sd_holding_hand(pos * rot, gun_pos + vec3(0.9, -1., 1.7)), 1));
     return m;
@@ -325,7 +325,7 @@ vec3 lookat(vec2 uv, vec3 pos, vec3 dir, vec3 w_up)
 
 vec3 rayViewDir(vec2 size, vec2 coord) {
     vec2 xy = coord - size / 2.0;
-    float z = size.y / tan(radians(60.) / 2.0);
+    float z = size.y / tan(fov_shootanim.x / 2.0);
     return normalize(vec3(xy, z));
 }
 
@@ -333,11 +333,43 @@ mat4 viewMatrix(vec3 pos, vec3 dir, vec3 world_up) {
     vec3 right = normalize(cross(dir, world_up));
     vec3 up = normalize(cross(dir, right));
     return mat4(
-        vec4(right, 0.0),
-        vec4(up, 0.0),
-        vec4(dir, 0.0),
-        vec4(0.0, 0.0, 0.0, 1));
+    vec4(right, 0.0),
+    vec4(up, 0.0),
+    vec4(dir, 0.0),
+    vec4(0.0, 0.0, 0.0, 1));
 }
+
+vec3 blinnPhong(
+vec3 k_d,
+vec3 k_s,
+float alpha,
+vec3 p,
+vec3 eye,
+vec3 light_pos,
+vec3 light_intensity,
+vec3 n)
+{
+    vec3 l = normalize(light_pos - p);
+    vec3 v = normalize(eye - p);
+    vec3 h = normalize(l + v);
+    float diff = max(dot(l, n), 0.0);
+    float spec = max(dot(h, n), 0.0);
+
+    if (diff < 0.0) {
+        // Light not visible from this point on the surface
+        return vec3(0.0, 0.0, 0.0);
+    }
+
+    if (spec < 0.0) {
+        // Light reflection in opposite direction as viewer, apply only diffuse
+        // component
+        return light_intensity * (k_d * diff);
+    }
+
+    return light_intensity * (k_d * diff + k_s * pow(spec, alpha));
+}
+
+const vec3 skycolor = vec3(113, 188, 225) / 255.0;
 
 void main()
 {
@@ -358,15 +390,8 @@ void main()
         discard;
     }
 
-    vec3 lp = cam_pos_ + d.distance * ray_world_dir;
-    vec3 normal = get_normal(lp);
-    float lv = 0.;
-
-    lv += light(normal, lp, cam_pos_) * 0.7;
-
-    lv *= ambient_ocl(lp, normal);
-
-    lv += 0.05;
+    vec3 ray_hit_pos = cam_pos_ + d.distance * ray_world_dir;
+    vec3 normal = get_normal(ray_hit_pos);
 
     vec3 col = vec3(46., 209., 162.) / 255.;
     switch (d.materialId) {
@@ -380,5 +405,17 @@ void main()
             break;
     }
 
-    outColor = vec4(clamp(pow(col * lv, 1. / vec3(2.2)), 0, 1), 1.0);
+    const vec3 ambientLight = skycolor * col * 0.5;
+    vec3 color = ambientLight;
+    color += blinnPhong(
+        col,
+        vec3(1.0),
+        10.0,
+        ray_hit_pos,
+        cam_pos,
+        vec3(0.0, 10.0, 0.0),
+        vec3(0.4),
+        normal);
+    color *= ambient_ocl(ray_hit_pos, normal);
+    outColor = vec4(color, 1.0);
 }

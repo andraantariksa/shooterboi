@@ -3,20 +3,24 @@ use winit::event::{ElementState, KeyboardInput, MouseButton, VirtualKeyCode, Win
 
 pub struct InputManager {
     pub keyboard_buttons: HashSet<VirtualKeyCode>,
+    pub keyboard_buttons_pressed: HashSet<VirtualKeyCode>,
     pub mouse_buttons: HashSet<MouseButton>,
+    pub mouse_buttons_pressed: HashSet<MouseButton>,
     pub mouse_movement: nalgebra::Vector2<f32>,
 }
 
 impl InputManager {
-    pub(crate) fn new() -> Self {
+    pub fn new() -> Self {
         Self {
+            keyboard_buttons_pressed: HashSet::new(),
             keyboard_buttons: HashSet::new(),
+            mouse_buttons_pressed: HashSet::new(),
             mouse_buttons: HashSet::new(),
             mouse_movement: nalgebra::Vector2::new(0.0, 0.0),
         }
     }
 
-    pub(crate) fn process(&mut self, event: &WindowEvent) -> bool {
+    pub fn process(&mut self, event: &WindowEvent) -> bool {
         match event {
             WindowEvent::KeyboardInput {
                 input:
@@ -28,6 +32,7 @@ impl InputManager {
                 ..
             } => {
                 self.keyboard_buttons.insert(*key);
+                self.keyboard_buttons_pressed.insert(*key);
                 true
             }
             WindowEvent::KeyboardInput {
@@ -48,6 +53,7 @@ impl InputManager {
                 ..
             } => {
                 self.mouse_buttons.insert(*button);
+                self.mouse_buttons_pressed.insert(*button);
                 true
             }
             WindowEvent::MouseInput {
@@ -62,15 +68,25 @@ impl InputManager {
         }
     }
 
-    pub(crate) fn clear(&mut self) {
+    pub fn clear(&mut self) {
         self.mouse_movement.data.0 = [[0.0, 0.0]];
+        self.keyboard_buttons_pressed.clear();
+        self.mouse_buttons_pressed.clear();
     }
 
-    pub(crate) fn is_mouse_press(&self, key: &MouseButton) -> bool {
+    pub fn is_mouse_press(&self, key: &MouseButton) -> bool {
         self.mouse_buttons.contains(key)
     }
 
-    pub(crate) fn is_keyboard_press(&self, key: &VirtualKeyCode) -> bool {
+    pub fn is_mouse_pressed(&self, key: &MouseButton) -> bool {
+        self.mouse_buttons_pressed.contains(key)
+    }
+
+    pub fn is_keyboard_press(&self, key: &VirtualKeyCode) -> bool {
         self.keyboard_buttons.contains(key)
+    }
+
+    pub fn is_keyboard_pressed(&self, key: &VirtualKeyCode) -> bool {
+        self.keyboard_buttons_pressed.contains(key)
     }
 }

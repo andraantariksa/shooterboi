@@ -296,7 +296,7 @@ vec3 lookat(vec2 uv, vec3 pos, vec3 dir, vec3 w_up)
 
 vec3 rayViewDir(vec2 size, vec2 coord) {
     vec2 xy = coord - size / 2.0;
-    float z = size.y / tan(radians(60.) / 2.0);
+    float z = size.y / tan(fov_shootanim.x / 2.0);
     return normalize(vec3(xy, z));
 }
 
@@ -361,13 +361,6 @@ void main()
 
     vec3 ray_hit_pos = cam_pos + d.distance * ray_world_dir;
     vec3 normal = get_normal(ray_hit_pos);
-//    float lv = 0.;
-//
-//    lv += light(normal, lp, cam_pos) * 0.7;
-//
-//    lv *= ambient_ocl(lp, normal);
-//
-//    lv += 0.05;
 
     vec3 col = vec3(46., 209., 162.) / 255.;
     switch (d.materialId) {
@@ -399,7 +392,6 @@ void main()
 
     const vec3 ambientLight = skycolor * col * 0.5;
     vec3 color = ambientLight;
-
     color += blinnPhong(
         col,
         vec3(1.0),

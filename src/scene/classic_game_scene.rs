@@ -1,7 +1,6 @@
 use conrod_core::widget::envelope_editor::EnvelopePoint;
-use conrod_core::{Colorable, Labelable, Positionable, Sizeable, Widget};
-use std::collections::HashMap;
-use std::fs::File;
+use conrod_core::{Colorable, Positionable, Sizeable, Widget};
+
 use std::io::{BufReader, Cursor};
 
 use hecs::{Entity, World};
@@ -17,7 +16,7 @@ use crate::input_manager::InputManager;
 use crate::physics::GamePhysics;
 use crate::renderer::{Renderer, ShapeType};
 use crate::scene::pause_scene::PauseScene;
-use crate::scene::{Scene, SceneOp};
+use crate::scene::{MaybeMessage, Scene, SceneOp};
 use crate::timer::Timer;
 use crate::window::Window;
 use conrod_core::widget_ids;
@@ -66,7 +65,7 @@ pub struct ClassicGameScene {
 }
 
 impl ClassicGameScene {
-    pub fn new(renderer: &mut Renderer, conrod_handle: &mut ConrodHandle) -> Self {
+    pub fn new(_renderer: &mut Renderer, conrod_handle: &mut ConrodHandle) -> Self {
         let mut world = World::new();
 
         let mut physics = GamePhysics::new();
@@ -127,9 +126,10 @@ impl ClassicGameScene {
 impl Scene for ClassicGameScene {
     fn init(
         &mut self,
+        _message: MaybeMessage,
         window: &mut Window,
         renderer: &mut Renderer,
-        conrod_handle: &mut ConrodHandle,
+        _conrod_handle: &mut ConrodHandle,
         audio_context: &mut AudioContext,
     ) {
         renderer.is_render_gui = true;
@@ -216,7 +216,7 @@ impl Scene for ClassicGameScene {
         }
 
         {
-            let mut player_rigid_body = self
+            let player_rigid_body = self
                 .physics
                 .rigid_body_set
                 .get_mut(self.player_rigid_body_handle)
@@ -240,7 +240,7 @@ impl Scene for ClassicGameScene {
         delta_time: f32,
         conrod_handle: &mut ConrodHandle,
         audio_context: &mut AudioContext,
-        control_flow: &mut ControlFlow,
+        _control_flow: &mut ControlFlow,
     ) -> SceneOp {
         renderer.camera.move_direction(input_manager.mouse_movement);
 
@@ -304,7 +304,7 @@ impl Scene for ClassicGameScene {
                 &(),
             );
 
-            let mut player_rigid_body = self
+            let player_rigid_body = self
                 .physics
                 .rigid_body_set
                 .get_mut(self.player_rigid_body_handle)
@@ -354,7 +354,7 @@ impl Scene for ClassicGameScene {
                     renderer.camera.get_direction().into_inner(),
                 );
                 const MAX_RAYCAST_DISTANCE: f32 = 1000.0;
-                if let Some((handle, distance)) = self.physics.query_pipeline.cast_ray(
+                if let Some((handle, _distance)) = self.physics.query_pipeline.cast_ray(
                     &self.physics.collider_set,
                     &ray,
                     MAX_RAYCAST_DISTANCE,
@@ -365,6 +365,21 @@ impl Scene for ClassicGameScene {
                     let collider = self.physics.collider_set.get(handle).unwrap();
                     let entity = Entity::from_bits(collider.user_data as u64);
                     if let Ok(_) = self.world.get::<Target>(entity) {
+                        // let sink = rodio::SpatialSink::try_new(
+                        //     &audio_context.output_stream_handle,
+                        //     [],
+                        //     [],
+                        //     [],
+                        // )
+                        // .unwrap();
+                        // sink.append(
+                        //     rodio::Decoder::new(BufReader::new(Cursor::new(
+                        //         AUDIO_FILE_SHOOT.to_vec(),
+                        //     )))
+                        //     .unwrap(),
+                        // );
+                        // audio_context.global_sinks_array.push(sink);
+
                         let position = &mut self.world.get_mut::<Position>(entity).unwrap().0;
                         position.x += 0.5;
                     } else {
@@ -379,10 +394,21 @@ impl Scene for ClassicGameScene {
         drop(ui_cell);
 
         if input_manager.is_keyboard_press(&VirtualKeyCode::Escape) {
-            scene_op = SceneOp::Push(Box::new(PauseScene::new(renderer, conrod_handle)));
+            scene_op = SceneOp::Push(Box::new(PauseScene::new(renderer, conrod_handle)), None);
         }
 
-        for (id, (position, collider_handle, _)) in self
+        scene_op
+    }
+
+    fn prerender(
+        &mut self,
+        renderer: &mut Renderer,
+        input_manager: &InputManager,
+        delta_time: f32,
+        conrod_handle: &mut ConrodHandle,
+        audio_context: &mut AudioContext,
+    ) {
+        for (_id, (position, collider_handle, _)) in self
             .world
             .query_mut::<(&Position, &ColliderHandle, &Target)>()
         {
@@ -390,20 +416,27 @@ impl Scene for ClassicGameScene {
             collider.set_translation(position.0);
             let (objects, ref mut bound) = renderer.render_objects.next();
             objects.position = position.0;
-            objects.shape_type = ShapeType::Sphere;
-            objects.shape_data1.x = collider.shape().as_ball().unwrap().radius;
+            objects.shape_type = ShapeType::Cylinder;
+            let cam_to_obj = nalgebra::Unit::new_normalize(position.0 - renderer.camera.position);
+            let inner_cam_to_obj = cam_to_obj.into_inner() * -0.1;
+
+            objects.shape_data1.x = inner_cam_to_obj.x;
+            objects.shape_data1.y = inner_cam_to_obj.y;
+            objects.shape_data1.z = inner_cam_to_obj.z;
+            objects.shape_data1.w = collider.shape().as_ball().unwrap().radius;
+
+            objects.shape_data2 = objects.shape_data1 * -1.0;
+
             *bound = ObjectBound::Sphere(0.5);
         }
-
-        scene_op
     }
 
     fn deinit(
         &mut self,
         window: &mut Window,
         renderer: &mut Renderer,
-        conrod_handle: &mut ConrodHandle,
-        audio_context: &mut AudioContext,
+        _conrod_handle: &mut ConrodHandle,
+        _audio_context: &mut AudioContext,
     ) {
         renderer.render_objects.clear();
         window.set_is_cursor_grabbed(false);

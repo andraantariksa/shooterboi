@@ -6,8 +6,8 @@ use crate::audio::AudioContext;
 use crate::gui::ConrodHandle;
 use crate::input_manager::InputManager;
 use crate::renderer::Renderer;
-use crate::scene::settings_scene::SettingsScene;
-use crate::scene::{Scene, SceneOp, MARGIN};
+
+use crate::scene::{MaybeMessage, Scene, SceneOp, MARGIN};
 use crate::window::Window;
 use conrod_core::widget_ids;
 
@@ -26,7 +26,7 @@ pub struct GuideScene {
 }
 
 impl GuideScene {
-    pub fn new(renderer: &mut Renderer, conrod_handle: &mut ConrodHandle) -> Self {
+    pub fn new(_renderer: &mut Renderer, conrod_handle: &mut ConrodHandle) -> Self {
         Self {
             ids: GuideSceneIds::new(conrod_handle.get_ui_mut().widget_id_generator()),
         }
@@ -36,10 +36,11 @@ impl GuideScene {
 impl Scene for GuideScene {
     fn init(
         &mut self,
-        window: &mut Window,
+        _message: MaybeMessage,
+        _window: &mut Window,
         renderer: &mut Renderer,
-        conrod_handle: &mut ConrodHandle,
-        audio_context: &mut AudioContext,
+        _conrod_handle: &mut ConrodHandle,
+        _audio_context: &mut AudioContext,
     ) {
         renderer.is_render_gui = true;
         renderer.is_render_game = false;
@@ -47,12 +48,12 @@ impl Scene for GuideScene {
 
     fn update(
         &mut self,
-        renderer: &mut Renderer,
+        _renderer: &mut Renderer,
         input_manager: &InputManager,
-        delta_time: f32,
+        _delta_time: f32,
         conrod_handle: &mut ConrodHandle,
-        audio_context: &mut AudioContext,
-        control_flow: &mut ControlFlow,
+        _audio_context: &mut AudioContext,
+        _control_flow: &mut ControlFlow,
     ) -> SceneOp {
         let mut scene_op = SceneOp::None;
 
@@ -71,7 +72,7 @@ impl Scene for GuideScene {
 
         if input_manager.is_keyboard_press(&VirtualKeyCode::Escape) || back_button.next().is_some()
         {
-            scene_op = SceneOp::Pop(1);
+            scene_op = SceneOp::Pop(1, None);
         }
 
         scene_op
@@ -79,10 +80,10 @@ impl Scene for GuideScene {
 
     fn deinit(
         &mut self,
-        window: &mut Window,
-        renderer: &mut Renderer,
-        conrod_handle: &mut ConrodHandle,
-        audio_context: &mut AudioContext,
+        _window: &mut Window,
+        _renderer: &mut Renderer,
+        _conrod_handle: &mut ConrodHandle,
+        _audio_context: &mut AudioContext,
     ) {
     }
 }
