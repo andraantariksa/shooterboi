@@ -18,10 +18,11 @@ pub mod rendering_info;
 pub mod vertex;
 
 #[derive(Debug, Copy, Clone)]
+#[repr(u32)]
 pub enum ShapeType {
     None = 0,
-    Sphere = 1,
-    Box = 2,
+    Box = 1,
+    Sphere = 2,
     Cylinder = 3,
 }
 
@@ -33,18 +34,15 @@ pub struct RenderQueueData {
     _p2: [i32; 1],
     pub rotation: nalgebra::Vector3<f32>,
     _p3: [i32; 1],
-    pub color: nalgebra::Vector3<f32>,
-    _p4: [i32; 1],
     pub shape_data1: nalgebra::Vector4<f32>,
     pub shape_data2: nalgebra::Vector4<f32>,
     pub shape_type: ShapeType,
-    _p5: [u8; 3 + 4 * 3],
+    _p4: [i32; 3],
 }
 
 impl RenderQueueData {
     pub fn new_none() -> Self {
         Self {
-            color: nalgebra::Vector3::new(0.0, 0.0, 0.0),
             position: nalgebra::Vector3::new(0.0, 0.0, 0.0),
             scale: nalgebra::Vector3::new(0.0, 0.0, 0.0),
             rotation: nalgebra::Vector3::new(0.0, 0.0, 0.0),
@@ -54,15 +52,14 @@ impl RenderQueueData {
             _p1: [0; 1],
             _p2: [0; 1],
             _p3: [0; 1],
-            _p4: [0; 1],
-            _p5: [0; 3 + 4 * 3],
+            _p4: [0; 3],
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::renderer::{RenderObjectType, RenderQueueData, ShapeType};
+    use crate::renderer::{RenderQueueData, ShapeType};
 
     #[test]
     fn render_queue_data_size() {
@@ -71,7 +68,7 @@ mod tests {
 
     #[test]
     fn shape_type_size() {
-        assert_eq!(core::mem::size_of::<ShapeType>(), 1);
+        assert_eq!(core::mem::size_of::<ShapeType>(), 4);
     }
 }
 
@@ -151,9 +148,9 @@ pub struct Renderer {
     pub camera: Camera,
     pub is_render_game: bool,
     pub is_render_gui: bool,
-    surface: wgpu::Surface,
-    device: wgpu::Device,
-    queue: wgpu::Queue,
+    pub surface: wgpu::Surface,
+    pub device: wgpu::Device,
+    pub queue: wgpu::Queue,
     pub surface_and_window_config: SurfaceAndWindowConfig,
     pub game_renderer: GameSceneRenderer,
     pub gui_renderer: ConrodSceneRenderer,
@@ -254,13 +251,13 @@ impl Renderer {
             let (objects, objects_len) = self
                 .render_objects
                 .get_objects_and_active_len(&self.camera.get_frustum());
-            self.rendering_info.fov = self.camera.fov;
+            self.rendering_info.fov_shootanim.x = self.camera.fov;
             self.rendering_info.cam_pos = self.camera.position;
             self.rendering_info.cam_dir = *self.camera.get_direction();
             self.rendering_info.reso_time.x = self.surface_and_window_config.surface.width as f32;
             self.rendering_info.reso_time.y = self.surface_and_window_config.surface.height as f32;
             self.rendering_info.reso_time.z = app_run_time;
-            self.rendering_info.queue_count = objects_len as u32;
+            self.rendering_info.queuecount_raymarchmaxstep_aostep.x = objects_len as u32;
             self.queue.write_buffer(
                 &self.game_renderer.rendering_info_buffer,
                 0,
@@ -300,6 +297,7 @@ impl Renderer {
                     &self.device,
                     &self.surface_and_window_config,
                     conrod_handle,
+                    self.is_render_game,
                 );
             }
         }

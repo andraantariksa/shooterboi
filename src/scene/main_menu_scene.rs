@@ -1,16 +1,21 @@
 use conrod_core::widget::envelope_editor::EnvelopePoint;
 use conrod_core::{Labelable, Positionable, Sizeable, Widget};
+use std::io::{BufReader, Cursor};
 use winit::event_loop::ControlFlow;
 
-use crate::audio::{AudioContext, SINK_ID_MAIN_MENU_BGM};
+use crate::audio::{AudioContext, AUDIO_FILE_AWESOMENESS};
 use crate::gui::ConrodHandle;
 use crate::input_manager::InputManager;
 use crate::renderer::Renderer;
 use crate::scene::classic_game_scene::ClassicGameScene;
+use crate::scene::exit_confirm_scene::QuitConfirmScene;
+use crate::scene::guide_scene::GuideScene;
 use crate::scene::settings_scene::SettingsScene;
 use crate::scene::{Scene, SceneOp, MARGIN};
 use crate::window::Window;
 use conrod_core::widget_ids;
+use rodio::Source;
+use winit::event::VirtualKeyCode;
 
 widget_ids! {
     pub struct MainMenuSceneIds {
@@ -19,7 +24,8 @@ widget_ids! {
         quit_button,
         guide_button,
         settings_button,
-        start_classic_mode_button
+        start_classic_mode_button,
+        title_image
     }
 }
 
@@ -46,17 +52,13 @@ impl Scene for MainMenuScene {
         renderer.is_render_gui = true;
         renderer.is_render_game = false;
 
-        let mut sink_bgm = audio_context.get_sink_mut(SINK_ID_MAIN_MENU_BGM);
-        if sink_bgm.empty() {
-            sink_bgm.append(
-                rodio::Decoder::new(std::io::Cursor::new(
-                    include_bytes!("../../assets/audio/little-town.ogg").to_vec(),
-                ))
+        println!("Init main menu");
+        let mut sink = rodio::Sink::try_new(&audio_context.output_stream_handle).unwrap();
+        sink.append(
+            rodio::Decoder::new(BufReader::new(Cursor::new(AUDIO_FILE_AWESOMENESS.to_vec())))
                 .unwrap(),
-            );
-        } else {
-            sink_bgm.play();
-        }
+        );
+        audio_context.global_sinks_map.insert("bgm", sink);
     }
 
     fn update(
@@ -70,63 +72,76 @@ impl Scene for MainMenuScene {
     ) -> SceneOp {
         let mut scene_op = SceneOp::None;
 
-        let mut sink_bgm = audio_context.get_sink_mut(SINK_ID_MAIN_MENU_BGM);
-        if sink_bgm.empty() {
-            sink_bgm.append(
-                rodio::Decoder::new(std::io::Cursor::new(
-                    include_bytes!("../../assets/audio/little-town.ogg").to_vec(),
-                ))
-                .unwrap(),
-            );
-        } else {
-            sink_bgm.play();
-        }
-
         let settings_button;
+        let classic_game_button;
+        let quit_button;
+        let guide_button;
 
         {
+            let image_id = conrod_handle
+                .get_image_id_map()
+                .get("title")
+                .unwrap()
+                .clone();
+            let ropa_font_id = *conrod_handle.get_font_id_map().get("ropa").unwrap();
             let mut ui_cell = conrod_handle.get_ui_mut().set_widgets();
 
-            conrod_core::widget::Canvas::new()
-                .pad(MARGIN)
-                .set(self.ids.canvas, &mut ui_cell);
+            conrod_core::widget::Canvas::new().set(self.ids.canvas, &mut ui_cell);
 
-            for _press in conrod_core::widget::Button::new()
-                .label("Classic Mode")
-                .wh(conrod_core::Dimensions::new(100.0, 100.0))
-                .mid_left_with_margin_on(self.ids.canvas, MARGIN)
-                .set(self.ids.start_classic_mode_button, &mut ui_cell)
-            {
-                scene_op = SceneOp::Push(Box::new(ClassicGameScene::new(renderer)));
-            }
+            let canvas_h = ui_cell.h_of(self.ids.canvas).unwrap();
+
+            conrod_core::widget::Image::new(image_id)
+                .mid_top_with_margin_on(self.ids.canvas, MARGIN)
+                .h(canvas_h / 3.0)
+                .set(self.ids.title_image, &mut ui_cell);
 
             settings_button = conrod_core::widget::Button::new()
                 .label("Settings")
-                .wh(conrod_core::Dimensions::new(100.0, 100.0))
+                .label_font_id(ropa_font_id)
+                .wh(conrod_core::Dimensions::new(130.0, 40.0))
                 .bottom_left_with_margin_on(self.ids.canvas, MARGIN)
                 .set(self.ids.settings_button, &mut ui_cell);
 
-            for _press in conrod_core::widget::Button::new()
-                .label("Guide")
-                .wh(conrod_core::Dimensions::new(100.0, 100.0))
-                .mid_bottom_with_margin_on(self.ids.canvas, MARGIN)
-                .set(self.ids.guide_button, &mut ui_cell)
-            {
-                println!("Guide");
-            }
+            classic_game_button = conrod_core::widget::Button::new()
+                .label("Classic Mode")
+                .label_font_id(ropa_font_id)
+                .wh(conrod_core::Dimensions::new(130.0, 40.0))
+                .mid_left_with_margin_on(self.ids.canvas, MARGIN)
+                .set(self.ids.start_classic_mode_button, &mut ui_cell);
 
-            for _press in conrod_core::widget::Button::new()
+            guide_button = conrod_core::widget::Button::new()
+                .label("Guide")
+                .label_font_id(ropa_font_id)
+                .wh(conrod_core::Dimensions::new(130.0, 40.0))
+                .mid_bottom_with_margin_on(self.ids.canvas, MARGIN)
+                .set(self.ids.guide_button, &mut ui_cell);
+
+            quit_button = conrod_core::widget::Button::new()
                 .label("Quit")
-                .wh(conrod_core::Dimensions::new(100.0, 100.0))
+                .label_font_id(ropa_font_id)
+                .wh(conrod_core::Dimensions::new(130.0, 40.0))
                 .bottom_right_with_margin_on(self.ids.canvas, MARGIN)
-                .set(self.ids.quit_button, &mut ui_cell)
-            {
-                *control_flow = ControlFlow::Exit;
-            }
+                .set(self.ids.quit_button, &mut ui_cell);
+        }
+
+        for _press in guide_button {
+            scene_op = SceneOp::Push(Box::new(GuideScene::new(renderer, conrod_handle)));
+        }
+
+        if input_manager.is_keyboard_press(&VirtualKeyCode::Escape) {
+            scene_op = SceneOp::Push(Box::new(QuitConfirmScene::new(renderer, conrod_handle)));
+        }
+
+        for _press in quit_button {
+            scene_op = SceneOp::Push(Box::new(QuitConfirmScene::new(renderer, conrod_handle)));
         }
 
         for _press in settings_button {
             scene_op = SceneOp::Push(Box::new(SettingsScene::new(renderer, conrod_handle)));
+        }
+
+        for _press in classic_game_button {
+            scene_op = SceneOp::Push(Box::new(ClassicGameScene::new(renderer, conrod_handle)));
         }
 
         scene_op
@@ -139,5 +154,6 @@ impl Scene for MainMenuScene {
         conrod_handle: &mut ConrodHandle,
         audio_context: &mut AudioContext,
     ) {
+        println!("Deinit main menu");
     }
 }

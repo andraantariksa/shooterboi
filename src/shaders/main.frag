@@ -6,8 +6,8 @@
 #define MAX_QUEUE 100
 
 #define SHAPE_TYPE_NONE 0
-#define SHAPE_TYPE_SPHERE 1
-#define SHAPE_TYPE_BOX 2
+#define SHAPE_TYPE_BOX 1
+#define SHAPE_TYPE_SPHERE 2
 #define SHAPE_TYPE_CYLINDER 3
 
 struct RenderQueue
@@ -15,7 +15,6 @@ struct RenderQueue
     vec3 position;
     vec3 scale;
     vec3 rotation;
-    vec3 color;
     vec4 shape_data;
     vec4 shape_data2;
     uint shape_type;
@@ -25,13 +24,14 @@ layout(std140, binding = 0) uniform rendering_info {
     vec3 reso_time;
     vec3 cam_pos;
     vec3 cam_dir;
-    float fov;
-    uint queue_count;
+    vec2 fov_shootanim;
+    uvec3 queuecount_raymarchmaxstep_aostep;
 };
 
 #ifdef IS_WEB
 layout(std140, binding = 1) uniform render_queue {
 #else
+// std430
 layout(std430, binding = 1) readonly buffer render_queue {
 #endif
     RenderQueue queue[50];
@@ -175,11 +175,8 @@ Distance scene_dist(vec3 pos)
 {
     Distance m = Distance(sd_plane(pos, vec3(0, 1, 0), 0), 3);
 
-    for (uint i = 0u; i < queue_count; i++) {
+    for (uint i = 0u; i < queuecount_raymarchmaxstep_aostep.x; i++) {
         switch (queue[i].shape_type) {
-            case SHAPE_TYPE_SPHERE:
-                m = sd_union(m, Distance(sd_sphere(pos - queue[i].position, queue[i].shape_data.x), 2));
-                break;
             case SHAPE_TYPE_BOX:
                 m = sd_union(m,
                     Distance(
@@ -187,6 +184,9 @@ Distance scene_dist(vec3 pos)
                             pos - queue[i].position,
                             queue[i].shape_data.xyz),
                             4));
+                break;
+            case SHAPE_TYPE_SPHERE:
+                m = sd_union(m, Distance(sd_sphere(pos - queue[i].position, queue[i].shape_data.x), 2));
                 break;
             case SHAPE_TYPE_CYLINDER:
                 m = sd_union(m,
@@ -213,8 +213,6 @@ Distance scene_dist(vec3 pos)
         }
     }
 
-    m = sd_union(m, Distance(sd_sphere(pos, 1.0), 2));
-
     return m;
 }
 
@@ -237,7 +235,7 @@ Distance ray_march(vec3 ray_origin, vec3 ray_dir)
     uint mat_id = 0;
     vec3 current_pos = vec3(0);
 
-    for (uint i = 0u; i < 128u; i++) {
+    for (uint i = 0u; i < queuecount_raymarchmaxstep_aostep.y; i++) {
         current_pos = ray_origin + d * ray_dir;
         Distance closest_distance = scene_dist(current_pos);
 
@@ -274,7 +272,7 @@ float ambient_ocl(in vec3 pos, in vec3 nor)
 {
     float occ = 0.0;
     float sca = 1.0;
-    for (int i = 0; i < 4; i++)
+    for (uint i = 0; i < queuecount_raymarchmaxstep_aostep.z; i++)
     {
         float h = 0.001 + 0.15 * float(i) / 4.0;
         Distance d = scene_dist(pos + h * nor);
@@ -312,51 +310,6 @@ mat4 viewMatrix(vec3 pos, vec3 dir, vec3 world_up) {
         vec4(0.0, 0.0, 0.0, 1));
 }
 
-/**
- * Lighting contribution of a single point light source via Phong illumination.
- *
- * The vec3 returned is the RGB color of the light's contribution.
- *
- * k_a: Ambient color
- * k_d: Diffuse color
- * k_s: Specular color
- * alpha: Shininess coefficient
- * p: position of point being lit
- * eye: the position of the camera
- * lightPos: the position of the light
- * lightIntensity: color/intensity of the light
- *
- * See https://en.wikipedia.org/wiki/Phong_reflection_model#Description
- */
-vec3 phongContribForLight(
-    vec3 k_d,
-    vec3 k_s,
-    float alpha,
-    vec3 p,
-    vec3 eye,
-    vec3 lightPos,
-    vec3 lightIntensity,
-    vec3 N) {
-    vec3 L = normalize(lightPos - p);
-    vec3 V = normalize(eye - p);
-    vec3 R = normalize(reflect(-L, N));
-
-    float dotLN = dot(L, N);
-    float dotRV = dot(R, V);
-
-    if (dotLN < 0.0) {
-        // Light not visible from this point on the surface
-        return vec3(0.0, 0.0, 0.0);
-    }
-
-    if (dotRV < 0.0) {
-        // Light reflection in opposite direction as viewer, apply only diffuse
-        // component
-        return lightIntensity * (k_d * dotLN);
-    }
-    return lightIntensity * (k_d * dotLN + k_s * pow(dotRV, alpha));
-}
-
 vec3 blinnPhong(
     vec3 k_d,
     vec3 k_s,
@@ -388,6 +341,7 @@ vec3 blinnPhong(
 }
 
 const vec3 skycolor = vec3(113, 188, 225) / 255.0;
+
 void main()
 {
     vec3 world_up = vec3(0.0, 1.0, 0.0);
@@ -457,6 +411,4 @@ void main()
         normal);
     color *= ambient_ocl(ray_hit_pos, normal);
     outColor = vec4(color, 1.0);
-    //outColor = vec4(vec3(ao), 1.0);
-//    outColor = vec4(clamp(pow(col * lv, 1. / vec3(2.2)), 0, 1), 1.0);
 }

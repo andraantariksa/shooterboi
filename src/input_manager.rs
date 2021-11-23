@@ -42,8 +42,20 @@ impl InputManager {
                 self.keyboard_buttons.remove(key);
                 true
             }
-            WindowEvent::MouseInput { button, .. } => {
+            WindowEvent::MouseInput {
+                button,
+                state: ElementState::Pressed,
+                ..
+            } => {
                 self.mouse_buttons.insert(*button);
+                true
+            }
+            WindowEvent::MouseInput {
+                button,
+                state: ElementState::Released,
+                ..
+            } => {
+                self.mouse_buttons.remove(button);
                 true
             }
             _ => false,
@@ -51,7 +63,6 @@ impl InputManager {
     }
 
     pub(crate) fn clear(&mut self) {
-        self.mouse_buttons.clear();
         self.mouse_movement.data.0 = [[0.0, 0.0]];
     }
 

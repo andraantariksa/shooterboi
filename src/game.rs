@@ -15,7 +15,7 @@ use winit::window::{Window as WinitWindow, WindowId};
 
 conrod_winit::v023_conversion_fns!();
 
-pub struct App {
+pub struct Game {
     scene_stack: VecDeque<Box<dyn Scene>>,
     renderer: Renderer,
     delta_time: Instant,
@@ -26,11 +26,11 @@ pub struct App {
     audio_context: AudioContext,
 }
 
-impl App {
+impl Game {
     pub fn new(window: WinitWindow) -> Self {
         let mut renderer = pollster::block_on(Renderer::new(&window));
         // self.window.set_is_cursor_grabbed(true);
-        let mut conrod_handle = ConrodHandle::new(&renderer);
+        let mut conrod_handle = ConrodHandle::new(&mut renderer);
         conrod_handle.get_ui_mut().handle_event(
             convert_event::<()>(
                 &Event::WindowEvent {
@@ -98,7 +98,8 @@ impl App {
                             let new_pos =
                                 nalgebra::Point2::<f32>::new(position.x as f32, position.y as f32);
 
-                            self.renderer.camera.move_direction(center - new_pos);
+                            self.input_manager.mouse_movement += center - new_pos;
+
                             self.window.set_cursor_position(PhysicalPosition {
                                 x: window_size.width as f32 / 2.0,
                                 y: window_size.height as f32 / 2.0,
@@ -123,18 +124,18 @@ impl App {
                     {
                         let mut dir_diff = nalgebra::Vector2::new(0.0, 0.0);
                         if self.input_manager.is_keyboard_press(&VirtualKeyCode::Left) {
-                            dir_diff.x += 5000.0 * delta_time;
+                            dir_diff.x += 400.0 * delta_time;
                         } else if self.input_manager.is_keyboard_press(&VirtualKeyCode::Right) {
-                            dir_diff.x -= 5000.0 * delta_time;
+                            dir_diff.x -= 400.0 * delta_time;
                         }
 
                         if self.input_manager.is_keyboard_press(&VirtualKeyCode::Up) {
-                            dir_diff.y += 5000.0 * delta_time;
+                            dir_diff.y += 400.0 * delta_time;
                         } else if self.input_manager.is_keyboard_press(&VirtualKeyCode::Down) {
-                            dir_diff.y -= 5000.0 * delta_time;
+                            dir_diff.y -= 400.0 * delta_time;
                         }
 
-                        self.renderer.camera.move_direction(dir_diff);
+                        self.input_manager.mouse_movement += dir_diff;
                     }
                 }
 
@@ -165,7 +166,9 @@ impl App {
                     // All other errors (Outdated, Timeout) should be resolved by the next frame
                     Err(e) => eprintln!("{:?}", e),
                 };
+
                 self.input_manager.clear();
+                self.audio_context.clear();
 
                 match scene_op {
                     SceneOp::None => {}

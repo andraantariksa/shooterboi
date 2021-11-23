@@ -8,26 +8,25 @@ struct RenderQueue
     vec3 position;
     vec3 scale;
     vec3 rotation;
-    vec3 color;
     vec4 shape_data;
     vec4 shape_data2;
     uint shape_type;
-    uint type;
 };
 
 layout(std140, binding = 0) uniform rendering_info {
     vec3 reso_time;
     vec3 cam_pos;
     vec3 cam_dir;
-    float fov;
-    uint queue_count;
+    vec2 fov_shootanim;
+    uvec3 queuecount_raymarchmaxstep_aostep;
 };
 
 #ifdef IS_WEB
 layout(std140, binding = 1) uniform render_queue {
 #else
-    layout(std430, binding = 1) readonly buffer render_queue {
-    #endif
+// std430
+layout(std430, binding = 1) readonly buffer render_queue {
+#endif
     RenderQueue queue[50];
 };
 
@@ -227,12 +226,21 @@ vec3 repeat(vec3 pos, vec3 c)
     return mod(pos + 0.5 * c, c) - 0.5 * c;
 }
 
+mat3 rot_x(float rad)
+{
+    float c = cos(rad);
+    float s = sin(rad);
+    return mat3(1., 0., 0.,
+               0., c, -s,
+               0., s, c);
+}
+
 Distance scene_dist(vec3 pos)
 {
     vec3 gun_pos = vec3(1., -0.5, -5.);
-    Distance m = Distance(sd_silver_horn(pos, gun_pos), 0);
-//    Distance m = Distance(sd_silver_horn(pos, vec3(1., -0.5, -5.)), 0);
-    m = sd_union(m, Distance(sd_holding_hand(pos, gun_pos + vec3(0.9, -1., 1.7)), 1));
+    mat3 rot = rot_x(fov_shootanim.x);
+    Distance m = Distance(sd_silver_horn(pos * rot, gun_pos), 0);
+    m = sd_union(m, Distance(sd_holding_hand(pos * rot, gun_pos + vec3(0.9, -1., 1.7)), 1));
     return m;
 }
 
@@ -252,7 +260,7 @@ Distance ray_march(vec3 ray_origin, vec3 ray_dir)
     Distance dist_traveled = Distance(0.0, 0);
     vec3 current_pos = vec3(0);
 
-    for (uint i = 0u; i < 50u; i++) {
+    for (uint i = 0u; i < queuecount_raymarchmaxstep_aostep.y; i++) {
         current_pos = ray_origin + dist_traveled.distance * ray_dir;
         Distance closest_distance = scene_dist(current_pos);
 
@@ -293,7 +301,7 @@ float ambient_ocl(in vec3 pos, in vec3 nor)
 {
     float occ = 0.0;
     float sca = 1.0;
-    for (int i = 0; i < 2; i++)
+    for (uint i = 0; i < queuecount_raymarchmaxstep_aostep.z; i++)
     {
         float h = 0.001 + 0.15 * float(i) / 4.0;
         Distance d = scene_dist(pos + h * nor);

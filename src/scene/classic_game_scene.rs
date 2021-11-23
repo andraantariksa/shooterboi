@@ -1,12 +1,16 @@
+use conrod_core::widget::envelope_editor::EnvelopePoint;
+use conrod_core::{Colorable, Labelable, Positionable, Sizeable, Widget};
 use std::collections::HashMap;
-use std::io::Cursor;
+use std::fs::File;
+use std::io::{BufReader, Cursor};
 
 use hecs::{Entity, World};
+use instant::Duration;
 use rapier3d::prelude::*;
 use winit::event::{MouseButton, VirtualKeyCode};
 use winit::event_loop::ControlFlow;
 
-use crate::audio::{AudioContext, SINK_ID_MAIN_MENU_BGM};
+use crate::audio::{AudioContext, AUDIO_FILE_SHOOT};
 use crate::camera::ObjectBound;
 use crate::gui::ConrodHandle;
 use crate::input_manager::InputManager;
@@ -14,7 +18,9 @@ use crate::physics::GamePhysics;
 use crate::renderer::{Renderer, ShapeType};
 use crate::scene::pause_scene::PauseScene;
 use crate::scene::{Scene, SceneOp};
+use crate::timer::Timer;
 use crate::window::Window;
+use conrod_core::widget_ids;
 
 #[derive(Debug)]
 struct Label(&'static str);
@@ -23,14 +29,44 @@ pub struct Target;
 
 pub struct Position(nalgebra::Vector3<f32>);
 
+widget_ids! {
+    pub struct ClassicGameSceneIds {
+        // The main canvas
+        canvas,
+        canvas_duration,
+        duration_label,
+        start_duration_label
+    }
+}
+
+pub struct Score {
+    shoot: u32,
+    missed: u32,
+}
+
+impl Score {
+    pub fn new() -> Self {
+        Self {
+            shoot: 0,
+            missed: 0,
+        }
+    }
+}
+
 pub struct ClassicGameScene {
+    ids: ClassicGameSceneIds,
     world: World,
     physics: GamePhysics,
     player_rigid_body_handle: RigidBodyHandle,
+    game_timer: Timer,
+    shoot_timer: Timer,
+    game_start_timer: Timer,
+    score: Score,
+    game_running: bool,
 }
 
 impl ClassicGameScene {
-    pub fn new(renderer: &mut Renderer) -> Self {
+    pub fn new(renderer: &mut Renderer, conrod_handle: &mut ConrodHandle) -> Self {
         let mut world = World::new();
 
         let mut physics = GamePhysics::new();
@@ -58,10 +94,32 @@ impl ClassicGameScene {
         );
         world.spawn((player_rigid_body_handle,));
 
+        {
+            let entity = world.reserve_entity();
+            world.spawn_at(
+                entity,
+                (
+                    Position(nalgebra::Vector3::new(0.0, 5.0, -10.0)),
+                    physics.collider_set.insert(
+                        ColliderBuilder::new(SharedShape::ball(0.5))
+                            .user_data(entity.to_bits() as u128)
+                            .build(),
+                    ),
+                    Target,
+                ),
+            );
+        }
+
         Self {
             world,
             physics,
             player_rigid_body_handle,
+            ids: ClassicGameSceneIds::new(conrod_handle.get_ui_mut().widget_id_generator()),
+            score: Score::new(),
+            shoot_timer: Timer::new_finished(),
+            game_timer: Timer::new(Duration::new(120, 0)),
+            game_start_timer: Timer::new(Duration::new(4, 0)),
+            game_running: false,
         }
     }
 }
@@ -74,7 +132,7 @@ impl Scene for ClassicGameScene {
         conrod_handle: &mut ConrodHandle,
         audio_context: &mut AudioContext,
     ) {
-        renderer.is_render_gui = false;
+        renderer.is_render_gui = true;
         renderer.is_render_game = true;
 
         {
@@ -158,25 +216,21 @@ impl Scene for ClassicGameScene {
         }
 
         {
-            let entity = self.world.reserve_entity();
-            self.world.spawn_at(
-                entity,
-                (
-                    Position(nalgebra::Vector3::new(0.0, 5.0, -10.0)),
-                    self.physics.collider_set.insert(
-                        ColliderBuilder::new(SharedShape::ball(0.5))
-                            .user_data(entity.to_bits() as u128)
-                            .build(),
-                    ),
-                    Target,
-                ),
-            );
+            let mut player_rigid_body = self
+                .physics
+                .rigid_body_set
+                .get_mut(self.player_rigid_body_handle)
+                .unwrap();
+            renderer.camera.position = *player_rigid_body.translation();
         }
 
-        renderer.rendering_info.queue_count = 10;
-
         window.set_is_cursor_grabbed(true);
-        audio_context.get_sink_mut(SINK_ID_MAIN_MENU_BGM).stop();
+
+        audio_context.global_sinks_map.remove("bgm");
+
+        self.game_start_timer.reset(Duration::new(4, 0));
+        self.game_start_timer.start();
+        self.game_running = false;
     }
 
     fn update(
@@ -188,93 +242,144 @@ impl Scene for ClassicGameScene {
         audio_context: &mut AudioContext,
         control_flow: &mut ControlFlow,
     ) -> SceneOp {
+        renderer.camera.move_direction(input_manager.mouse_movement);
+
+        let timer_duration = self.game_timer.get_duration();
+        let sec = timer_duration.as_secs_f32();
+
+        let mut ui_cell = conrod_handle.get_ui_mut().set_widgets();
+        {
+            conrod_core::widget::Canvas::new()
+                .color(conrod_core::Color::Rgba(0.0, 0.0, 0.0, 0.0))
+                .set(self.ids.canvas, &mut ui_cell);
+
+            conrod_core::widget::Canvas::new()
+                .color(conrod_core::Color::Rgba(1.0, 1.0, 1.0, 0.3))
+                .mid_top_of(self.ids.canvas)
+                .wh(conrod_core::Dimensions::new(100.0, 30.0))
+                .set(self.ids.canvas_duration, &mut ui_cell);
+
+            conrod_core::widget::Text::new(&format!(
+                "{:02}:{:02}",
+                (sec / 60.0) as i32,
+                (sec % 60.0) as i32
+            ))
+            .rgba(1.0, 1.0, 1.0, 1.0)
+            .align_middle_x_of(self.ids.canvas_duration)
+            .align_middle_y_of(self.ids.canvas_duration)
+            .set(self.ids.duration_label, &mut ui_cell);
+        }
+
         let mut scene_op = SceneOp::None;
+
+        if !self.game_running {
+            if self.game_start_timer.is_finished() {
+                self.game_timer.start();
+                self.game_running = true;
+            } else {
+                conrod_core::widget::Text::new(&format!(
+                    "{}",
+                    self.game_start_timer.get_duration().as_secs()
+                ))
+                .align_middle_x_of(self.ids.canvas)
+                .align_middle_y_of(self.ids.canvas)
+                .set(self.ids.start_duration_label, &mut ui_cell);
+                self.game_start_timer.update();
+            }
+        } else {
+            self.game_timer.update();
+            self.shoot_timer.update();
+
+            self.physics.physics_pipeline.step(
+                &self.physics.gravity,
+                &self.physics.integration_parameters,
+                &mut self.physics.island_manager,
+                &mut self.physics.broad_phase,
+                &mut self.physics.narrow_phase,
+                &mut self.physics.rigid_body_set,
+                &mut self.physics.collider_set,
+                &mut self.physics.joint_set,
+                &mut self.physics.ccd_solver,
+                &(),
+                &(),
+            );
+
+            let mut player_rigid_body = self
+                .physics
+                .rigid_body_set
+                .get_mut(self.player_rigid_body_handle)
+                .unwrap();
+            renderer.camera.position = *player_rigid_body.translation();
+
+            if input_manager.is_keyboard_press(&VirtualKeyCode::A) {
+                renderer.camera.position -=
+                    100.0 * delta_time * *renderer.camera.get_direction_right();
+            } else if input_manager.is_keyboard_press(&VirtualKeyCode::D) {
+                renderer.camera.position +=
+                    100.0 * delta_time * *renderer.camera.get_direction_right();
+            }
+
+            if input_manager.is_keyboard_press(&VirtualKeyCode::W) {
+                renderer.camera.position +=
+                    100.0 * delta_time * *renderer.camera.get_direction_without_pitch();
+            } else if input_manager.is_keyboard_press(&VirtualKeyCode::S) {
+                renderer.camera.position -=
+                    100.0 * delta_time * *renderer.camera.get_direction_without_pitch();
+            }
+
+            player_rigid_body.set_translation(renderer.camera.position, false);
+
+            self.physics.query_pipeline.update(
+                &self.physics.island_manager,
+                &self.physics.rigid_body_set,
+                &self.physics.collider_set,
+            );
+
+            if input_manager.is_mouse_press(&MouseButton::Left) && self.shoot_timer.is_finished() {
+                self.shoot_timer.reset(Duration::new(0, 400000000));
+                let sink = rodio::Sink::try_new(&audio_context.output_stream_handle).unwrap();
+                sink.append(
+                    rodio::Decoder::new(BufReader::new(Cursor::new(AUDIO_FILE_SHOOT.to_vec())))
+                        .unwrap(),
+                );
+                audio_context.global_sinks_array.push(sink);
+
+                self.score.shoot += 1;
+
+                let ray = Ray::new(
+                    nalgebra::Point::from(
+                        renderer.camera.position
+                            + renderer.camera.get_direction().into_inner() * 1.0,
+                    ),
+                    renderer.camera.get_direction().into_inner(),
+                );
+                const MAX_RAYCAST_DISTANCE: f32 = 1000.0;
+                if let Some((handle, distance)) = self.physics.query_pipeline.cast_ray(
+                    &self.physics.collider_set,
+                    &ray,
+                    MAX_RAYCAST_DISTANCE,
+                    true,
+                    self.physics.interaction_groups,
+                    None,
+                ) {
+                    let collider = self.physics.collider_set.get(handle).unwrap();
+                    let entity = Entity::from_bits(collider.user_data as u64);
+                    if let Ok(_) = self.world.get::<Target>(entity) {
+                        let position = &mut self.world.get_mut::<Position>(entity).unwrap().0;
+                        position.x += 0.5;
+                    } else {
+                        self.score.missed += 1;
+                    }
+                } else {
+                    self.score.missed += 1;
+                }
+            }
+        }
+
+        drop(ui_cell);
 
         if input_manager.is_keyboard_press(&VirtualKeyCode::Escape) {
             scene_op = SceneOp::Push(Box::new(PauseScene::new(renderer, conrod_handle)));
-        }
-
-        self.physics.physics_pipeline.step(
-            &self.physics.gravity,
-            &self.physics.integration_parameters,
-            &mut self.physics.island_manager,
-            &mut self.physics.broad_phase,
-            &mut self.physics.narrow_phase,
-            &mut self.physics.rigid_body_set,
-            &mut self.physics.collider_set,
-            &mut self.physics.joint_set,
-            &mut self.physics.ccd_solver,
-            &(),
-            &(),
-        );
-
-        let mut player_rigid_body = self
-            .physics
-            .rigid_body_set
-            .get_mut(self.player_rigid_body_handle)
-            .unwrap();
-        renderer.camera.position = *player_rigid_body.translation();
-
-        if input_manager.is_keyboard_press(&VirtualKeyCode::A) {
-            renderer.camera.position -= 100.0 * delta_time * *renderer.camera.get_direction_right();
-        } else if input_manager.is_keyboard_press(&VirtualKeyCode::D) {
-            renderer.camera.position += 100.0 * delta_time * *renderer.camera.get_direction_right();
-        }
-
-        if input_manager.is_keyboard_press(&VirtualKeyCode::W) {
-            renderer.camera.position +=
-                100.0 * delta_time * *renderer.camera.get_direction_without_pitch();
-        } else if input_manager.is_keyboard_press(&VirtualKeyCode::S) {
-            renderer.camera.position -=
-                100.0 * delta_time * *renderer.camera.get_direction_without_pitch();
-        }
-
-        player_rigid_body.set_translation(renderer.camera.position, false);
-
-        self.physics.query_pipeline.update(
-            &self.physics.island_manager,
-            &self.physics.rigid_body_set,
-            &self.physics.collider_set,
-        );
-
-        if input_manager.is_mouse_press(&MouseButton::Left) {
-            let shoot_audio = audio_context
-                .output_stream_handle
-                .play_once(Cursor::new(
-                    include_bytes!("../../assets/audio/shoot.wav").to_vec(),
-                ))
-                .unwrap();
-            audio_context.global_sinks.push(shoot_audio);
-
-            let ray = Ray::new(
-                nalgebra::Point::from(
-                    renderer.camera.position + renderer.camera.get_direction().into_inner() * 1.0,
-                ),
-                renderer.camera.get_direction().into_inner(),
-            );
-            const MAX_RAYCAST_DISTANCE: f32 = 1000.0;
-            if let Some((handle, distance)) = self.physics.query_pipeline.cast_ray(
-                &self.physics.collider_set,
-                &ray,
-                MAX_RAYCAST_DISTANCE,
-                true,
-                self.physics.interaction_groups,
-                None,
-            ) {
-                let collider = self.physics.collider_set.get(handle).unwrap();
-                let entity = Entity::from_bits(collider.user_data as u64);
-                if let Ok(_) = self.world.get::<Target>(entity) {
-                    let shoot_audio = audio_context
-                        .output_stream_handle
-                        .play_once(Cursor::new(
-                            include_bytes!("../../assets/audio/shooted.wav").to_vec(),
-                        ))
-                        .unwrap();
-                    audio_context.global_sinks.push(shoot_audio);
-                    let position = &mut self.world.get_mut::<Position>(entity).unwrap().0;
-                    position.x += 0.5;
-                }
-            }
         }
 
         for (id, (position, collider_handle, _)) in self
@@ -302,5 +407,6 @@ impl Scene for ClassicGameScene {
     ) {
         renderer.render_objects.clear();
         window.set_is_cursor_grabbed(false);
+        println!("Deinit game");
     }
 }

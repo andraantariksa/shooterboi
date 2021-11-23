@@ -59,30 +59,34 @@ impl Scene for PauseScene {
         let settings_button;
 
         {
+            let ropa_font_id = *conrod_handle.get_font_id_map().get("ropa").unwrap();
             let mut ui_cell = conrod_handle.get_ui_mut().set_widgets();
             conrod_core::widget::Canvas::new()
                 .pad(MARGIN)
                 .set(self.ids.canvas, &mut ui_cell);
 
+            settings_button = conrod_core::widget::Button::new()
+                .label("Settings")
+                .label_font_id(ropa_font_id)
+                .middle_of(self.ids.canvas)
+                .wh(conrod_core::Dimensions::new(100.0, 30.0))
+                .set(self.ids.settings_button, &mut ui_cell);
+
             for _ in conrod_core::widget::Button::new()
                 .label("Resume")
-                .mid_top_with_margin_on(self.ids.canvas, MARGIN)
-                .wh(conrod_core::Dimensions::new(100.0, 100.0))
+                .label_font_id(ropa_font_id)
+                .up_from(self.ids.settings_button, 30.0)
+                .wh(conrod_core::Dimensions::new(100.0, 30.0))
                 .set(self.ids.resume_button, &mut ui_cell)
             {
                 scene_op = SceneOp::Pop(1);
             }
 
-            settings_button = conrod_core::widget::Button::new()
-                .label("Settings")
-                .middle_of(self.ids.canvas)
-                .wh(conrod_core::Dimensions::new(100.0, 100.0))
-                .set(self.ids.settings_button, &mut ui_cell);
-
             for _ in conrod_core::widget::Button::new()
                 .label("Quit")
-                .mid_bottom_with_margin_on(self.ids.canvas, MARGIN)
-                .wh(conrod_core::Dimensions::new(100.0, 100.0))
+                .label_font_id(ropa_font_id)
+                .down_from(self.ids.settings_button, 30.0)
+                .wh(conrod_core::Dimensions::new(100.0, 30.0))
                 .set(self.ids.quit_buton, &mut ui_cell)
             {
                 scene_op = SceneOp::Pop(2);

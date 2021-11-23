@@ -8,15 +8,19 @@ use winit::event_loop::ControlFlow;
 use pause_scene::PauseScene;
 use settings_scene::SettingsScene;
 
-use crate::audio::{AudioContext, SINK_ID_MAIN_MENU_BGM};
+use crate::audio::AudioContext;
 use crate::gui::ConrodHandle;
 use crate::input_manager::InputManager;
 use crate::renderer::Renderer;
 use crate::window::Window;
 
+pub mod after_game_scene;
 pub mod classic_game_scene;
+pub mod exit_confirm_scene;
+pub mod guide_scene;
 pub mod main_menu_scene;
 pub mod pause_scene;
+pub mod score_scene;
 pub mod settings_scene;
 
 pub enum SceneOp {

@@ -8,10 +8,11 @@ mod input_manager;
 mod physics;
 mod renderer;
 mod scene;
+mod timer;
 mod util;
 mod window;
 
-use crate::game::App;
+use crate::game::Game;
 use winit::event::WindowEvent;
 use winit::event_loop::{ControlFlow, EventLoop};
 use winit::window::WindowBuilder;
@@ -45,7 +46,7 @@ fn main() {
             .expect("Append canvas to HTML body");
     }
 
-    let mut game = App::new(window);
+    let mut game = Game::new(window);
 
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Poll;
