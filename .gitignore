@@ -1,2 +1,3 @@
 /target
 /dist
+/src/shaders/*.spv

@@ -9,7 +9,7 @@ pub struct AudioContext {
     pub output_stream: rodio::OutputStream,
     pub global_sinks_map: HashMap<&'static str, rodio::Sink>,
     pub global_sinks_array: Vec<rodio::Sink>,
-    volume: f32,
+    pub volume: f32,
 }
 
 impl AudioContext {

@@ -2,10 +2,11 @@ use crate::audio::AudioContext;
 use crate::gui::ConrodHandle;
 use crate::input_manager::InputManager;
 use crate::renderer::Renderer;
-use crate::scene::{main_menu_scene::MainMenuScene, Scene, SceneOp};
+use crate::scene::classic_score_scene::ClassicScoreScene;
+use crate::scene::{main_menu_scene::MainMenuScene, Scene, SceneOp, Value};
 use crate::window::Window;
 use instant::{Duration, Instant};
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::ops::Sub;
 use winit::dpi::{PhysicalPosition, PhysicalSize};
 use winit::event::{Event, VirtualKeyCode, WindowEvent};
@@ -43,7 +44,8 @@ impl Game {
         let mut window = Window::from(window);
         let mut audio_context = AudioContext::new();
         let mut scene_stack = VecDeque::<Box<dyn Scene>>::new();
-        let mut first_scene = MainMenuScene::new(&mut renderer, &mut conrod_handle);
+        let mut first_scene = MainMenuScene::new(&mut renderer, &mut conrod_handle); // ClassicScoreScene::new(&mut renderer, &mut conrod_handle);
+
         first_scene.init(
             None,
             &mut window,
@@ -136,6 +138,7 @@ impl Game {
                 let elapsed = self.frame_elapsed_time.elapsed().as_secs_f32();
 
                 let scene_op = self.scene_stack.back_mut().unwrap().update(
+                    &mut self.window,
                     &mut self.renderer,
                     &self.input_manager,
                     elapsed,

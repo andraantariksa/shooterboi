@@ -1,30 +1,16 @@
-use crate::camera::Camera;
 use wgpu::util::DeviceExt;
 
+use crate::camera::Camera;
 use crate::gui::ConrodHandle;
 use crate::renderer::rendering_info::RenderingInfo;
-use crate::renderer::vertex::Vertex;
+use crate::renderer::vertex::{CoordVertex, QUAD_VERTICES};
 use crate::renderer::{RenderObjects, SurfaceAndWindowConfig};
 use crate::util::any_as_u8_slice;
-
-const QUAD_VERTICES: [Vertex; 4] = [
-    Vertex {
-        position: [-1.0, -1.0, 0.0],
-    }, // Bottom left
-    Vertex {
-        position: [-1.0, 1.0, 0.0],
-    }, // Top left
-    Vertex {
-        position: [1.0, -1.0, 0.0],
-    }, // Bottom right
-    Vertex {
-        position: [1.0, 1.0, 0.0],
-    }, // Top right
-];
 
 pub struct GameSceneRenderer {
     pub main_render_pipeline: wgpu::RenderPipeline,
     pub screen_render_pipeline: wgpu::RenderPipeline,
+    pub crosshair_render_pipeline: wgpu::RenderPipeline,
     pub main_bind_group: wgpu::BindGroup,
     pub rendering_info_buffer: wgpu::Buffer,
     pub render_objects_buffer: wgpu::Buffer,
@@ -49,6 +35,12 @@ impl GameSceneRenderer {
             source: wgpu::include_spirv!("../shaders/screen.frag.spv").source,
         });
 
+        let crosshair_fragment_shader =
+            device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+                label: Some("Crosshair fragment shader"),
+                source: wgpu::include_spirv!("../shaders/crosshair.frag.spv").source,
+            });
+
         let vertex_shader = device.create_shader_module(&wgpu::ShaderModuleDescriptor {
             label: Some("Vertex shader"),
             source: wgpu::include_spirv!("../shaders/main.vert.spv").source,
@@ -72,7 +64,7 @@ impl GameSceneRenderer {
                             has_dynamic_offset: false,
                             min_binding_size: None,
                         },
-                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        visibility: wgpu::ShaderStages::FRAGMENT | wgpu::ShaderStages::VERTEX,
                     },
                     wgpu::BindGroupLayoutEntry {
                         count: None,
@@ -139,7 +131,7 @@ impl GameSceneRenderer {
             vertex: wgpu::VertexState {
                 module: &vertex_shader,
                 entry_point: "main",
-                buffers: &[Vertex::desc()],
+                buffers: &[CoordVertex::desc()],
             },
             fragment: Some(wgpu::FragmentState {
                 module: &main_fragment_shader,
@@ -174,7 +166,7 @@ impl GameSceneRenderer {
                 vertex: wgpu::VertexState {
                     module: &vertex_shader,
                     entry_point: "main",
-                    buffers: &[Vertex::desc()],
+                    buffers: &[CoordVertex::desc()],
                 },
                 fragment: Some(wgpu::FragmentState {
                     module: &screen_fragment_shader,
@@ -202,10 +194,46 @@ impl GameSceneRenderer {
                 },
             });
 
+        let crosshair_render_pipeline =
+            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                label: Some("Render Pipeline"),
+                layout: Some(&render_pipeline_layout),
+                vertex: wgpu::VertexState {
+                    module: &vertex_shader,
+                    entry_point: "main",
+                    buffers: &[CoordVertex::desc()],
+                },
+                fragment: Some(wgpu::FragmentState {
+                    module: &crosshair_fragment_shader,
+                    entry_point: "main",
+                    targets: &[wgpu::ColorTargetState {
+                        format: surface_config.format,
+                        blend: None,
+                        write_mask: wgpu::ColorWrites::ALL,
+                    }],
+                }),
+                primitive: wgpu::PrimitiveState {
+                    topology: wgpu::PrimitiveTopology::TriangleStrip,
+                    strip_index_format: None,
+                    front_face: wgpu::FrontFace::Ccw,
+                    cull_mode: None,
+                    polygon_mode: wgpu::PolygonMode::Fill,
+                    clamp_depth: false,
+                    conservative: false,
+                },
+                depth_stencil: None,
+                multisample: wgpu::MultisampleState {
+                    count: 1,
+                    mask: !0,
+                    alpha_to_coverage_enabled: false,
+                },
+            });
+
         Self {
             main_bind_group,
-            screen_render_pipeline,
             main_render_pipeline,
+            screen_render_pipeline,
+            crosshair_render_pipeline,
             render_objects_buffer,
             rendering_info_buffer,
             vertex_buffer,

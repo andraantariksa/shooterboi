@@ -46,7 +46,6 @@ impl ConrodHandle {
         font_id_map.insert("ropa", ropa_font);
 
         let mut image_map = conrod_core::image::Map::new();
-        const LOGO_TEXTURE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Bgra8UnormSrgb;
 
         let mut image_id_map = HashMap::new();
 
@@ -59,11 +58,11 @@ impl ConrodHandle {
             &renderer.device,
             &mut renderer.queue,
             title_image_rgba,
-            LOGO_TEXTURE_FORMAT,
+            renderer.surface_and_window_config.surface.format,
         );
         let title_image = conrod_wgpu::Image {
             texture: title_texture,
-            texture_format: LOGO_TEXTURE_FORMAT,
+            texture_format: renderer.surface_and_window_config.surface.format,
             width: logo_w,
             height: texture_h,
         };

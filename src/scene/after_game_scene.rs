@@ -50,6 +50,7 @@ impl Scene for GuideScene {
 
     fn update(
         &mut self,
+        window: &mut Window,
         _renderer: &mut Renderer,
         input_manager: &InputManager,
         _delta_time: f32,

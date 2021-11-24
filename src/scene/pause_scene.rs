@@ -7,7 +7,7 @@ use crate::gui::ConrodHandle;
 use crate::input_manager::InputManager;
 use crate::renderer::Renderer;
 use crate::scene::settings_scene::SettingsScene;
-use crate::scene::{MaybeMessage, Scene, SceneOp, MARGIN};
+use crate::scene::{MaybeMessage, Scene, SceneOp, BUTTON_HEIGHT, BUTTON_WIDTH, MARGIN};
 use crate::window::Window;
 use conrod_core::widget_ids;
 
@@ -48,6 +48,7 @@ impl Scene for PauseScene {
 
     fn update(
         &mut self,
+        window: &mut Window,
         renderer: &mut Renderer,
         _input_manager: &InputManager,
         _delta_time: f32,
@@ -70,14 +71,14 @@ impl Scene for PauseScene {
                 .label("Settings")
                 .label_font_id(ropa_font_id)
                 .middle_of(self.ids.canvas)
-                .wh(conrod_core::Dimensions::new(100.0, 30.0))
+                .wh(conrod_core::Dimensions::new(BUTTON_WIDTH, BUTTON_HEIGHT))
                 .set(self.ids.settings_button, &mut ui_cell);
 
             for _ in conrod_core::widget::Button::new()
                 .label("Resume")
                 .label_font_id(ropa_font_id)
                 .up_from(self.ids.settings_button, 30.0)
-                .wh(conrod_core::Dimensions::new(100.0, 30.0))
+                .wh(conrod_core::Dimensions::new(BUTTON_WIDTH, BUTTON_HEIGHT))
                 .set(self.ids.resume_button, &mut ui_cell)
             {
                 scene_op = SceneOp::Pop(1, None);
@@ -87,7 +88,7 @@ impl Scene for PauseScene {
                 .label("Quit")
                 .label_font_id(ropa_font_id)
                 .down_from(self.ids.settings_button, 30.0)
-                .wh(conrod_core::Dimensions::new(100.0, 30.0))
+                .wh(conrod_core::Dimensions::new(BUTTON_WIDTH, BUTTON_HEIGHT))
                 .set(self.ids.quit_buton, &mut ui_cell)
             {
                 scene_op = SceneOp::Pop(2, None);

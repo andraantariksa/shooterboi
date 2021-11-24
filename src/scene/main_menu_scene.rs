@@ -11,7 +11,7 @@ use crate::scene::classic_game_scene::ClassicGameScene;
 use crate::scene::exit_confirm_scene::QuitConfirmScene;
 use crate::scene::guide_scene::GuideScene;
 use crate::scene::settings_scene::SettingsScene;
-use crate::scene::{MaybeMessage, Scene, SceneOp, Value, MARGIN};
+use crate::scene::{MaybeMessage, Scene, SceneOp, Value, BUTTON_HEIGHT, BUTTON_WIDTH, MARGIN};
 use crate::window::Window;
 use conrod_core::widget_ids;
 use rodio::Source;
@@ -58,8 +58,7 @@ impl Scene for MainMenuScene {
             if let Some(is_start) = message.get("start_bgm") {
                 if let Value::Bool(false) = is_start {
                 } else {
-                    let sink =
-                        rodio::Sink::try_new(&audio_context.output_stream_handle).unwrap();
+                    let sink = rodio::Sink::try_new(&audio_context.output_stream_handle).unwrap();
                     sink.append(
                         rodio::Decoder::new(BufReader::new(Cursor::new(
                             AUDIO_FILE_AWESOMENESS.to_vec(),
@@ -93,6 +92,7 @@ impl Scene for MainMenuScene {
 
     fn update(
         &mut self,
+        window: &mut Window,
         renderer: &mut Renderer,
         input_manager: &InputManager,
         _delta_time: f32,
@@ -108,10 +108,7 @@ impl Scene for MainMenuScene {
         let guide_button;
 
         {
-            let image_id = *conrod_handle
-                .get_image_id_map()
-                .get("title")
-                .unwrap();
+            let image_id = *conrod_handle.get_image_id_map().get("title").unwrap();
             let ropa_font_id = *conrod_handle.get_font_id_map().get("ropa").unwrap();
             let mut ui_cell = conrod_handle.get_ui_mut().set_widgets();
 
@@ -120,7 +117,7 @@ impl Scene for MainMenuScene {
             quit_button = conrod_core::widget::Button::new()
                 .label("Quit")
                 .label_font_id(ropa_font_id)
-                .wh(conrod_core::Dimensions::new(130.0, 40.0))
+                .wh(conrod_core::Dimensions::new(BUTTON_WIDTH, BUTTON_HEIGHT))
                 .bottom_left_with_margin_on(self.ids.canvas, MARGIN)
                 .set(self.ids.quit_button, &mut ui_cell);
 
@@ -137,21 +134,21 @@ impl Scene for MainMenuScene {
             classic_game_button = conrod_core::widget::Button::new()
                 .label("Classic Mode")
                 .label_font_id(ropa_font_id)
-                .wh(conrod_core::Dimensions::new(130.0, 40.0))
+                .wh(conrod_core::Dimensions::new(BUTTON_WIDTH, BUTTON_HEIGHT))
                 .up_from(self.ids.guide_button, GAP_BETWEEN_BUTTON)
                 .set(self.ids.start_classic_mode_button, &mut ui_cell);
 
             guide_button = conrod_core::widget::Button::new()
                 .label("Guide")
                 .label_font_id(ropa_font_id)
-                .wh(conrod_core::Dimensions::new(130.0, 40.0))
+                .wh(conrod_core::Dimensions::new(BUTTON_WIDTH, BUTTON_HEIGHT))
                 .up_from(self.ids.settings_button, GAP_BETWEEN_BUTTON)
                 .set(self.ids.guide_button, &mut ui_cell);
 
             settings_button = conrod_core::widget::Button::new()
                 .label("Settings")
                 .label_font_id(ropa_font_id)
-                .wh(conrod_core::Dimensions::new(130.0, 40.0))
+                .wh(conrod_core::Dimensions::new(BUTTON_WIDTH, BUTTON_HEIGHT))
                 .up_from(self.ids.quit_button, GAP_BETWEEN_BUTTON)
                 .set(self.ids.settings_button, &mut ui_cell);
         }

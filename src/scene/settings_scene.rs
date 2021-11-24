@@ -54,6 +54,7 @@ impl Scene for SettingsScene {
 
     fn update(
         &mut self,
+        window: &mut Window,
         renderer: &mut Renderer,
         _input_manager: &InputManager,
         _delta_time: f32,

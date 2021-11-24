@@ -20,6 +20,7 @@ hecs = "0.6.5"
 #hecs = { path = "extern/hecs" }
 # Database
 gluesql = "0.8"
+rand = { version = "0.8", features = ["small_rng"] }
 # GUI
 #egui_wgpu_backend = "0.12"
 #egui = "0.14"

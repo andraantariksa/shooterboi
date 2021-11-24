@@ -3,31 +3,14 @@
 #define EPS 0.0001
 #define MAX_DISTANCE 100.0
 
-struct RenderQueue
-{
-    vec3 position;
-    vec3 scale;
-    vec3 rotation;
-    vec4 shape_data;
-    vec4 shape_data2;
-    uint shape_type;
-};
-
 layout(std140, binding = 0) uniform rendering_info {
     vec3 reso_time;
     vec3 cam_pos;
     vec3 cam_dir;
     vec2 fov_shootanim;
     uvec3 queuecount_raymarchmaxstep_aostep;
-};
-
-#ifdef IS_WEB
-layout(std140, binding = 1) uniform render_queue {
-#else
-// std430
-layout(std430, binding = 1) readonly buffer render_queue {
-#endif
-    RenderQueue queue[50];
+    vec4 crosshair_color;
+    vec4 crosshair_inner_outer;
 };
 
 layout(location = 0) out vec4 outColor;

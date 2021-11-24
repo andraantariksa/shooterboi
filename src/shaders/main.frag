@@ -1,6 +1,5 @@
 #version 450
 
-//#define DEV
 #define EPS 0.0001
 #define MAX_DISTANCE 100.0
 #define MAX_QUEUE 100
@@ -26,6 +25,8 @@ layout(std140, binding = 0) uniform rendering_info {
     vec3 cam_dir;
     vec2 fov_shootanim;
     uvec3 queuecount_raymarchmaxstep_aostep;
+    vec4 crosshair_color;
+    vec4 crosshair_inner_outer;
 };
 
 #ifdef IS_WEB

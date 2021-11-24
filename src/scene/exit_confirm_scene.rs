@@ -8,7 +8,7 @@ use crate::gui::ConrodHandle;
 use crate::input_manager::InputManager;
 use crate::renderer::Renderer;
 
-use crate::scene::{MaybeMessage, Scene, SceneOp, Value};
+use crate::scene::{MaybeMessage, Scene, SceneOp, Value, BUTTON_HEIGHT, BUTTON_WIDTH};
 use crate::window::Window;
 use conrod_core::widget_ids;
 use winit::event::VirtualKeyCode;
@@ -51,6 +51,7 @@ impl Scene for QuitConfirmScene {
 
     fn update(
         &mut self,
+        window: &mut Window,
         _renderer: &mut Renderer,
         input_manager: &InputManager,
         _delta_time: f32,
@@ -70,12 +71,13 @@ impl Scene for QuitConfirmScene {
 
             conrod_core::widget::Canvas::new()
                 .middle_of(self.ids.canvas)
-                .wh(conrod_core::Dimensions::new(300.0, 100.0))
+                .wh(conrod_core::Dimensions::new(BUTTON_WIDTH * 2.5, 100.0))
                 .set(self.ids.buttons_canvas, &mut ui_cell);
 
             conrod_core::widget::Text::new("Are you sure you want to quit?")
                 .font_id(ropa_font_id)
-                .middle()
+                .center_justify()
+                .align_middle_x()
                 .align_top_of(self.ids.buttons_canvas)
                 .wh(conrod_core::Dimensions::new(250.0, 30.0))
                 .set(self.ids.confirm_label, &mut ui_cell);
@@ -84,14 +86,14 @@ impl Scene for QuitConfirmScene {
                 .label("Yes")
                 .label_font_id(ropa_font_id)
                 .mid_left_of(self.ids.buttons_canvas)
-                .wh(conrod_core::Dimensions::new(100.0, 30.0))
+                .wh(conrod_core::Dimensions::new(BUTTON_WIDTH, BUTTON_HEIGHT))
                 .set(self.ids.yes_button, &mut ui_cell);
 
             no_button = conrod_core::widget::Button::new()
                 .label("No")
                 .label_font_id(ropa_font_id)
                 .mid_right_of(self.ids.buttons_canvas)
-                .wh(conrod_core::Dimensions::new(100.0, 30.0))
+                .wh(conrod_core::Dimensions::new(BUTTON_WIDTH, BUTTON_HEIGHT))
                 .set(self.ids.no_button, &mut ui_cell);
         }
 

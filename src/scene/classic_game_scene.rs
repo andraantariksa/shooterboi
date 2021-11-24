@@ -1,5 +1,6 @@
 use conrod_core::widget::envelope_editor::EnvelopePoint;
 use conrod_core::{Colorable, Positionable, Sizeable, Widget};
+use std::collections::HashMap;
 
 use std::io::{BufReader, Cursor};
 
@@ -15,11 +16,15 @@ use crate::gui::ConrodHandle;
 use crate::input_manager::InputManager;
 use crate::physics::GamePhysics;
 use crate::renderer::{Renderer, ShapeType};
+use crate::scene::classic_score_scene::ClassicScoreScene;
 use crate::scene::pause_scene::PauseScene;
-use crate::scene::{MaybeMessage, Scene, SceneOp};
+use crate::scene::{MaybeMessage, Message, Scene, SceneOp, Value};
 use crate::timer::Timer;
 use crate::window::Window;
 use conrod_core::widget_ids;
+use rand::distributions::Uniform;
+use rand::prelude::SmallRng;
+use rand::{Rng, RngCore, SeedableRng};
 
 #[derive(Debug)]
 struct Label(&'static str);
@@ -39,16 +44,41 @@ widget_ids! {
 }
 
 pub struct Score {
-    shoot: u32,
-    missed: u32,
+    pub accuracy: f32,
+    pub hit: u16,
+    pub miss: u16,
+    pub score: i32,
+    pub avg_hit_time: f32,
 }
 
 impl Score {
     pub fn new() -> Self {
         Self {
-            shoot: 0,
-            missed: 0,
+            hit: 0,
+            miss: 0,
+            score: 0,
+            avg_hit_time: 0.0,
+            accuracy: 0.0,
         }
+    }
+
+    pub fn read_message(&mut self, message: &MaybeMessage) -> Option<()> {
+        if let Some(message) = message {
+            self.hit = *message.get("hit")?.to_i32() as u16;
+            self.miss = *message.get("miss")?.to_i32() as u16;
+            self.score = *message.get("score")?.to_i32();
+            self.avg_hit_time = *message.get("avg_hit_time")?.to_f32();
+            self.accuracy = *message.get("accuracy")?.to_f32();
+        }
+        Some(())
+    }
+
+    pub fn write_message(&self, message: &mut Message) {
+        message.insert("hit", Value::I32(self.hit as i32));
+        message.insert("miss", Value::I32(self.miss as i32));
+        message.insert("score", Value::I32(self.score));
+        message.insert("avg_hit_time", Value::F32(self.avg_hit_time));
+        message.insert("accuracy", Value::F32(self.accuracy));
     }
 }
 
@@ -62,6 +92,7 @@ pub struct ClassicGameScene {
     game_start_timer: Timer,
     score: Score,
     game_running: bool,
+    rng: SmallRng,
 }
 
 impl ClassicGameScene {
@@ -116,9 +147,10 @@ impl ClassicGameScene {
             ids: ClassicGameSceneIds::new(conrod_handle.get_ui_mut().widget_id_generator()),
             score: Score::new(),
             shoot_timer: Timer::new_finished(),
-            game_timer: Timer::new(Duration::new(120, 0)),
+            game_timer: Timer::new(Duration::new(100, 0)),
             game_start_timer: Timer::new(Duration::new(4, 0)),
             game_running: false,
+            rng: SmallRng::from_entropy(),
         }
     }
 }
@@ -235,6 +267,7 @@ impl Scene for ClassicGameScene {
 
     fn update(
         &mut self,
+        window: &mut Window,
         renderer: &mut Renderer,
         input_manager: &InputManager,
         delta_time: f32,
@@ -247,6 +280,7 @@ impl Scene for ClassicGameScene {
         let timer_duration = self.game_timer.get_duration();
         let sec = timer_duration.as_secs_f32();
 
+        let ropa_font_id = *conrod_handle.get_font_id_map().get("ropa").unwrap();
         let mut ui_cell = conrod_handle.get_ui_mut().set_widgets();
         {
             conrod_core::widget::Canvas::new()
@@ -264,6 +298,7 @@ impl Scene for ClassicGameScene {
                 (sec / 60.0) as i32,
                 (sec % 60.0) as i32
             ))
+            .font_id(ropa_font_id)
             .rgba(1.0, 1.0, 1.0, 1.0)
             .align_middle_x_of(self.ids.canvas_duration)
             .align_middle_y_of(self.ids.canvas_duration)
@@ -277,14 +312,15 @@ impl Scene for ClassicGameScene {
                 self.game_timer.start();
                 self.game_running = true;
             } else {
+                self.game_start_timer.update();
                 conrod_core::widget::Text::new(&format!(
                     "{}",
                     self.game_start_timer.get_duration().as_secs()
                 ))
+                .font_id(ropa_font_id)
                 .align_middle_x_of(self.ids.canvas)
                 .align_middle_y_of(self.ids.canvas)
                 .set(self.ids.start_duration_label, &mut ui_cell);
-                self.game_start_timer.update();
             }
         } else {
             self.game_timer.update();
@@ -344,8 +380,6 @@ impl Scene for ClassicGameScene {
                 );
                 audio_context.global_sinks_array.push(sink);
 
-                self.score.shoot += 1;
-
                 let ray = Ray::new(
                     nalgebra::Point::from(
                         renderer.camera.position
@@ -381,17 +415,34 @@ impl Scene for ClassicGameScene {
                         // audio_context.global_sinks_array.push(sink);
 
                         let position = &mut self.world.get_mut::<Position>(entity).unwrap().0;
-                        position.x += 0.5;
+                        let x = self.rng.sample(Uniform::new(1.0, 3.0)) * 3.0;
+                        let y = self.rng.sample(Uniform::new(1.0, 3.0)) * 3.0;
+                        position.x += x;
+                        position.y += y;
+                        println!("{} {}", x, y);
+
+                        self.score.hit += 1;
                     } else {
-                        self.score.missed += 1;
+                        self.score.miss += 1;
                     }
                 } else {
-                    self.score.missed += 1;
+                    self.score.miss += 1;
                 }
             }
         }
 
         drop(ui_cell);
+
+        if sec <= 0.0 {
+            scene_op = SceneOp::Push(
+                Box::new(ClassicScoreScene::new(renderer, conrod_handle)),
+                Some({
+                    let mut m = HashMap::new();
+                    self.score.write_message(&mut m);
+                    m
+                }),
+            );
+        }
 
         if input_manager.is_keyboard_press(&VirtualKeyCode::Escape) {
             scene_op = SceneOp::Push(Box::new(PauseScene::new(renderer, conrod_handle)), None);
