@@ -1,11 +1,13 @@
 use wgpu::util::DeviceExt;
+use wgpu::{Device, SurfaceConfiguration};
 
 use crate::camera::Camera;
 use crate::gui::ConrodHandle;
+use crate::renderer::crosshair::Crosshair;
 use crate::renderer::rendering_info::RenderingInfo;
-use crate::renderer::vertex::{CoordVertex, QUAD_VERTICES};
+use crate::renderer::vertex::{CoordColorVertex, CoordVertex, QUAD_VERTICES};
 use crate::renderer::{RenderObjects, SurfaceAndWindowConfig};
-use crate::util::any_as_u8_slice;
+use crate::util::{any_sized_as_u8_slice, any_slice_as_u8_slice};
 
 pub struct GameSceneRenderer {
     pub main_render_pipeline: wgpu::RenderPipeline,
@@ -14,7 +16,8 @@ pub struct GameSceneRenderer {
     pub main_bind_group: wgpu::BindGroup,
     pub rendering_info_buffer: wgpu::Buffer,
     pub render_objects_buffer: wgpu::Buffer,
-    pub vertex_buffer: wgpu::Buffer,
+    pub quad_vertex_buffer: wgpu::Buffer,
+    pub crosshair_vertex_buffer: wgpu::Buffer,
 }
 
 impl GameSceneRenderer {
@@ -24,6 +27,7 @@ impl GameSceneRenderer {
         rendering_info: &RenderingInfo,
         render_objects: &mut RenderObjects,
         camera: &Camera,
+        crosshair: &Crosshair,
     ) -> Self {
         let main_fragment_shader = device.create_shader_module(&wgpu::ShaderModuleDescriptor {
             label: Some("Main fragment shader"),
@@ -35,22 +39,34 @@ impl GameSceneRenderer {
             source: wgpu::include_spirv!("../shaders/screen.frag.spv").source,
         });
 
+        let crosshair_vertex_shader = device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+            label: Some("Crosshair vertex shader"),
+            source: wgpu::include_spirv!("../shaders/crosshair.vert.spv").source,
+        });
+
         let crosshair_fragment_shader =
             device.create_shader_module(&wgpu::ShaderModuleDescriptor {
                 label: Some("Crosshair fragment shader"),
                 source: wgpu::include_spirv!("../shaders/crosshair.frag.spv").source,
             });
 
-        let vertex_shader = device.create_shader_module(&wgpu::ShaderModuleDescriptor {
-            label: Some("Vertex shader"),
+        let main_vertex_shader = device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+            label: Some("Main vertex shader"),
             source: wgpu::include_spirv!("../shaders/main.vert.spv").source,
         });
 
-        let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        let quad_vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Quad vertex buffer"),
-            contents: any_as_u8_slice(&QUAD_VERTICES), // bytemuck::cast_slice(QUAD_VERTICES),
+            contents: any_sized_as_u8_slice(&QUAD_VERTICES),
             usage: wgpu::BufferUsages::VERTEX,
         });
+
+        let crosshair_vertex_buffer =
+            device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("Crosshair vertex buffer"),
+                contents: any_slice_as_u8_slice(crosshair.get_vertices().as_slice()),
+                usage: wgpu::BufferUsages::VERTEX,
+            });
 
         let main_bindgroup_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -85,14 +101,14 @@ impl GameSceneRenderer {
 
         let render_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                label: Some("Render Pipeline Layout"),
+                label: Some("Render pipeline layout"),
                 bind_group_layouts: &[&main_bindgroup_layout],
                 push_constant_ranges: &[],
             });
 
         let render_objects_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Rendering objects"),
-            contents: any_as_u8_slice(
+            contents: any_sized_as_u8_slice(
                 &render_objects
                     .get_objects_and_active_len(&camera.get_frustum())
                     .0,
@@ -106,12 +122,14 @@ impl GameSceneRenderer {
 
         let rendering_info_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Rendering info buffer"),
-            contents: any_as_u8_slice(rendering_info),
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            contents: any_sized_as_u8_slice(rendering_info),
+            usage: wgpu::BufferUsages::UNIFORM
+                | wgpu::BufferUsages::COPY_DST
+                | wgpu::BufferUsages::VERTEX,
         });
 
         let main_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("main bind group"),
+            label: Some("Main bind group"),
             layout: &main_bindgroup_layout,
             entries: &[
                 wgpu::BindGroupEntry {
@@ -126,10 +144,10 @@ impl GameSceneRenderer {
         });
 
         let main_render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("Render Pipeline"),
+            label: Some("Main render pipeline"),
             layout: Some(&render_pipeline_layout),
             vertex: wgpu::VertexState {
-                module: &vertex_shader,
+                module: &main_vertex_shader,
                 entry_point: "main",
                 buffers: &[CoordVertex::desc()],
             },
@@ -161,10 +179,10 @@ impl GameSceneRenderer {
 
         let screen_render_pipeline =
             device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-                label: Some("Render Pipeline"),
+                label: Some("Screen render pipeline"),
                 layout: Some(&render_pipeline_layout),
                 vertex: wgpu::VertexState {
-                    module: &vertex_shader,
+                    module: &main_vertex_shader,
                     entry_point: "main",
                     buffers: &[CoordVertex::desc()],
                 },
@@ -196,12 +214,12 @@ impl GameSceneRenderer {
 
         let crosshair_render_pipeline =
             device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-                label: Some("Render Pipeline"),
+                label: Some("Crosshair render pipeline"),
                 layout: Some(&render_pipeline_layout),
                 vertex: wgpu::VertexState {
-                    module: &vertex_shader,
+                    module: &crosshair_vertex_shader,
                     entry_point: "main",
-                    buffers: &[CoordVertex::desc()],
+                    buffers: &[CoordColorVertex::desc()],
                 },
                 fragment: Some(wgpu::FragmentState {
                     module: &crosshair_fragment_shader,
@@ -213,7 +231,7 @@ impl GameSceneRenderer {
                     }],
                 }),
                 primitive: wgpu::PrimitiveState {
-                    topology: wgpu::PrimitiveTopology::TriangleStrip,
+                    topology: wgpu::PrimitiveTopology::TriangleList,
                     strip_index_format: None,
                     front_face: wgpu::FrontFace::Ccw,
                     cull_mode: None,
@@ -236,7 +254,8 @@ impl GameSceneRenderer {
             crosshair_render_pipeline,
             render_objects_buffer,
             rendering_info_buffer,
-            vertex_buffer,
+            quad_vertex_buffer,
+            crosshair_vertex_buffer,
         }
     }
 
@@ -247,9 +266,10 @@ impl GameSceneRenderer {
         _device: &wgpu::Device,
         _surface_config: &SurfaceAndWindowConfig,
         _conrod_handle: &mut ConrodHandle,
+        crosshair: &Crosshair,
     ) {
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("Render pass"),
+            label: Some("Game render pass"),
             color_attachments: &[wgpu::RenderPassColorAttachment {
                 view,
                 resolve_target: None,
@@ -265,12 +285,17 @@ impl GameSceneRenderer {
             }],
             depth_stencil_attachment: None,
         });
-        render_pass.set_pipeline(&self.main_render_pipeline);
+
         render_pass.set_bind_group(0, &self.main_bind_group, &[]);
-        render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
+        render_pass.set_pipeline(&self.main_render_pipeline);
+        render_pass.set_vertex_buffer(0, self.quad_vertex_buffer.slice(..));
         render_pass.draw(0..4, 0..1);
 
         render_pass.set_pipeline(&self.screen_render_pipeline);
         render_pass.draw(0..4, 0..1);
+
+        render_pass.set_pipeline(&self.crosshair_render_pipeline);
+        render_pass.set_vertex_buffer(0, self.crosshair_vertex_buffer.slice(..));
+        render_pass.draw(0..crosshair.vertices_len(), 0..1);
     }
 }

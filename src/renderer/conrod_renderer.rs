@@ -50,7 +50,7 @@ impl ConrodSceneRenderer {
             .render(device, conrod_handle.get_image_map());
         let buffer_slice = render.vertex_buffer.slice(..);
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("Render pass gui"),
+            label: Some("GUI render pass"),
             color_attachments: &[wgpu::RenderPassColorAttachment {
                 view,
                 resolve_target: None,

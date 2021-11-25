@@ -6,12 +6,14 @@ layout(std140, binding = 0) uniform rendering_info {
     vec3 cam_dir;
     vec2 fov_shootanim;
     uvec3 queuecount_raymarchmaxstep_aostep;
-    vec4 crosshair_color;
-    vec4 crosshair_inner_outer;
 };
 
-layout (location = 0) in vec2 pos;
+layout(location = 0) in vec2 pos;
+layout(location = 1) in vec4 col_in;
+
+layout(location = 0) out vec4 col_out;
 
 void main() {
-    gl_Position = vec4(pos.x / (reso_time.x / 2.0), pos.y / (reso_time.y / 2.0), 0., 0.);
+    col_out = col_in;
+    gl_Position = vec4(pos / (reso_time.xy / 2.), 0., 1.);
 }

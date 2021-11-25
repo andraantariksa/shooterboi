@@ -1,18 +1,9 @@
 #version 450
 
-layout(std140, binding = 0) uniform rendering_info {
-    vec3 reso_time;
-    vec3 cam_pos;
-    vec3 cam_dir;
-    vec2 fov_shootanim;
-    uvec3 queuecount_raymarchmaxstep_aostep;
-    vec4 crosshair_color;
-    vec4 crosshair_inner_outer;
-};
-
-layout(location = 0) out vec4 outColor;
+layout(location = 0) in vec4 in_col;
+layout(location = 0) out vec4 out_col;
 
 void main()
 {
-    outColor = crosshair_color;
+    out_col = in_col;
 }

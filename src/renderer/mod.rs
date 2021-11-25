@@ -6,11 +6,12 @@ use game_renderer::GameSceneRenderer;
 
 use crate::camera::{Camera, Frustum, ObjectBound};
 use crate::gui::ConrodHandle;
+use crate::renderer::crosshair::Crosshair;
 use crate::renderer::rendering_info::RenderingInfo;
-
-use crate::util::any_as_u8_slice;
+use crate::util::any_sized_as_u8_slice;
 
 pub mod conrod_renderer;
+pub mod crosshair;
 pub mod game_renderer;
 pub mod rendering_info;
 pub mod vertex;
@@ -144,6 +145,7 @@ pub struct Renderer {
     pub render_objects: RenderObjects,
     pub rendering_info: RenderingInfo,
     pub camera: Camera,
+    pub crosshair: Crosshair,
     pub is_render_game: bool,
     pub is_render_gui: bool,
     pub surface: wgpu::Surface,
@@ -200,6 +202,7 @@ impl Renderer {
         let rendering_info = RenderingInfo::new(window_size);
 
         let camera = Camera::new();
+        let crosshair = Crosshair::new();
 
         Self {
             game_renderer: game_renderer::GameSceneRenderer::new(
@@ -208,7 +211,9 @@ impl Renderer {
                 &rendering_info,
                 &mut render_objects,
                 &camera,
+                &crosshair,
             ),
+            crosshair,
             gui_renderer: conrod_renderer::ConrodSceneRenderer::new(
                 &surface_config,
                 &device,
@@ -259,12 +264,12 @@ impl Renderer {
             self.queue.write_buffer(
                 &self.game_renderer.rendering_info_buffer,
                 0,
-                any_as_u8_slice(&self.rendering_info),
+                any_sized_as_u8_slice(&self.rendering_info),
             );
             self.queue.write_buffer(
                 &self.game_renderer.render_objects_buffer,
                 0,
-                any_as_u8_slice(&objects),
+                any_sized_as_u8_slice(&objects),
             );
         }
 
@@ -286,6 +291,7 @@ impl Renderer {
                     &self.device,
                     &self.surface_and_window_config,
                     conrod_handle,
+                    &self.crosshair,
                 );
             }
             if self.is_render_gui {
