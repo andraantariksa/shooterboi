@@ -10,6 +10,7 @@ use rapier3d::prelude::*;
 use winit::event::{MouseButton, VirtualKeyCode};
 use winit::event_loop::ControlFlow;
 
+use crate::animation::InOutAnimation;
 use crate::audio::{AudioContext, AUDIO_FILE_SHOOT};
 use crate::camera::ObjectBound;
 use crate::gui::ConrodHandle;
@@ -20,6 +21,7 @@ use crate::scene::classic_score_scene::ClassicScoreScene;
 use crate::scene::pause_scene::PauseScene;
 use crate::scene::{MaybeMessage, Message, Scene, SceneOp, Value};
 use crate::timer::Timer;
+use crate::util::lerp;
 use crate::window::Window;
 use conrod_core::widget_ids;
 use rand::distributions::Uniform;
@@ -93,6 +95,7 @@ pub struct ClassicGameScene {
     score: Score,
     game_running: bool,
     rng: SmallRng,
+    shoot_animation: InOutAnimation,
 }
 
 impl ClassicGameScene {
@@ -148,9 +151,10 @@ impl ClassicGameScene {
             score: Score::new(),
             shoot_timer: Timer::new_finished(),
             game_timer: Timer::new(Duration::new(100, 0)),
-            game_start_timer: Timer::new(Duration::new(4, 0)),
+            game_start_timer: Timer::new(Duration::new(3, 0)),
             game_running: false,
             rng: SmallRng::from_entropy(),
+            shoot_animation: InOutAnimation::new(0.8, 1.5),
         }
     }
 }
@@ -172,7 +176,7 @@ impl Scene for ClassicGameScene {
             let (objects, ref mut bound) = renderer.render_objects.next_static();
             objects.position = nalgebra::Vector3::new(0.0, 0.0, -20.0);
             objects.shape_type = ShapeType::Box;
-            objects.shape_data1 = nalgebra::Vector4::new(20.0, 12.0, 0.1, 0.0);
+            objects.shape_data1 = nalgebra::Vector4::new(20.0, 12.0, 1.0, 0.0);
             *bound = ObjectBound::Sphere(20.0);
             self.physics.collider_set.insert(
                 ColliderBuilder::new(SharedShape::cuboid(
@@ -192,7 +196,7 @@ impl Scene for ClassicGameScene {
             let (objects, ref mut bound) = renderer.render_objects.next_static();
             objects.position = nalgebra::Vector3::new(0.0, 0.0, 10.0);
             objects.shape_type = ShapeType::Box;
-            objects.shape_data1 = nalgebra::Vector4::new(20.0, 5.0, 0.1, 0.0);
+            objects.shape_data1 = nalgebra::Vector4::new(20.0, 5.0, 1.0, 0.0);
             *bound = ObjectBound::Sphere(20.0);
             self.physics.collider_set.insert(
                 ColliderBuilder::new(SharedShape::cuboid(
@@ -212,7 +216,7 @@ impl Scene for ClassicGameScene {
             let (objects, ref mut bound) = renderer.render_objects.next_static();
             objects.position = nalgebra::Vector3::new(-20.0, 0.0, -5.0);
             objects.shape_type = ShapeType::Box;
-            objects.shape_data1 = nalgebra::Vector4::new(0.1, 5.0, 15.0, 0.0);
+            objects.shape_data1 = nalgebra::Vector4::new(1.0, 5.0, 15.0, 0.0);
             *bound = ObjectBound::Sphere(15.0);
             self.physics.collider_set.insert(
                 ColliderBuilder::new(SharedShape::cuboid(
@@ -232,7 +236,7 @@ impl Scene for ClassicGameScene {
             let (objects, ref mut bound) = renderer.render_objects.next_static();
             objects.position = nalgebra::Vector3::new(20.0, 0.0, -5.0);
             objects.shape_type = ShapeType::Box;
-            objects.shape_data1 = nalgebra::Vector4::new(0.1, 5.0, 15.0, 0.0);
+            objects.shape_data1 = nalgebra::Vector4::new(1.0, 5.0, 15.0, 0.0);
             *bound = ObjectBound::Sphere(15.0);
             self.physics.collider_set.insert(
                 ColliderBuilder::new(SharedShape::cuboid(
@@ -260,7 +264,7 @@ impl Scene for ClassicGameScene {
 
         audio_context.global_sinks_map.remove("bgm");
 
-        self.game_start_timer.reset(Duration::new(4, 0));
+        self.game_start_timer.reset(Duration::new(10, 0));
         self.game_start_timer.start();
         self.game_running = false;
     }
@@ -326,6 +330,13 @@ impl Scene for ClassicGameScene {
             self.game_timer.update();
             self.shoot_timer.update();
 
+            self.shoot_animation.update(delta_time);
+            renderer.rendering_info.fov_shootanim.y = lerp(
+                0.0f32,
+                -20.0f32.to_radians(),
+                self.shoot_animation.get_value(),
+            );
+
             self.physics.physics_pipeline.step(
                 &self.physics.gravity,
                 &self.physics.integration_parameters,
@@ -349,18 +360,18 @@ impl Scene for ClassicGameScene {
 
             if input_manager.is_keyboard_press(&VirtualKeyCode::A) {
                 renderer.camera.position -=
-                    100.0 * delta_time * *renderer.camera.get_direction_right();
+                    3.0 * delta_time * *renderer.camera.get_direction_right();
             } else if input_manager.is_keyboard_press(&VirtualKeyCode::D) {
                 renderer.camera.position +=
-                    100.0 * delta_time * *renderer.camera.get_direction_right();
+                    3.0 * delta_time * *renderer.camera.get_direction_right();
             }
 
             if input_manager.is_keyboard_press(&VirtualKeyCode::W) {
                 renderer.camera.position +=
-                    100.0 * delta_time * *renderer.camera.get_direction_without_pitch();
+                    3.0 * delta_time * *renderer.camera.get_direction_without_pitch();
             } else if input_manager.is_keyboard_press(&VirtualKeyCode::S) {
                 renderer.camera.position -=
-                    100.0 * delta_time * *renderer.camera.get_direction_without_pitch();
+                    3.0 * delta_time * *renderer.camera.get_direction_without_pitch();
             }
 
             player_rigid_body.set_translation(renderer.camera.position, false);
@@ -372,6 +383,7 @@ impl Scene for ClassicGameScene {
             );
 
             if input_manager.is_mouse_press(&MouseButton::Left) && self.shoot_timer.is_finished() {
+                self.shoot_animation.trigger();
                 self.shoot_timer.reset(Duration::new(0, 400000000));
                 let sink = rodio::Sink::try_new(&audio_context.output_stream_handle).unwrap();
                 sink.append(
@@ -415,11 +427,8 @@ impl Scene for ClassicGameScene {
                         // audio_context.global_sinks_array.push(sink);
 
                         let position = &mut self.world.get_mut::<Position>(entity).unwrap().0;
-                        let x = self.rng.sample(Uniform::new(1.0, 3.0)) * 3.0;
-                        let y = self.rng.sample(Uniform::new(1.0, 3.0)) * 3.0;
-                        position.x += x;
-                        position.y += y;
-                        println!("{} {}", x, y);
+                        position.x = self.rng.sample(Uniform::new(-3.0, 3.0));
+                        position.y = self.rng.sample(Uniform::new(0.5, 3.0));
 
                         self.score.hit += 1;
                     } else {
@@ -489,6 +498,7 @@ impl Scene for ClassicGameScene {
         _conrod_handle: &mut ConrodHandle,
         _audio_context: &mut AudioContext,
     ) {
+        renderer.rendering_info.fov_shootanim.y = 0.0;
         renderer.render_objects.clear();
         window.set_is_cursor_grabbed(false);
         println!("Deinit game");

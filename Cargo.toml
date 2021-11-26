@@ -15,27 +15,16 @@ bincode = "1.3.3"
 rapier3d = "0.11.1"
 serde = { version = "1", features = ["derive"] }
 log = "0.4.14"
-# ECS
 hecs = "0.6.5"
-#hecs = { path = "extern/hecs" }
-# Database
-gluesql = "0.8"
 rand = { version = "0.8", features = ["small_rng"] }
-# GUI
-#egui_wgpu_backend = "0.12"
-#egui = "0.14"
-#egui_winit_platform = "0.10.0"
 conrod_winit = "0.75"
 conrod_wgpu = "0.76"
 conrod_core = "0.76"
-conrod_example_shared = "0.75"
-#iced_wgpu = { git = "https://github.com/iced-rs/iced.git", rev = "65f690b07559a36fe8bfcba31edd851c5c286704" }
-#iced_winit = { git = "https://github.com/iced-rs/iced.git", rev = "65f690b07559a36fe8bfcba31edd851c5c286704" }
-# PATCH
 getrandom = { version = "0.2", features = ["js"] }
-#winit = { git = "https://github.com/iced-rs/winit.git", rev = "1e6623c4d06d110e5408dcbdf1edebd07e6a200e" }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
+gluesql = { git = "https://github.com/gluesql/gluesql.git", default-features = false, features = ["memory-storage", "alter-table", "sorter"] }
+uuid = { version = "0.8", features = ["wasm-bindgen", "v4"] }
 wgpu = { version = "0.11", features = ["webgl", "spirv"] }
 web-sys = "0.3.55"
 image = { version = "0.23.14", default-features = false, features = ["gif", "jpeg", "ico", "png", "pnm", "tga", "tiff", "webp", "bmp", "hdr", "dxt", "dds", "farbfeld"] }
@@ -45,6 +34,7 @@ console_error_panic_hook = "0.1.7"
 #wasm-bindgen-futures = "0.4.28"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+gluesql = { git = "https://github.com/gluesql/gluesql.git" }
 wgpu = { version = "0.11", features = ["spirv"] }
 image = "0.23.14"
 winit = "0.25.0"

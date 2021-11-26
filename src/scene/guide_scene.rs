@@ -1,5 +1,6 @@
 use conrod_core::widget::envelope_editor::EnvelopePoint;
 use conrod_core::{Labelable, Positionable, Sizeable, Widget};
+use std::collections::HashMap;
 use winit::event_loop::ControlFlow;
 
 use crate::audio::AudioContext;
@@ -7,7 +8,7 @@ use crate::gui::ConrodHandle;
 use crate::input_manager::InputManager;
 use crate::renderer::Renderer;
 
-use crate::scene::{MaybeMessage, Scene, SceneOp, MARGIN};
+use crate::scene::{MaybeMessage, Scene, SceneOp, Value, MARGIN};
 use crate::window::Window;
 use conrod_core::widget_ids;
 
@@ -58,6 +59,8 @@ impl Scene for GuideScene {
     ) -> SceneOp {
         let mut scene_op = SceneOp::None;
 
+        let ropa_font_id = *conrod_handle.get_font_id_map().get("ropa").unwrap();
+
         let mut back_button;
 
         {
@@ -66,6 +69,7 @@ impl Scene for GuideScene {
 
             back_button = conrod_core::widget::Button::new()
                 .label("Back")
+                .label_font_id(ropa_font_id)
                 .bottom_left_with_margin_on(self.ids.canvas, MARGIN)
                 .wh(conrod_core::Dimensions::new(100.0, 30.0))
                 .set(self.ids.back_button, &mut ui_cell);
@@ -73,7 +77,11 @@ impl Scene for GuideScene {
 
         if input_manager.is_keyboard_press(&VirtualKeyCode::Escape) || back_button.next().is_some()
         {
-            scene_op = SceneOp::Pop(1, None);
+            scene_op = SceneOp::Pop(1, {
+                let mut m = HashMap::new();
+                m.insert("start_bgm", Value::Bool(false));
+                Some(m)
+            });
         }
 
         scene_op

@@ -1,3 +1,5 @@
+use std::ops::{Add, Mul, Sub};
+
 #[inline]
 pub fn any_sized_as_u8_slice<T: Sized>(p: &T) -> &[u8] {
     unsafe {
@@ -25,4 +27,13 @@ pub fn clamp<T: PartialOrd>(input: T, min: T, max: T) -> T {
     } else {
         input
     }
+}
+
+#[inline]
+pub fn lerp<T: Add<Output = T> + Sub<Output = T> + Mul<Output = T> + Copy>(
+    start: T,
+    end: T,
+    pos: T,
+) -> T {
+    start + (end - start) * pos
 }

@@ -66,10 +66,20 @@ impl ConrodHandle {
             width: logo_w,
             height: texture_h,
         };
+        image_id_map.insert("title", image_map.insert(title_image));
 
-        let title_image = image_map.insert(title_image);
-
-        image_id_map.insert("title", title_image);
+        let crosshair_texture = create_empty_texture(
+            &renderer.device,
+            nalgebra::Vector2::new(200, 200),
+            renderer.surface_and_window_config.surface.format,
+        );
+        let crosshair_image = conrod_wgpu::Image {
+            texture: crosshair_texture,
+            texture_format: renderer.surface_and_window_config.surface.format,
+            width: logo_w,
+            height: texture_h,
+        };
+        image_id_map.insert("crosshair", image_map.insert(crosshair_image));
 
         Self {
             ui,
@@ -120,6 +130,27 @@ pub fn theme() -> conrod_core::Theme {
         mouse_drag_threshold: 0.0,
         double_click_threshold: std::time::Duration::from_millis(500),
     }
+}
+
+fn create_empty_texture(
+    device: &wgpu::Device,
+    dimension: nalgebra::Vector2<u32>,
+    format: wgpu::TextureFormat,
+) -> wgpu::Texture {
+    let texture_extent = wgpu::Extent3d {
+        width: dimension.x,
+        height: dimension.x,
+        depth_or_array_layers: 1,
+    };
+    device.create_texture(&wgpu::TextureDescriptor {
+        label: Some("Creating texture"),
+        size: texture_extent,
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format,
+        usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+    })
 }
 
 fn create_image_texture(
