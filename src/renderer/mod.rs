@@ -274,9 +274,11 @@ impl Renderer {
         }
 
         let frame = self.surface.get_current_texture()?;
-        let view = frame
-            .texture
-            .create_view(&wgpu::TextureViewDescriptor::default());
+        let view = frame.texture.create_view(&wgpu::TextureViewDescriptor {
+            label: Some("Texture view descriptor"),
+            format: Some(self.surface_and_window_config.surface.format),
+            ..Default::default()
+        });
 
         let mut encoder = self
             .device

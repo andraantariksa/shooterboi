@@ -109,4 +109,4 @@ pub trait Scene {
     );
 }
 
-pub const MARGIN: conrod_core::Scalar = 30.0;
+pub const MARGIN: conrod_core::Scalar = 15.0;

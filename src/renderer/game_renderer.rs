@@ -65,7 +65,7 @@ impl GameSceneRenderer {
             device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
                 label: Some("Crosshair vertex buffer"),
                 contents: any_slice_as_u8_slice(crosshair.get_vertices().as_slice()),
-                usage: wgpu::BufferUsages::VERTEX,
+                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
             });
 
         let main_bindgroup_layout =

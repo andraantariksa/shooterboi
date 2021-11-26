@@ -2,8 +2,5 @@
 <project version="4">
   <component name="VcsDirectoryMappings">
     <mapping directory="$PROJECT_DIR$" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/extern/ambisonic" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/extern/hecs" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/extern/rand" vcs="Git" />
   </component>
 </project>

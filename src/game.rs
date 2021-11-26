@@ -1,7 +1,9 @@
 use crate::audio::AudioContext;
+use crate::database::Database;
 use crate::gui::ConrodHandle;
 use crate::input_manager::InputManager;
 use crate::renderer::Renderer;
+use crate::scene::classic_game_scene::ClassicGameScene;
 use crate::scene::classic_score_scene::ClassicScoreScene;
 use crate::scene::{main_menu_scene::MainMenuScene, Scene, SceneOp, Value};
 use crate::window::Window;
@@ -18,12 +20,13 @@ conrod_winit::v023_conversion_fns!();
 pub struct Game {
     scene_stack: VecDeque<Box<dyn Scene>>,
     renderer: Renderer,
-    frame_elapsed_time: Instant,
+    last_time: Instant,
     running_time: Instant,
     window: Window,
     input_manager: InputManager,
     conrod_handle: ConrodHandle,
     audio_context: AudioContext,
+    database: Database,
 }
 
 impl Game {
@@ -54,15 +57,18 @@ impl Game {
             &mut audio_context,
         );
         scene_stack.push_back(Box::new(first_scene));
+        let mut database = Database::new();
+        database.init();
         Self {
             window,
             scene_stack,
             conrod_handle,
             renderer,
             input_manager: InputManager::new(),
-            frame_elapsed_time: Instant::now(),
+            last_time: Instant::now(),
             running_time: Instant::now(),
             audio_context,
+            database,
         }
     }
 
@@ -111,9 +117,12 @@ impl Game {
                 };
             }
             Event::MainEventsCleared => {
+                let current_time = Instant::now();
+                let delta_time = current_time.duration_since(self.last_time).as_secs_f32();
+                self.last_time = current_time;
+
                 // #[cfg(target_arch = "wasm32")]
                 if self.window.is_cursor_grabbed() {
-                    let delta_time = self.frame_elapsed_time.elapsed().as_secs_f32();
                     {
                         let mut dir_diff = nalgebra::Vector2::new(0.0, 0.0);
                         if self.input_manager.is_keyboard_press(&VirtualKeyCode::Left) {
@@ -135,13 +144,11 @@ impl Game {
                 // const MAX_FRAME_TIME: f32 = 0.2;
                 // const FIXED_TIMESTEP: f32 = 1.0 / 20.0;
 
-                let elapsed = self.frame_elapsed_time.elapsed().as_secs_f32();
-
                 let scene_op = self.scene_stack.back_mut().unwrap().update(
                     &mut self.window,
                     &mut self.renderer,
                     &self.input_manager,
-                    elapsed,
+                    delta_time,
                     &mut self.conrod_handle,
                     &mut self.audio_context,
                     control_flow,
@@ -207,7 +214,7 @@ impl Game {
                 self.scene_stack.back_mut().unwrap().prerender(
                     &mut self.renderer,
                     &self.input_manager,
-                    elapsed,
+                    delta_time,
                     &mut self.conrod_handle,
                     &mut self.audio_context,
                 );
@@ -233,8 +240,6 @@ impl Game {
 
                 self.input_manager.clear();
                 self.audio_context.clear();
-
-                self.frame_elapsed_time = Instant::now();
             }
             _ => {}
         };
