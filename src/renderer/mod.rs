@@ -208,6 +208,7 @@ impl Renderer {
             game_renderer: game_renderer::GameSceneRenderer::new(
                 &surface_config,
                 &device,
+                &queue,
                 &rendering_info,
                 &mut render_objects,
                 &camera,

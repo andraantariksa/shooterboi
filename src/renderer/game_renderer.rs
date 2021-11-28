@@ -24,6 +24,7 @@ impl GameSceneRenderer {
     pub fn new(
         surface_config: &wgpu::SurfaceConfiguration,
         device: &wgpu::Device,
+        queue: &wgpu::Queue,
         rendering_info: &RenderingInfo,
         render_objects: &mut RenderObjects,
         camera: &Camera,
@@ -68,6 +69,51 @@ impl GameSceneRenderer {
                 usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
             });
 
+        let image = image::load_from_memory(include_bytes!("../../assets/images/checker.png"))
+            .unwrap()
+            .to_rgba8();
+        let ground_texture = device.create_texture_with_data(
+            &queue,
+            &wgpu::TextureDescriptor {
+                label: Some("Ground texture"),
+                size: wgpu::Extent3d {
+                    width: image.width(),
+                    height: image.height(),
+                    depth_or_array_layers: 1,
+                },
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format: wgpu::TextureFormat::Rgba8Unorm,
+                usage: wgpu::TextureUsages::TEXTURE_BINDING,
+            },
+            &image.into_raw()[..],
+        );
+        let ground_texture_view = ground_texture.create_view(&wgpu::TextureViewDescriptor {
+            label: Some("Ground texture view"),
+            format: Some(wgpu::TextureFormat::Rgba8Unorm),
+            dimension: Some(wgpu::TextureViewDimension::D2),
+            aspect: wgpu::TextureAspect::All,
+            base_mip_level: 0,
+            mip_level_count: None,
+            base_array_layer: 0,
+            array_layer_count: None,
+        });
+        let texture_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            label: Some("Texture sampler"),
+            address_mode_u: wgpu::AddressMode::ClampToEdge,
+            address_mode_v: wgpu::AddressMode::ClampToEdge,
+            address_mode_w: wgpu::AddressMode::ClampToEdge,
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Nearest,
+            mipmap_filter: wgpu::FilterMode::Nearest,
+            lod_min_clamp: 0.0,
+            lod_max_clamp: 0.0,
+            compare: None,
+            anisotropy_clamp: None,
+            border_color: None,
+        });
+
         let main_bindgroup_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
                 label: Some("Bind group layout descriptor main"),
@@ -93,6 +139,25 @@ impl GameSceneRenderer {
                             },
                             has_dynamic_offset: false,
                             min_binding_size: None,
+                        },
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        count: None,
+                        binding: 2,
+                        ty: wgpu::BindingType::Sampler {
+                            filtering: true,
+                            comparison: false,
+                        },
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        count: None,
+                        binding: 3,
+                        ty: wgpu::BindingType::Texture {
+                            multisampled: false,
+                            sample_type: wgpu::TextureSampleType::Float { filterable: false },
+                            view_dimension: wgpu::TextureViewDimension::D2,
                         },
                         visibility: wgpu::ShaderStages::FRAGMENT,
                     },
@@ -139,6 +204,14 @@ impl GameSceneRenderer {
                 wgpu::BindGroupEntry {
                     binding: 1,
                     resource: render_objects_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: wgpu::BindingResource::Sampler(&texture_sampler),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: wgpu::BindingResource::TextureView(&ground_texture_view),
                 },
             ],
         });

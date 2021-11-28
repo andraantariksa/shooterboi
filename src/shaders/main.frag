@@ -36,6 +36,9 @@ layout(std430, binding = 1) readonly buffer render_queue {
     RenderQueue queue[50];
 };
 
+layout(binding = 2) uniform sampler checker_sampler;
+layout(binding = 3) uniform texture2D checker_texture;
+
 layout(location = 0) out vec4 outColor;
 
 struct RayHit
@@ -172,7 +175,7 @@ vec3 repeat(vec3 pos, vec3 c)
 
 Distance scene_dist(vec3 pos)
 {
-    Distance m = Distance(sd_plane(pos, vec3(0, 1, 0), 0), 3);
+    Distance m = Distance(sd_plane(pos, vec3(0., 1., 0.), 0), 3);
 
     for (uint i = 0u; i < queuecount_raymarchmaxstep_aostep.x; i++) {
         switch (queue[i].shape_type) {
@@ -182,7 +185,7 @@ Distance scene_dist(vec3 pos)
                         sd_box(
                             pos - queue[i].position,
                             queue[i].shape_data.xyz),
-                            4));
+                        2));
                 break;
             case SHAPE_TYPE_SPHERE:
                 m = sd_union(m, Distance(sd_sphere(pos - queue[i].position, queue[i].shape_data.x), 2));
@@ -353,35 +356,30 @@ void main()
 
     Distance d = ray_march(cam_pos, ray_world_dir);
 
+    vec3 ray_hit_pos = cam_pos + d.distance * ray_world_dir;
+    vec3 normal = get_normal(ray_hit_pos);
+
+    // * 0.5 + 0.5
+    vec3 a = texture(sampler2D(checker_texture, checker_sampler), normal.xz).rgb;
+
     if (d.distance > MAX_DISTANCE - EPS) {
         outColor = vec4(skycolor, 1.0);
         return;
     }
 
-    vec3 ray_hit_pos = cam_pos + d.distance * ray_world_dir;
-    vec3 normal = get_normal(ray_hit_pos);
-
     vec3 col = vec3(46., 209., 162.) / 255.;
     switch (d.materialId) {
-        //case 0:
-        //	col = vec3(0.);
-        //	break;
-        //case 1:
-        //	col = vec3(192. / 255.);
-        //	break;
-//        case 2:
-//        	col = vec3(46., 209., 162.) / 255.;
-//        	break;
+        case 1:
+            col = vec3(0., 1., 0.);
+            break;
         case 2:
             col = vec3(0., 1., 0.);
-        case 3:
-            col = vec3(0., 0., 1.);
             break;
-        //	col = texture(uTextureGround, lp.xz * 0.5 + 0.5).rgb;
-        //	//col = vec3(0.8, 0., 0.);
-        //	break;
+        case 3:
+            col = a;
+        	break;
         case 4:
-            col = vec3(1., 0., 0.);
+            col = vec3(108., 122., 137.) / 255.;
             break;
         default:
             break;

@@ -154,7 +154,7 @@ impl ClassicGameScene {
             game_start_timer: Timer::new(Duration::new(3, 0)),
             game_running: false,
             rng: SmallRng::from_entropy(),
-            shoot_animation: InOutAnimation::new(0.8, 1.5),
+            shoot_animation: InOutAnimation::new(3.0, 5.0),
         }
     }
 }
@@ -264,7 +264,7 @@ impl Scene for ClassicGameScene {
 
         audio_context.global_sinks_map.remove("bgm");
 
-        self.game_start_timer.reset(Duration::new(10, 0));
+        self.game_start_timer.reset(Duration::new(3, 0));
         self.game_start_timer.start();
         self.game_running = false;
     }
