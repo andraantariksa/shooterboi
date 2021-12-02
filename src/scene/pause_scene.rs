@@ -3,6 +3,7 @@ use conrod_core::{Labelable, Positionable, Sizeable, Widget};
 use winit::event_loop::ControlFlow;
 
 use crate::audio::AudioContext;
+use crate::database::Database;
 use crate::gui::ConrodHandle;
 use crate::input_manager::InputManager;
 use crate::renderer::Renderer;
@@ -41,6 +42,7 @@ impl Scene for PauseScene {
         renderer: &mut Renderer,
         _conrod_handle: &mut ConrodHandle,
         _audio_context: &mut AudioContext,
+        database: &mut Database,
     ) {
         renderer.is_render_gui = true;
         renderer.is_render_game = false;
@@ -55,6 +57,7 @@ impl Scene for PauseScene {
         conrod_handle: &mut ConrodHandle,
         _audio_context: &mut AudioContext,
         _control_flow: &mut ControlFlow,
+        database: &mut Database,
     ) -> SceneOp {
         let mut scene_op = SceneOp::None;
 
@@ -108,6 +111,7 @@ impl Scene for PauseScene {
         _renderer: &mut Renderer,
         _conrod_handle: &mut ConrodHandle,
         _audio_context: &mut AudioContext,
+        database: &mut Database,
     ) {
     }
 }

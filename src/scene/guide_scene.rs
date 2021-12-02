@@ -20,6 +20,7 @@ widget_ids! {
     }
 }
 
+use crate::database::Database;
 use winit::event::VirtualKeyCode;
 
 pub struct GuideScene {
@@ -42,6 +43,7 @@ impl Scene for GuideScene {
         renderer: &mut Renderer,
         _conrod_handle: &mut ConrodHandle,
         _audio_context: &mut AudioContext,
+        database: &mut Database,
     ) {
         renderer.is_render_gui = true;
         renderer.is_render_game = false;
@@ -56,6 +58,7 @@ impl Scene for GuideScene {
         conrod_handle: &mut ConrodHandle,
         _audio_context: &mut AudioContext,
         _control_flow: &mut ControlFlow,
+        database: &mut Database,
     ) -> SceneOp {
         let mut scene_op = SceneOp::None;
 
@@ -93,6 +96,7 @@ impl Scene for GuideScene {
         _renderer: &mut Renderer,
         _conrod_handle: &mut ConrodHandle,
         _audio_context: &mut AudioContext,
+        database: &mut Database,
     ) {
     }
 }

@@ -8,14 +8,14 @@ pub struct Crosshair {
     pub inner_line_thickness: f32,
     pub inner_line_offset: f32,
     pub inner_line_length: f32,
-    pub inner_line_opacity: f32,
+    // pub inner_line_opacity: f32,
     pub outer_line_enabled: bool,
     pub outer_line_thickness: f32,
     pub outer_line_offset: f32,
     pub outer_line_length: f32,
-    pub outer_line_opacity: f32,
+    // pub outer_line_opacity: f32,
     pub center_dot_enabled: bool,
-    pub center_dot_opacity: f32,
+    // pub center_dot_opacity: f32,
     pub center_dot_thickness: f32,
 }
 
@@ -27,14 +27,13 @@ impl Crosshair {
             inner_line_thickness: 5.0,
             inner_line_offset: 6.0,
             inner_line_length: 20.0,
-            inner_line_opacity: 0.777,
-
+            // inner_line_opacity: 0.777,
             outer_line_thickness: 4.0,
             outer_line_offset: 29.0,
             outer_line_length: 6.0,
-            outer_line_opacity: 1.0,
+            // outer_line_opacity: 1.0,
 
-            center_dot_opacity: 1.0,
+            // center_dot_opacity: 1.0,
             center_dot_thickness: 3.0,
 
             center_dot_enabled: true,
@@ -52,12 +51,7 @@ impl Crosshair {
         let mut resulting_vertices = Vec::<CoordColorVertex>::new();
 
         if self.center_dot_enabled {
-            let color = Vector4::new(
-                self.color.x,
-                self.color.y,
-                self.color.z,
-                self.center_dot_opacity,
-            );
+            let color = Vector4::new(self.color.x, self.color.y, self.color.z, 1.0);
             let dot = [
                 CoordColorVertex {
                     position: Vector2::<f32>::new(
@@ -106,12 +100,7 @@ impl Crosshair {
         }
 
         if self.inner_line_enabled {
-            let color = Vector4::new(
-                self.color.x,
-                self.color.y,
-                self.color.z,
-                self.inner_line_opacity,
-            );
+            let color = Vector4::new(self.color.x, self.color.y, self.color.z, 1.0);
             let inner_line = [
                 CoordColorVertex {
                     position: Vector2::<f32>::new(
@@ -170,12 +159,7 @@ impl Crosshair {
         }
 
         if self.outer_line_enabled {
-            let color = Vector4::new(
-                self.color.x,
-                self.color.y,
-                self.color.z,
-                self.outer_line_opacity,
-            );
+            let color = Vector4::new(self.color.x, self.color.y, self.color.z, 1.0);
             let outer_line = [
                 CoordColorVertex {
                     position: Vector2::<f32>::new(

@@ -9,14 +9,21 @@
 #define SHAPE_TYPE_SPHERE 2
 #define SHAPE_TYPE_CYLINDER 3
 
+#define MATERIAL_GREEN 0
+#define MATERIAL_YELLOW 1
+#define MATERIAL_WHITE 2
+#define MATERIAL_BLACK 3
+#define MATERIAL_GROUND 4
+#define MATERIAL_RED 5
+
 struct RenderQueue
 {
     vec3 position;
     vec3 scale;
     vec3 rotation;
-    vec4 shape_data;
+    vec4 shape_data1;
     vec4 shape_data2;
-    uint shape_type;
+    uvec2 shape_type_material_id;
 };
 
 layout(std140, binding = 0) uniform rendering_info {
@@ -111,49 +118,6 @@ float smin(float a, float b, float k)
     return mix(b, a, h) - k * h * (1.0 - h);
 }
 
-float sd_silver_horn(vec3 pos, vec3 c)
-{
-    pos -= c;
-    vec3 body_p = pos;
-
-    float body = sd_round_box(
-    body_p, vec3(1.60, 0.30, 0.10));
-
-    float in_pl = dot(pos - vec3(1, 1.25, 0), normalize(vec3(-0.20, 1, 0))) + 1.5;
-
-    body = max(body, -(dot(pos, normalize(vec3(1, 0.08, 0))) + 1.55));
-    body = max(body, -(dot(pos, normalize(vec3(-1, -0.45, 0))) + 1.40));
-    body = max(body, -in_pl);
-    body = max(body, -(dot(vec3(pos.x, abs(pos.yz)) - vec3(0, 0.30, 0.10), normalize(vec3(0, -1, -1))) - 0.05));
-
-    vec3 hp = pos - vec3(1.30, -.80, .0);
-    hp = rot_z(radians(20)) * hp;
-
-    float handle = sd_round_box(
-    hp, vec3(0.30, 0.75, 0.10));
-
-    handle = max(handle, -(dot(vec3(abs(hp.x), hp.y, abs(hp.z)) - vec3(0.30, 0.0, 0.10), normalize(vec3(-1, 0, -1))) - 0.04));
-
-    float main_part = min(handle, body);
-    //main_part = max(main_part, -(dot(vec3(pos.xy, abs(pos.z)), normalize(vec3(0, 0, -1))) + 0.10));
-
-    vec3 tp = pos - vec3(0.60, -0.45, 0);
-    float trigger_frame = sd_box(tp, vec3(0.50, 0.20, 0.05));
-
-    trigger_frame = max(trigger_frame, -(dot(tp - vec3(-0.50, 0.20, 0.05), normalize(vec3(1, 0.2, 0)))));
-
-    vec3 hole_p = pos - vec3(0.50, -0.46, 0);
-    hole_p.xy = abs(hole_p.xy);
-
-    float trigger_hole = length(hole_p.xy - vec2(clamp(hole_p.x, 0.0, 0.14), 0)) - 0.16;
-
-    //pos.x -= pos.y * pos.y;
-    //pos.z *= 1.5;
-
-    return min(main_part, max(trigger_frame, -trigger_hole)); //length(pos.xz) - 0.2;
-    //return length(pos.xz) - 0.2;cd
-}
-
 float sd_cylinder(vec3 p, vec3 a, vec3 b, float r)
 {
     vec3  ba = b - a;
@@ -175,41 +139,36 @@ vec3 repeat(vec3 pos, vec3 c)
 
 Distance scene_dist(vec3 pos)
 {
-    Distance m = Distance(sd_plane(pos, vec3(0., 1., 0.), 0), 3);
+    Distance m = Distance(sd_plane(pos, vec3(0., 1., 0.), 0), 4);
 
     for (uint i = 0u; i < queuecount_raymarchmaxstep_aostep.x; i++) {
-        switch (queue[i].shape_type) {
+        switch (queue[i].shape_type_material_id.x) {
             case SHAPE_TYPE_BOX:
                 m = sd_union(m,
                     Distance(
                         sd_box(
                             pos - queue[i].position,
-                            queue[i].shape_data.xyz),
-                        2));
+                            queue[i].shape_data1.xyz),
+                            queue[i].shape_type_material_id.y));
                 break;
             case SHAPE_TYPE_SPHERE:
-                m = sd_union(m, Distance(sd_sphere(pos - queue[i].position, queue[i].shape_data.x), 2));
+                m = sd_union(m,
+                        Distance(
+                            sd_sphere(
+                                pos - queue[i].position,
+                                queue[i].shape_data1.x),
+                                queue[i].shape_type_material_id.y));
                 break;
             case SHAPE_TYPE_CYLINDER:
                 m = sd_union(m,
                     Distance(
                         sd_cylinder(
                             pos - queue[i].position,
-                            queue[i].shape_data.xyz,
+                            queue[i].shape_data1.xyz,
                             queue[i].shape_data2.xyz,
-                            queue[i].shape_data.w),
-                            2));
+                            queue[i].shape_data1.w),
+                            queue[i].shape_type_material_id.y));
                 break;
-//            case SHAPE_TYPE_CAPSULE_LINE:
-//            m = sd_union(m,
-//            Distance(
-//            sd_capsule_line(
-//            pos - queue[i].position,
-//            queue[i].shape_data.xyz,
-//            queue[i].shape_data2.xyz,
-//            queue[i].shape_data.w),
-//            4));
-//            break;
             default:
                 break;
         }
@@ -296,13 +255,13 @@ vec3 lookat(vec2 uv, vec3 pos, vec3 dir, vec3 w_up)
     return normalize(uv.x * right + uv.y * up + dir * 2.0);
 }
 
-vec3 rayViewDir(vec2 size, vec2 coord) {
+vec3 ray_view_dir(vec2 size, vec2 coord) {
     vec2 xy = coord - size / 2.0;
     float z = size.y / tan(fov_shootanim.x / 2.0);
     return normalize(vec3(xy, z));
 }
 
-mat4 viewMatrix(vec3 pos, vec3 dir, vec3 world_up) {
+mat4 view_matrix(vec3 pos, vec3 dir, vec3 world_up) {
     vec3 right = normalize(cross(dir, world_up));
     vec3 up = normalize(cross(dir, right));
     return mat4(
@@ -312,7 +271,7 @@ mat4 viewMatrix(vec3 pos, vec3 dir, vec3 world_up) {
         vec4(0.0, 0.0, 0.0, 1));
 }
 
-vec3 blinnPhong(
+vec3 blinn_phong(
     vec3 k_d,
     vec3 k_s,
     float alpha,
@@ -343,15 +302,12 @@ vec3 blinnPhong(
 }
 
 const vec3 skycolor = vec3(113, 188, 225) / 255.0;
+const vec3 world_up = vec3(0.0, 1.0, 0.0);
 
 void main()
 {
-    vec3 world_up = vec3(0.0, 1.0, 0.0);
-
-    //vec2 uv = gl_FragCoord.xy / reso_time.xy * 2.0 - 1.0;
-    vec3 ray_view_dir = rayViewDir(reso_time.xy, gl_FragCoord.xy);
-    mat4 view_to_world = viewMatrix(cam_pos, cam_dir, world_up);
-
+    vec3 ray_view_dir = ray_view_dir(reso_time.xy, gl_FragCoord.xy);
+    mat4 view_to_world = view_matrix(cam_pos, cam_dir, world_up);
     vec3 ray_world_dir = (view_to_world * vec4(ray_view_dir, 0.0)).xyz;
 
     Distance d = ray_march(cam_pos, ray_world_dir);
@@ -359,7 +315,6 @@ void main()
     vec3 ray_hit_pos = cam_pos + d.distance * ray_world_dir;
     vec3 normal = get_normal(ray_hit_pos);
 
-    // * 0.5 + 0.5
     vec3 a = texture(sampler2D(checker_texture, checker_sampler), normal.xz).rgb;
 
     if (d.distance > MAX_DISTANCE - EPS) {
@@ -369,27 +324,31 @@ void main()
 
     vec3 col = vec3(46., 209., 162.) / 255.;
     switch (d.materialId) {
-        case 1:
-            col = vec3(0., 1., 0.);
-            break;
-        case 2:
-            col = vec3(0., 1., 0.);
-            break;
-        case 3:
-            col = a;
-        	break;
-        case 4:
-            col = vec3(108., 122., 137.) / 255.;
-            break;
+        case MATERIAL_RED:
+        col = vec3(1., 0., 0.);
+        break;
+        case MATERIAL_YELLOW:
+        col = vec3(230., 255., 110.) / 255.;
+        break;
+        case MATERIAL_WHITE:
+        col = vec3(1.);
+        break;
+        case MATERIAL_GROUND:
+        col = a;
+        break;
+        case MATERIAL_BLACK:
+        col = vec3(0.);
+        break;
+        case MATERIAL_GREEN:
+        col = vec3(0., 1., 0.);
+        break;
         default:
-            break;
+        break;
     }
 
-    //col *= 0.5;
-
-    const vec3 ambientLight = skycolor * col * 0.5;
-    vec3 color = ambientLight;
-    color += blinnPhong(
+    const vec3 ambient_light = skycolor * col * 0.5;
+    vec3 color = ambient_light;
+    color += blinn_phong(
         col,
         vec3(1.0),
         10.0,

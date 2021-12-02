@@ -9,9 +9,9 @@ layout(std140, binding = 0) uniform rendering_info {
 };
 
 layout(location = 0) in vec2 pos;
-layout(location = 1) in vec4 col_in;
+layout(location = 1) in vec3 col_in;
 
-layout(location = 0) out vec4 col_out;
+layout(location = 0) out vec3 col_out;
 
 void main() {
     col_out = col_in;

@@ -7,7 +7,6 @@ mod database;
 mod game;
 mod gui;
 mod input_manager;
-mod maze;
 mod physics;
 mod renderer;
 mod scene;

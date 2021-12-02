@@ -3,15 +3,18 @@ use std::collections::HashMap;
 use winit::event_loop::ControlFlow;
 
 use crate::audio::AudioContext;
+use crate::database::Database;
 use crate::gui::ConrodHandle;
 use crate::input_manager::InputManager;
 use crate::renderer::Renderer;
 use crate::window::Window;
 
-pub mod after_game_scene;
 pub mod classic_game_scene;
 pub mod classic_score_scene;
+pub mod elimination_game_scene;
+pub mod elimination_score_scene;
 pub mod exit_confirm_scene;
+pub mod game_selection_scene;
 pub mod guide_scene;
 pub mod main_menu_scene;
 pub mod pause_scene;
@@ -77,6 +80,7 @@ pub trait Scene {
         renderer: &mut Renderer,
         conrod_handle: &mut ConrodHandle,
         audio_context: &mut AudioContext,
+        database: &mut Database,
     );
 
     fn update(
@@ -88,6 +92,7 @@ pub trait Scene {
         conrod_handle: &mut ConrodHandle,
         audio_context: &mut AudioContext,
         control_flow: &mut ControlFlow,
+        database: &mut Database,
     ) -> SceneOp;
 
     fn prerender(
@@ -106,6 +111,7 @@ pub trait Scene {
         renderer: &mut Renderer,
         conrod_handle: &mut ConrodHandle,
         audio_context: &mut AudioContext,
+        database: &mut Database,
     );
 }
 

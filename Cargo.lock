@@ -1128,8 +1128,9 @@ dependencies = [
 
 [[package]]
 name = "gluesql"
-version = "0.8.0"
-source = "git+https://github.com/gluesql/gluesql.git#6add0fa09352a07670e1f0e2c06171cc6e1d662d"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3f1df98c1cdcd87fcabe8fa317c41c7c6b455b9f1cd2a23d9b5e683f68fd2626"
 dependencies = [
  "async-recursion",
  "async-trait",
@@ -2715,6 +2716,7 @@ dependencies = [
  "bincode",
  "bitflags",
  "bytemuck",
+ "chrono",
  "conrod_core",
  "conrod_wgpu",
  "conrod_winit",

@@ -69,6 +69,28 @@ impl GameSceneRenderer {
                 usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
             });
 
+        let render_objects_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Rendering objects"),
+            contents: any_sized_as_u8_slice(
+                &render_objects
+                    .get_objects_and_active_len(&camera.get_frustum())
+                    .0,
+            ),
+            usage: if cfg!(target_arch = "wasm32") {
+                wgpu::BufferUsages::UNIFORM
+            } else {
+                wgpu::BufferUsages::STORAGE
+            } | wgpu::BufferUsages::COPY_DST,
+        });
+
+        let rendering_info_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Rendering info buffer"),
+            contents: any_sized_as_u8_slice(rendering_info),
+            usage: wgpu::BufferUsages::UNIFORM
+                | wgpu::BufferUsages::COPY_DST
+                | wgpu::BufferUsages::VERTEX,
+        });
+
         let image = image::load_from_memory(include_bytes!("../../assets/images/checker.png"))
             .unwrap()
             .to_rgba8();
@@ -170,28 +192,6 @@ impl GameSceneRenderer {
                 bind_group_layouts: &[&main_bindgroup_layout],
                 push_constant_ranges: &[],
             });
-
-        let render_objects_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Rendering objects"),
-            contents: any_sized_as_u8_slice(
-                &render_objects
-                    .get_objects_and_active_len(&camera.get_frustum())
-                    .0,
-            ),
-            usage: if cfg!(target_arch = "wasm32") {
-                wgpu::BufferUsages::UNIFORM
-            } else {
-                wgpu::BufferUsages::STORAGE
-            } | wgpu::BufferUsages::COPY_DST,
-        });
-
-        let rendering_info_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Rendering info buffer"),
-            contents: any_sized_as_u8_slice(rendering_info),
-            usage: wgpu::BufferUsages::UNIFORM
-                | wgpu::BufferUsages::COPY_DST
-                | wgpu::BufferUsages::VERTEX,
-        });
 
         let main_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("Main bind group"),

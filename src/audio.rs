@@ -4,11 +4,36 @@ pub const AUDIO_FILE_AWESOMENESS: &[u8] = include_bytes!("../assets/audio/awesom
 pub const AUDIO_FILE_SHOOT: &[u8] = include_bytes!("../assets/audio/shoot.wav");
 pub const AUDIO_FILE_SHOOTED: &[u8] = include_bytes!("../assets/audio/shooted.wav");
 
+pub enum Sink {
+    Regular(rodio::Sink),
+    SpatialSink(rodio::SpatialSink),
+}
+
+impl Sink {
+    pub fn set_volume(&mut self, volume: f32) {
+        match self {
+            Sink::Regular(s) => {
+                s.set_volume(volume);
+            }
+            Sink::SpatialSink(s) => {
+                s.set_volume(volume);
+            }
+        };
+    }
+
+    pub fn empty(&self) -> bool {
+        match self {
+            Sink::Regular(s) => s.empty(),
+            Sink::SpatialSink(s) => s.empty(),
+        }
+    }
+}
+
 pub struct AudioContext {
     pub output_stream_handle: rodio::OutputStreamHandle,
     pub output_stream: rodio::OutputStream,
-    pub global_sinks_map: HashMap<&'static str, rodio::Sink>,
-    pub global_sinks_array: Vec<rodio::Sink>,
+    pub global_sinks_map: HashMap<&'static str, Sink>,
+    pub global_sinks_array: Vec<Sink>,
     pub volume: f32,
 }
 

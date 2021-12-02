@@ -3,12 +3,14 @@ use conrod_core::{Labelable, Positionable, Sizeable, Widget};
 use std::io::{BufReader, Cursor};
 use winit::event_loop::ControlFlow;
 
-use crate::audio::{AudioContext, AUDIO_FILE_AWESOMENESS};
+use crate::audio::{AudioContext, Sink, AUDIO_FILE_AWESOMENESS};
+use crate::database::Database;
 use crate::gui::ConrodHandle;
 use crate::input_manager::InputManager;
 use crate::renderer::Renderer;
 use crate::scene::classic_game_scene::ClassicGameScene;
 use crate::scene::exit_confirm_scene::QuitConfirmScene;
+use crate::scene::game_selection_scene::GameSelectionScene;
 use crate::scene::guide_scene::GuideScene;
 use crate::scene::settings_scene::SettingsScene;
 use crate::scene::{MaybeMessage, Scene, SceneOp, Value, BUTTON_HEIGHT, BUTTON_WIDTH, MARGIN};
@@ -49,6 +51,7 @@ impl Scene for MainMenuScene {
         renderer: &mut Renderer,
         _conrod_handle: &mut ConrodHandle,
         audio_context: &mut AudioContext,
+        database: &mut Database,
     ) {
         renderer.is_render_gui = true;
         renderer.is_render_game = false;
@@ -66,7 +69,9 @@ impl Scene for MainMenuScene {
                         .unwrap()
                         .repeat_infinite(),
                     );
-                    audio_context.global_sinks_map.insert("bgm", sink);
+                    audio_context
+                        .global_sinks_map
+                        .insert("bgm", Sink::Regular(sink));
                 }
             } else {
                 let sink = rodio::Sink::try_new(&audio_context.output_stream_handle).unwrap();
@@ -77,7 +82,9 @@ impl Scene for MainMenuScene {
                     .unwrap()
                     .repeat_infinite(),
                 );
-                audio_context.global_sinks_map.insert("bgm", sink);
+                audio_context
+                    .global_sinks_map
+                    .insert("bgm", Sink::Regular(sink));
             }
         } else {
             let sink = rodio::Sink::try_new(&audio_context.output_stream_handle).unwrap();
@@ -86,7 +93,9 @@ impl Scene for MainMenuScene {
                     .unwrap()
                     .repeat_infinite(),
             );
-            audio_context.global_sinks_map.insert("bgm", sink);
+            audio_context
+                .global_sinks_map
+                .insert("bgm", Sink::Regular(sink));
         }
     }
 
@@ -99,67 +108,80 @@ impl Scene for MainMenuScene {
         conrod_handle: &mut ConrodHandle,
         _audio_context: &mut AudioContext,
         _control_flow: &mut ControlFlow,
+        database: &mut Database,
     ) -> SceneOp {
         let mut scene_op = SceneOp::None;
 
         let settings_button;
         let classic_game_button;
+        #[cfg(not(target_arch = "wasm32"))]
         let mut quit_button;
         let guide_button;
 
         {
             let image_id = *conrod_handle.get_image_id_map().get("title").unwrap();
-            let ropa_font_id = *conrod_handle.get_font_id_map().get("ropa").unwrap();
+            let image = conrod_handle.get_image_map().get(&image_id).unwrap();
+            let ratio = image.height as f64 / image.width as f64;
             let mut ui_cell = conrod_handle.get_ui_mut().set_widgets();
 
             conrod_core::widget::Canvas::new().set(self.ids.canvas, &mut ui_cell);
 
-            quit_button = conrod_core::widget::Button::new()
-                .label("Quit")
-                .label_font_id(ropa_font_id)
-                .wh(conrod_core::Dimensions::new(BUTTON_WIDTH, BUTTON_HEIGHT))
-                .bottom_left_with_margin_on(self.ids.canvas, MARGIN)
-                .set(self.ids.quit_button, &mut ui_cell);
+            #[cfg(not(target_arch = "wasm32"))]
+            {
+                quit_button = conrod_core::widget::Button::new()
+                    .label("Quit")
+                    .wh(conrod_core::Dimensions::new(BUTTON_WIDTH, BUTTON_HEIGHT))
+                    .bottom_left_with_margin_on(self.ids.canvas, MARGIN)
+                    .set(self.ids.quit_button, &mut ui_cell);
+            }
 
             let canvas_w = ui_cell.w_of(self.ids.canvas).unwrap();
-            let button_w = ui_cell.w_of(self.ids.quit_button).unwrap();
 
             const GAP_BETWEEN_BUTTON: f64 = 20.0;
 
-            conrod_core::widget::Image::new(image_id)
-                .bottom_right_with_margin_on(self.ids.canvas, MARGIN)
-                .w(canvas_w - button_w - MARGIN * 2.0)
-                .set(self.ids.title_image, &mut ui_cell);
-
-            classic_game_button = conrod_core::widget::Button::new()
-                .label("Classic Mode")
-                .label_font_id(ropa_font_id)
-                .wh(conrod_core::Dimensions::new(BUTTON_WIDTH, BUTTON_HEIGHT))
-                .up_from(self.ids.guide_button, GAP_BETWEEN_BUTTON)
-                .set(self.ids.start_classic_mode_button, &mut ui_cell);
+            let mut _settings_button = conrod_core::widget::Button::new()
+                .label("Settings")
+                .wh(conrod_core::Dimensions::new(BUTTON_WIDTH, BUTTON_HEIGHT));
+            if cfg!(target_arch = "wasm32") {
+                _settings_button =
+                    _settings_button.bottom_left_with_margin_on(self.ids.canvas, MARGIN);
+            } else {
+                _settings_button =
+                    _settings_button.up_from(self.ids.quit_button, GAP_BETWEEN_BUTTON);
+            }
+            settings_button = _settings_button.set(self.ids.settings_button, &mut ui_cell);
 
             guide_button = conrod_core::widget::Button::new()
                 .label("Guide")
-                .label_font_id(ropa_font_id)
                 .wh(conrod_core::Dimensions::new(BUTTON_WIDTH, BUTTON_HEIGHT))
                 .up_from(self.ids.settings_button, GAP_BETWEEN_BUTTON)
                 .set(self.ids.guide_button, &mut ui_cell);
 
-            settings_button = conrod_core::widget::Button::new()
-                .label("Settings")
-                .label_font_id(ropa_font_id)
+            classic_game_button = conrod_core::widget::Button::new()
+                .label("Play")
                 .wh(conrod_core::Dimensions::new(BUTTON_WIDTH, BUTTON_HEIGHT))
-                .up_from(self.ids.quit_button, GAP_BETWEEN_BUTTON)
-                .set(self.ids.settings_button, &mut ui_cell);
+                .up_from(self.ids.guide_button, GAP_BETWEEN_BUTTON)
+                .set(self.ids.start_classic_mode_button, &mut ui_cell);
+
+            let logo_w = canvas_w - BUTTON_WIDTH - MARGIN * 2.0;
+            conrod_core::widget::Image::new(image_id)
+                .bottom_right_with_margin_on(self.ids.canvas, MARGIN)
+                .w(logo_w)
+                .h(ratio * logo_w)
+                .set(self.ids.title_image, &mut ui_cell);
         }
 
         for _press in guide_button {
             scene_op = SceneOp::Push(Box::new(GuideScene::new(renderer, conrod_handle)), None);
         }
 
-        if input_manager.is_keyboard_pressed(&VirtualKeyCode::Escape)
-            || quit_button.next().is_some()
-        {
+        if input_manager.is_keyboard_pressed(&VirtualKeyCode::Escape) || {
+            #[cfg(not(target_arch = "wasm32"))]
+            let ret = quit_button.next().is_some();
+            #[cfg(target_arch = "wasm32")]
+            let ret = false;
+            ret
+        } {
             scene_op = SceneOp::Push(
                 Box::new(QuitConfirmScene::new(renderer, conrod_handle)),
                 None,
@@ -172,7 +194,7 @@ impl Scene for MainMenuScene {
 
         for _press in classic_game_button {
             scene_op = SceneOp::Push(
-                Box::new(ClassicGameScene::new(renderer, conrod_handle)),
+                Box::new(GameSelectionScene::new(renderer, conrod_handle)),
                 None,
             );
         }
@@ -186,7 +208,7 @@ impl Scene for MainMenuScene {
         _renderer: &mut Renderer,
         _conrod_handle: &mut ConrodHandle,
         _audio_context: &mut AudioContext,
+        database: &mut Database,
     ) {
-        println!("Deinit main menu");
     }
 }

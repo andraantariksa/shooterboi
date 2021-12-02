@@ -26,6 +26,17 @@ pub enum ShapeType {
 }
 
 #[derive(Debug, Copy, Clone)]
+#[repr(u32)]
+pub enum MaterialType {
+    Green = 0,
+    Yellow = 1,
+    White = 2,
+    Black = 3,
+    Ground = 4,
+    Red = 5,
+}
+
+#[derive(Debug, Copy, Clone)]
 pub struct RenderQueueData {
     pub position: nalgebra::Vector3<f32>,
     _p1: [i32; 1],
@@ -35,8 +46,8 @@ pub struct RenderQueueData {
     _p3: [i32; 1],
     pub shape_data1: nalgebra::Vector4<f32>,
     pub shape_data2: nalgebra::Vector4<f32>,
-    pub shape_type: ShapeType,
-    _p4: [i32; 3],
+    pub shape_type_material: (ShapeType, MaterialType),
+    _p4: [i32; 2],
 }
 
 impl RenderQueueData {
@@ -45,13 +56,13 @@ impl RenderQueueData {
             position: nalgebra::Vector3::new(0.0, 0.0, 0.0),
             scale: nalgebra::Vector3::new(0.0, 0.0, 0.0),
             rotation: nalgebra::Vector3::new(0.0, 0.0, 0.0),
-            shape_type: ShapeType::None,
+            shape_type_material: (ShapeType::None, MaterialType::Black),
             shape_data1: nalgebra::Vector4::new(0.0, 0.0, 0.0, 0.0),
             shape_data2: nalgebra::Vector4::new(0.0, 0.0, 0.0, 0.0),
             _p1: [0; 1],
             _p2: [0; 1],
             _p3: [0; 1],
-            _p4: [0; 3],
+            _p4: [0; 2],
         }
     }
 }

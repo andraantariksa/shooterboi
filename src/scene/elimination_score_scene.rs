@@ -1,26 +1,23 @@
-use chrono::NaiveDateTime;
 use conrod_core::widget::envelope_editor::EnvelopePoint;
 use conrod_core::{Colorable, Labelable, Positionable, Sizeable, Widget};
-use std::time::UNIX_EPOCH;
 use winit::event_loop::ControlFlow;
 
 use crate::audio::AudioContext;
-use crate::database::Database;
 use crate::gui::ConrodHandle;
 use crate::input_manager::InputManager;
 use crate::renderer::Renderer;
+
+use crate::database::Database;
+use crate::scene::classic_game_scene::Score;
 use crate::scene::{
-    MaybeMessage, Message, Scene, SceneOp, Value, BUTTON_HEIGHT, BUTTON_WIDTH, GAP_BETWEEN_ITEM,
-    MARGIN,
+    MaybeMessage, Scene, SceneOp, BUTTON_HEIGHT, BUTTON_WIDTH, GAP_BETWEEN_ITEM, MARGIN,
 };
 use crate::window::Window;
 use conrod_core::widget_ids;
-use gluesql::chrono::Utc;
-use instant::{Instant, SystemTime};
 use winit::event::VirtualKeyCode;
 
 widget_ids! {
-    pub struct ClassicScoreSceneIds {
+    pub struct EliminationScoreSceneIds {
         // The main canvas
         canvas,
         title_label,
@@ -49,54 +46,23 @@ widget_ids! {
     }
 }
 
-pub struct ClassicScoreDisplay {
-    pub accuracy: f32,
-    pub hit: u16,
-    pub miss: u16,
-    pub score: i32,
-    pub avg_hit_time: f32,
-    pub created_at: NaiveDateTime,
+pub struct EliminationScoreScene {
+    ids: EliminationScoreSceneIds,
+    score: Score,
 }
 
-impl ClassicScoreDisplay {
-    pub fn new() -> Self {
-        Self {
-            accuracy: 0.0,
-            hit: 0,
-            miss: 0,
-            score: 0,
-            avg_hit_time: 0.0,
-            created_at: NaiveDateTime::from_timestamp(0, 0),
-        }
-    }
-
-    pub fn read_message(&mut self, message: &MaybeMessage) {
-        if let Some(msg) = message {
-            self.hit = *msg.get("hit").unwrap().to_i32() as u16;
-            self.miss = *msg.get("miss").unwrap().to_i32() as u16;
-            self.score = *msg.get("score").unwrap().to_i32();
-            self.avg_hit_time = *msg.get("avg_hit_time").unwrap().to_f32();
-            self.accuracy = self.hit as f32 / (self.hit + self.miss).max(1) as f32 * 100.0;
-        }
-    }
-}
-
-pub struct ClassicScoreScene {
-    ids: ClassicScoreSceneIds,
-    score: ClassicScoreDisplay,
-}
-
-impl ClassicScoreScene {
+impl EliminationScoreScene {
     pub fn new(_renderer: &mut Renderer, conrod_handle: &mut ConrodHandle) -> Self {
-        let mut ids = ClassicScoreSceneIds::new(conrod_handle.get_ui_mut().widget_id_generator());
+        let mut ids =
+            EliminationScoreSceneIds::new(conrod_handle.get_ui_mut().widget_id_generator());
         Self {
             ids,
-            score: ClassicScoreDisplay::new(),
+            score: Score::new(),
         }
     }
 }
 
-impl Scene for ClassicScoreScene {
+impl Scene for EliminationScoreScene {
     fn init(
         &mut self,
         message: MaybeMessage,
@@ -109,25 +75,7 @@ impl Scene for ClassicScoreScene {
         renderer.is_render_gui = true;
         renderer.is_render_game = false;
 
-        self.score.read_message(&message);
-        database
-            .glue
-            .execute(&format!(
-                "INSERT INTO classic_game_score VALUES (\
-                {},\
-                {},\
-                {},\
-                {},\
-                {},\
-                \"{}\")",
-                self.score.hit as f32 / (self.score.hit + self.score.miss).max(1) as f32 * 100.0,
-                self.score.hit,
-                self.score.miss,
-                self.score.score,
-                self.score.avg_hit_time,
-                Utc::now().naive_utc()
-            ))
-            .unwrap();
+        // self.score.read_message(&message);
     }
 
     fn update(
@@ -146,11 +94,13 @@ impl Scene for ClassicScoreScene {
         let next_button;
         // let score_history_button;
         {
+            let ropa_font_id = *conrod_handle.get_font_id_map().get("ropa").unwrap();
             let mut ui_cell = conrod_handle.get_ui_mut().set_widgets();
 
             conrod_core::widget::Canvas::new().set(self.ids.canvas, &mut ui_cell);
 
             conrod_core::widget::Text::new("Training Report")
+                .font_id(ropa_font_id)
                 .align_middle_x()
                 .mid_top_with_margin_on(self.ids.canvas, MARGIN)
                 .set(self.ids.title_label, &mut ui_cell);
@@ -188,60 +138,78 @@ impl Scene for ClassicScoreScene {
                 .set(self.ids.miss_canvas, &mut ui_cell);
 
             conrod_core::widget::Text::new("Accuracy")
+                .font_id(ropa_font_id)
                 .mid_left_of(self.ids.accuracy_canvas)
                 .left_justify()
                 .set(self.ids.accuracy_label, &mut ui_cell);
 
-            conrod_core::widget::Text::new(&format!("{:.1}%", self.score.accuracy))
-                .mid_right_of(self.ids.accuracy_canvas)
-                .left_justify()
-                .set(self.ids.accuracy_value_label, &mut ui_cell);
+            // conrod_core::widget::Text::new(&format!("{}", self.score.accuracy))
+            //     .font_id(ropa_font_id)
+            //     .mid_right_of(self.ids.accuracy_canvas)
+            //     .left_justify()
+            //     .set(self.ids.accuracy_value_label, &mut ui_cell);
 
             conrod_core::widget::Text::new("Hit")
+                .font_id(ropa_font_id)
                 .mid_left_of(self.ids.hit_canvas)
                 .left_justify()
                 .set(self.ids.hit_label, &mut ui_cell);
 
             conrod_core::widget::Text::new(&format!("{}", self.score.hit))
+                .font_id(ropa_font_id)
                 .mid_right_of(self.ids.hit_canvas)
                 .left_justify()
                 .set(self.ids.hit_value_label, &mut ui_cell);
 
             conrod_core::widget::Text::new("Score")
+                .font_id(ropa_font_id)
                 .mid_left_of(self.ids.score_canvas)
                 .left_justify()
                 .set(self.ids.score_label, &mut ui_cell);
 
             conrod_core::widget::Text::new(&format!("{}", self.score.score))
+                .font_id(ropa_font_id)
                 .mid_right_of(self.ids.score_canvas)
                 .left_justify()
                 .set(self.ids.score_value_label, &mut ui_cell);
 
             conrod_core::widget::Text::new("Avg hit time")
+                .font_id(ropa_font_id)
                 .mid_left_of(self.ids.avg_hit_time_canvas)
                 .left_justify()
                 .set(self.ids.avg_hit_time_label, &mut ui_cell);
 
-            conrod_core::widget::Text::new(&format!("{:.3}s", self.score.avg_hit_time))
-                .mid_right_of(self.ids.avg_hit_time_canvas)
-                .left_justify()
-                .set(self.ids.avg_hit_time_value_label, &mut ui_cell);
+            // conrod_core::widget::Text::new(&format!("{}", self.score.avg_hit_time))
+            //     .font_id(ropa_font_id)
+            //     .mid_right_of(self.ids.avg_hit_time_canvas)
+            //     .left_justify()
+            //     .set(self.ids.avg_hit_time_value_label, &mut ui_cell);
 
             conrod_core::widget::Text::new("Miss")
+                .font_id(ropa_font_id)
                 .mid_left_of(self.ids.miss_canvas)
                 .left_justify()
                 .set(self.ids.miss_label, &mut ui_cell);
 
             conrod_core::widget::Text::new(&format!("{}", self.score.miss))
+                .font_id(ropa_font_id)
                 .mid_right_of(self.ids.miss_canvas)
                 .left_justify()
                 .set(self.ids.miss_value_label, &mut ui_cell);
 
             next_button = conrod_core::widget::Button::new()
                 .label("Next")
+                .label_font_id(ropa_font_id)
                 .bottom_right_with_margin_on(self.ids.canvas, MARGIN)
                 .wh(conrod_core::Dimensions::new(BUTTON_WIDTH, BUTTON_HEIGHT))
                 .set(self.ids.next_button, &mut ui_cell);
+
+            // score_history_button = conrod_core::widget::Button::new()
+            //     .label("See Score History")
+            //     .label_font_id(ropa_font_id)
+            //     .up_from(self.ids.next_button, 20.0)
+            //     .wh(conrod_core::Dimensions::new(BUTTON_WIDTH, BUTTON_HEIGHT))
+            //     .set(self.ids.see_score_history_button, &mut ui_cell);
         }
 
         if input_manager.is_keyboard_press(&VirtualKeyCode::Escape)

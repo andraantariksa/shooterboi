@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use winit::event_loop::ControlFlow;
 
 use crate::audio::AudioContext;
+use crate::database::Database;
 use crate::gui::ConrodHandle;
 use crate::input_manager::InputManager;
 use crate::renderer::vertex::CoordColorVertex;
@@ -17,43 +18,85 @@ widget_ids! {
     pub struct SettingsSceneIds {
         // The main canvas
         canvas,
-        settings_canvas,
 
+        header_canvas,
         title_text,
 
-        settings_max_march_step_slider_canvas,
+        body_canvas,
 
+        settings_canvas,
+        settings_canvas_scrollbar,
+
+        footer_canvas,
+        back_button,
+
+        max_march_step_canvas,
         max_march_step_slider_label,
         max_march_step_slider,
 
+        ambient_occlusion_sample_canvas,
         ambient_occlusion_sample_slider_label,
         ambient_occlusion_sample_slider,
 
+        volume_canvas,
         volume_slider_label,
         volume_slider,
         volume_enable_box,
 
-        crosshair_color_label,
         crosshair_color_canvas,
+        crosshair_color_label,
+        crosshair_color_color_canvas,
         crosshair_color_r_canvas,
         crosshair_color_g_canvas,
         crosshair_color_b_canvas,
+        crosshair_color_r_slider,
+        crosshair_color_g_slider,
+        crosshair_color_b_slider,
+        crosshair_color_r_label,
+        crosshair_color_g_label,
+        crosshair_color_b_label,
 
-        center_dot_enable_box,
+        center_dot_enable_canvas,
+        center_dot_enable_label,
+        center_dot_enable_toggle,
+        center_dot_thickness_canvas,
         center_dot_thickness_slider_label,
         center_dot_thickness_slider,
-        center_dot_opacity_slider_label,
-        center_dot_opacity_slider,
+        // center_dot_offset_canvas,
+        // center_dot_offset_slider_label,
+        // center_dot_offset_slider,
+        // center_dot_opacity_canvas,
+        // center_dot_opacity_slider_label,
+        // center_dot_opacity_slider,
 
-        inner_line_enable_box,
+        inner_line_enable_canvas,
+        inner_line_enable_label,
+        inner_line_enable_toggle,
+        inner_line_thickness_canvas,
         inner_line_thickness_slider_label,
         inner_line_thickness_slider,
-        inner_line_opacity_slider_label,
-        inner_line_opacity_slider,
+        inner_line_offset_canvas,
+        inner_line_offset_slider_label,
+        inner_line_offset_slider,
+        // inner_line_opacity_canvas,
+        // inner_line_opacity_slider_label,
+        // inner_line_opacity_slider,
 
+        outer_line_enable_canvas,
+        outer_line_enable_label,
+        outer_line_enable_toggle,
+        outer_line_thickness_canvas,
+        outer_line_thickness_slider_label,
+        outer_line_thickness_slider,
+        outer_line_offset_canvas,
+        outer_line_offset_slider_label,
+        outer_line_offset_slider,
+        outer_line_opacity_canvas,
+        outer_line_opacity_slider_label,
+        outer_line_opacity_slider,
+
+        crosshair_preview_canvas,
         crosshair_preview_image,
-
-        back_button
     }
 }
 
@@ -69,6 +112,13 @@ impl SettingsScene {
     }
 }
 
+fn settings_item_canvas() -> conrod_core::widget::Canvas<'static> {
+    conrod_core::widget::Canvas::new()
+        .length(90.0)
+        .pad_top(10.0)
+        .pad_bottom(10.0)
+}
+
 impl Scene for SettingsScene {
     fn init(
         &mut self,
@@ -77,6 +127,7 @@ impl Scene for SettingsScene {
         renderer: &mut Renderer,
         _conrod_handle: &mut ConrodHandle,
         _audio_context: &mut AudioContext,
+        database: &mut Database,
     ) {
         renderer.is_render_gui = true;
         renderer.is_render_game = false;
@@ -99,6 +150,7 @@ impl Scene for SettingsScene {
         conrod_handle: &mut ConrodHandle,
         audio_context: &mut AudioContext,
         _control_flow: &mut ControlFlow,
+        database: &mut Database,
     ) -> SceneOp {
         let crosshair_texture_id = conrod_handle
             .get_image_id_map()
@@ -153,15 +205,81 @@ impl Scene for SettingsScene {
         let ropa_font_id = *conrod_handle.get_font_id_map().get("ropa").unwrap();
         let mut ui_cell = conrod_handle.get_ui_mut().set_widgets();
         conrod_core::widget::Canvas::new()
-            .pad(MARGIN)
-            .scroll_kids_vertically()
-            .rgb(0.8, 0.8, 0.0)
+            .flow_down(&[
+                (
+                    self.ids.body_canvas,
+                    conrod_core::widget::Canvas::new().flow_right(&[
+                        (
+                            self.ids.settings_canvas,
+                            conrod_core::widget::Canvas::new()
+                                .scroll_kids_vertically()
+                                .parent(self.ids.canvas)
+                                .flow_down(&[
+                                    (self.ids.max_march_step_canvas, settings_item_canvas()),
+                                    (
+                                        self.ids.ambient_occlusion_sample_canvas,
+                                        settings_item_canvas(),
+                                    ),
+                                    (
+                                        self.ids.crosshair_color_canvas,
+                                        conrod_core::widget::Canvas::new()
+                                            .length(90.0)
+                                            .pad_top(10.0)
+                                            .pad_bottom(10.0)
+                                            .flow_right(&[
+                                                (
+                                                    self.ids.crosshair_color_r_canvas,
+                                                    conrod_core::widget::Canvas::new(),
+                                                ),
+                                                (
+                                                    self.ids.crosshair_color_g_canvas,
+                                                    conrod_core::widget::Canvas::new(),
+                                                ),
+                                                (
+                                                    self.ids.crosshair_color_b_canvas,
+                                                    conrod_core::widget::Canvas::new(),
+                                                ),
+                                            ]),
+                                    ),
+                                    (self.ids.volume_canvas, settings_item_canvas()),
+                                    // Center dot
+                                    (self.ids.center_dot_enable_canvas, settings_item_canvas()),
+                                    // (self.ids.center_dot_opacity_canvas, settings_item_canvas()),
+                                    (self.ids.center_dot_thickness_canvas, settings_item_canvas()),
+                                    // Inner line
+                                    (self.ids.inner_line_enable_canvas, settings_item_canvas()),
+                                    // (self.ids.inner_line_opacity_canvas, settings_item_canvas()),
+                                    (self.ids.inner_line_thickness_canvas, settings_item_canvas()),
+                                    (self.ids.inner_line_offset_canvas, settings_item_canvas()),
+                                    // Outer line
+                                    (self.ids.outer_line_enable_canvas, settings_item_canvas()),
+                                    // (self.ids.outer_line_opacity_canvas, settings_item_canvas()),
+                                    (self.ids.outer_line_thickness_canvas, settings_item_canvas()),
+                                    (self.ids.outer_line_offset_canvas, settings_item_canvas()),
+                                ]),
+                        ),
+                        (
+                            self.ids.crosshair_preview_canvas,
+                            conrod_core::widget::Canvas::new().length(250.0),
+                        ),
+                    ]),
+                ),
+                (
+                    self.ids.footer_canvas,
+                    conrod_core::widget::Canvas::new().length(60.0),
+                ),
+            ])
             .set(self.ids.canvas, &mut ui_cell);
+
+        conrod_core::widget::Scrollbar::y_axis(self.ids.settings_canvas)
+            .rgb(1.0, 0.0, 0.0)
+            .h_of(self.ids.settings_canvas)
+            .set(self.ids.settings_canvas_scrollbar, &mut ui_cell);
 
         conrod_core::widget::Text::new("Settings")
             .font_id(ropa_font_id)
-            .align_middle_x_of(self.ids.canvas)
-            .mid_top_with_margin_on(self.ids.canvas, MARGIN)
+            .middle_of(self.ids.header_canvas)
+            .parent(self.ids.header_canvas)
             .set(self.ids.title_text, &mut ui_cell);
 
         const GAP_BETWEEN_OPTION_SETTINGS: f64 = 30.0;
@@ -169,7 +287,7 @@ impl Scene for SettingsScene {
 
         conrod_core::widget::Text::new("Maximum raymarch step")
             .font_id(ropa_font_id)
-            .align_middle_x_of(self.ids.canvas)
+            .mid_top_of(self.ids.max_march_step_canvas)
             .set(self.ids.max_march_step_slider_label, &mut ui_cell);
 
         for value in conrod_core::widget::Slider::new(
@@ -177,8 +295,7 @@ impl Scene for SettingsScene {
             0f32,
             200f32,
         )
-        .align_middle_x_of(self.ids.canvas)
-        .label_font_id(ropa_font_id)
+        .mid_bottom_of(self.ids.max_march_step_canvas)
         .label(&format!(
             "{}",
             renderer.rendering_info.queuecount_raymarchmaxstep_aostep.y as u8
@@ -191,7 +308,7 @@ impl Scene for SettingsScene {
 
         conrod_core::widget::Text::new("Ambient occlusion step")
             .font_id(ropa_font_id)
-            .align_middle_x_of(self.ids.canvas)
+            .mid_top_of(self.ids.ambient_occlusion_sample_canvas)
             .set(self.ids.ambient_occlusion_sample_slider_label, &mut ui_cell);
 
         for value in conrod_core::widget::Slider::new(
@@ -199,8 +316,7 @@ impl Scene for SettingsScene {
             0f32,
             10f32,
         )
-        .align_middle_x_of(self.ids.canvas)
-        .label_font_id(ropa_font_id)
+        .mid_bottom_of(self.ids.ambient_occlusion_sample_canvas)
         .label(&format!(
             "{}",
             renderer.rendering_info.queuecount_raymarchmaxstep_aostep.z as u8
@@ -213,12 +329,11 @@ impl Scene for SettingsScene {
 
         conrod_core::widget::Text::new("Audio Volume")
             .font_id(ropa_font_id)
-            .align_middle_x_of(self.ids.canvas)
+            .mid_top_of(self.ids.volume_canvas)
             .set(self.ids.volume_slider_label, &mut ui_cell);
 
         for value in conrod_core::widget::Slider::new(audio_context.get_volume(), 0f32, 1f32)
-            .align_middle_x_of(self.ids.canvas)
-            .label_font_id(ropa_font_id)
+            .mid_bottom_of(self.ids.volume_canvas)
             .label(&format!("{}", (audio_context.get_volume() * 100.0) as u8))
             .wh(conrod_core::Dimensions::new(200.0, 30.0))
             .set(self.ids.volume_slider, &mut ui_cell)
@@ -226,88 +341,90 @@ impl Scene for SettingsScene {
             audio_context.set_volume(value);
         }
 
-        conrod_core::widget::Text::new("Center dot opacity")
+        conrod_core::widget::Text::new("Center dot enabled")
             .font_id(ropa_font_id)
-            .align_middle_x_of(self.ids.canvas)
-            .set(self.ids.crosshair_color_label, &mut ui_cell);
+            .mid_top_of(self.ids.center_dot_enable_canvas)
+            .set(self.ids.center_dot_enable_label, &mut ui_cell);
 
-        conrod_core::widget::Canvas::new()
-            .flow_right(&[
-                (
-                    self.ids.crosshair_color_r_canvas,
-                    conrod_core::widget::Canvas::new().rgb(1.0, 0.0, 0.0),
-                ),
-                (
-                    self.ids.crosshair_color_g_canvas,
-                    conrod_core::widget::Canvas::new().rgb(0.0, 1.0, 0.0),
-                ),
-                (
-                    self.ids.crosshair_color_b_canvas,
-                    conrod_core::widget::Canvas::new().rgb(0.0, 0.0, 1.0),
-                ),
-            ])
-            .rgb(0.5, 0.5, 0.5)
-            .set(self.ids.crosshair_color_canvas, &mut ui_cell);
-
-        conrod_core::widget::Text::new("Center dot opacity")
-            .font_id(ropa_font_id)
-            .align_middle_x_of(self.ids.canvas)
-            .set(self.ids.center_dot_opacity_slider_label, &mut ui_cell);
-
-        for value in
-            conrod_core::widget::Slider::new(renderer.crosshair.center_dot_opacity, 0f32, 1f32)
-                .align_middle_x_of(self.ids.canvas)
-                .label_font_id(ropa_font_id)
-                .label(&format!("{}", renderer.crosshair.center_dot_opacity))
-                .wh(conrod_core::Dimensions::new(200.0, 30.0))
-                .set(self.ids.center_dot_opacity_slider, &mut ui_cell)
+        for value in conrod_core::widget::Toggle::new(renderer.crosshair.center_dot_enabled)
+            .mid_bottom_of(self.ids.center_dot_enable_canvas)
+            .wh(conrod_core::Dimensions::new(40.0, 40.0))
+            .set(self.ids.center_dot_enable_toggle, &mut ui_cell)
         {
-            renderer.crosshair.center_dot_opacity = value;
+            renderer.crosshair.center_dot_enabled = value;
         }
+
+        // conrod_core::widget::Text::new("Center dot opacity")
+        //     .font_id(ropa_font_id)
+        //     .mid_top_of(self.ids.center_dot_opacity_canvas)
+        //     .set(self.ids.center_dot_opacity_slider_label, &mut ui_cell);
+
+        // for value in
+        //     conrod_core::widget::Slider::new(renderer.crosshair.center_dot_opacity, 0f32, 1f32)
+        //         .mid_bottom_of(self.ids.center_dot_opacity_canvas)
+        //
+        //         .label(&format!("{}", renderer.crosshair.center_dot_opacity))
+        //         .wh(conrod_core::Dimensions::new(200.0, 30.0))
+        //         .set(self.ids.center_dot_opacity_slider, &mut ui_cell)
+        // {
+        //     renderer.crosshair.center_dot_opacity = value;
+        // }
 
         conrod_core::widget::Text::new("Center dot thickness")
             .font_id(ropa_font_id)
-            .align_middle_x_of(self.ids.canvas)
+            .mid_top_of(self.ids.center_dot_thickness_canvas)
             .set(self.ids.center_dot_thickness_slider_label, &mut ui_cell);
 
-        for value in conrod_core::widget::Slider::new(audio_context.get_volume(), 0f32, 100f32)
-            .align_middle_x_of(self.ids.canvas)
-            .label_font_id(ropa_font_id)
-            .label(&format!(
-                "{}",
-                renderer.crosshair.center_dot_thickness as u8
-            ))
-            .wh(conrod_core::Dimensions::new(200.0, 30.0))
-            .set(self.ids.center_dot_thickness_slider, &mut ui_cell)
+        for value in
+            conrod_core::widget::Slider::new(renderer.crosshair.center_dot_thickness, 0f32, 100f32)
+                .mid_bottom_of(self.ids.center_dot_thickness_canvas)
+                .label(&format!(
+                    "{}",
+                    renderer.crosshair.center_dot_thickness as u8
+                ))
+                .wh(conrod_core::Dimensions::new(200.0, 30.0))
+                .set(self.ids.center_dot_thickness_slider, &mut ui_cell)
         {
             renderer.crosshair.center_dot_thickness = value.round();
         }
 
-        conrod_core::widget::Text::new("Inner line opacity")
+        conrod_core::widget::Text::new("Inner line enabled")
             .font_id(ropa_font_id)
-            .align_middle_x_of(self.ids.canvas)
-            .set(self.ids.inner_line_opacity_slider_label, &mut ui_cell);
+            .mid_top_of(self.ids.inner_line_enable_canvas)
+            .set(self.ids.inner_line_enable_label, &mut ui_cell);
 
-        for value in
-            conrod_core::widget::Slider::new(renderer.crosshair.inner_line_opacity, 0f32, 1f32)
-                .align_middle_x_of(self.ids.canvas)
-                .label_font_id(ropa_font_id)
-                .label(&format!("{}", renderer.crosshair.inner_line_opacity))
-                .wh(conrod_core::Dimensions::new(200.0, 30.0))
-                .set(self.ids.inner_line_opacity_slider, &mut ui_cell)
+        for value in conrod_core::widget::Toggle::new(renderer.crosshair.inner_line_enabled)
+            .mid_bottom_of(self.ids.inner_line_enable_canvas)
+            .wh(conrod_core::Dimensions::new(40.0, 40.0))
+            .set(self.ids.inner_line_enable_toggle, &mut ui_cell)
         {
-            renderer.crosshair.inner_line_opacity = value;
+            renderer.crosshair.inner_line_enabled = value;
         }
+
+        // conrod_core::widget::Text::new("Inner line opacity")
+        //     .font_id(ropa_font_id)
+        //     .mid_top_of(self.ids.inner_line_opacity_canvas)
+        //     .set(self.ids.inner_line_opacity_slider_label, &mut ui_cell);
+        //
+        // for value in
+        //     conrod_core::widget::Slider::new(renderer.crosshair.inner_line_opacity, 0f32, 1f32)
+        //         .mid_bottom_of(self.ids.inner_line_opacity_canvas)
+        //
+        //         .label(&format!("{}", renderer.crosshair.inner_line_opacity))
+        //         .wh(conrod_core::Dimensions::new(200.0, 30.0))
+        //         .set(self.ids.inner_line_opacity_slider, &mut ui_cell)
+        // {
+        //     renderer.crosshair.inner_line_opacity = value;
+        // }
 
         conrod_core::widget::Text::new("Inner line thickness")
             .font_id(ropa_font_id)
-            .align_middle_x_of(self.ids.canvas)
+            .mid_top_of(self.ids.inner_line_thickness_canvas)
             .set(self.ids.inner_line_thickness_slider_label, &mut ui_cell);
 
         for value in
             conrod_core::widget::Slider::new(renderer.crosshair.inner_line_thickness, 0f32, 100f32)
-                .align_middle_x_of(self.ids.canvas)
-                .label_font_id(ropa_font_id)
+                .mid_bottom_of(self.ids.inner_line_thickness_canvas)
                 .label(&format!(
                     "{}",
                     renderer.crosshair.inner_line_thickness as u8
@@ -318,15 +435,142 @@ impl Scene for SettingsScene {
             renderer.crosshair.inner_line_thickness = value.round();
         }
 
+        conrod_core::widget::Text::new("Inner line offset")
+            .font_id(ropa_font_id)
+            .mid_top_of(self.ids.inner_line_offset_canvas)
+            .set(self.ids.inner_line_offset_slider_label, &mut ui_cell);
+
+        for value in
+            conrod_core::widget::Slider::new(renderer.crosshair.inner_line_offset, 0f32, 100f32)
+                .mid_bottom_of(self.ids.inner_line_offset_canvas)
+                .label(&format!("{}", renderer.crosshair.inner_line_offset as u8))
+                .wh(conrod_core::Dimensions::new(200.0, 30.0))
+                .set(self.ids.inner_line_offset_slider, &mut ui_cell)
+        {
+            renderer.crosshair.inner_line_offset = value.round();
+        }
+
+        conrod_core::widget::Text::new("Outer line enabled")
+            .font_id(ropa_font_id)
+            .mid_top_of(self.ids.outer_line_enable_canvas)
+            .set(self.ids.outer_line_enable_label, &mut ui_cell);
+
+        for value in conrod_core::widget::Toggle::new(renderer.crosshair.outer_line_enabled)
+            .mid_bottom_of(self.ids.outer_line_enable_canvas)
+            .wh(conrod_core::Dimensions::new(40.0, 40.0))
+            .set(self.ids.outer_line_enable_toggle, &mut ui_cell)
+        {
+            renderer.crosshair.outer_line_enabled = value;
+        }
+
+        // conrod_core::widget::Text::new("Outer line opacity")
+        //     .font_id(ropa_font_id)
+        //     .mid_top_of(self.ids.outer_line_opacity_canvas)
+        //     .set(self.ids.outer_line_opacity_slider_label, &mut ui_cell);
+        //
+        // for value in
+        //     conrod_core::widget::Slider::new(renderer.crosshair.outer_line_opacity, 0f32, 1f32)
+        //         .mid_bottom_of(self.ids.outer_line_opacity_canvas)
+        //
+        //         .label(&format!("{}", renderer.crosshair.outer_line_opacity))
+        //         .wh(conrod_core::Dimensions::new(200.0, 30.0))
+        //         .set(self.ids.outer_line_opacity_slider, &mut ui_cell)
+        // {
+        //     renderer.crosshair.outer_line_opacity = value;
+        // }
+
+        conrod_core::widget::Text::new("Outer line thickness")
+            .font_id(ropa_font_id)
+            .mid_top_of(self.ids.outer_line_thickness_canvas)
+            .set(self.ids.outer_line_thickness_slider_label, &mut ui_cell);
+
+        for value in
+            conrod_core::widget::Slider::new(renderer.crosshair.outer_line_thickness, 0f32, 100f32)
+                .mid_bottom_of(self.ids.outer_line_thickness_canvas)
+                .label(&format!(
+                    "{}",
+                    renderer.crosshair.outer_line_thickness as u8
+                ))
+                .wh(conrod_core::Dimensions::new(200.0, 30.0))
+                .set(self.ids.outer_line_thickness_slider, &mut ui_cell)
+        {
+            renderer.crosshair.outer_line_thickness = value.round();
+        }
+
+        conrod_core::widget::Text::new("Outer line offset")
+            .font_id(ropa_font_id)
+            .mid_top_of(self.ids.outer_line_offset_canvas)
+            .set(self.ids.outer_line_offset_slider_label, &mut ui_cell);
+
+        for value in
+            conrod_core::widget::Slider::new(renderer.crosshair.outer_line_offset, 0f32, 100f32)
+                .mid_bottom_of(self.ids.outer_line_offset_canvas)
+                .label(&format!("{}", renderer.crosshair.outer_line_offset as u8))
+                .wh(conrod_core::Dimensions::new(200.0, 30.0))
+                .set(self.ids.outer_line_offset_slider, &mut ui_cell)
+        {
+            renderer.crosshair.outer_line_offset = value.round();
+        }
+
+        conrod_core::widget::Text::new("Red color")
+            .font_id(ropa_font_id)
+            .padded_w_of(self.ids.crosshair_color_r_canvas, MARGIN)
+            .center_justify()
+            .mid_top_of(self.ids.crosshair_color_r_canvas)
+            .set(self.ids.crosshair_color_r_label, &mut ui_cell);
+
+        for value in conrod_core::widget::Slider::new(renderer.crosshair.color.x, 0f32, 1f32)
+            .mid_bottom_of(self.ids.crosshair_color_r_canvas)
+            .padded_w_of(self.ids.crosshair_color_r_canvas, MARGIN)
+            .label(&format!("{:.3}", renderer.crosshair.color.x))
+            .wh(conrod_core::Dimensions::new(200.0, 30.0))
+            .set(self.ids.crosshair_color_r_slider, &mut ui_cell)
+        {
+            renderer.crosshair.color.x = value;
+        }
+
+        conrod_core::widget::Text::new("Green color")
+            .font_id(ropa_font_id)
+            .padded_w_of(self.ids.crosshair_color_r_canvas, MARGIN)
+            .center_justify()
+            .mid_top_of(self.ids.crosshair_color_g_canvas)
+            .set(self.ids.crosshair_color_g_label, &mut ui_cell);
+
+        for value in conrod_core::widget::Slider::new(renderer.crosshair.color.y, 0f32, 1f32)
+            .mid_bottom_of(self.ids.crosshair_color_g_canvas)
+            .padded_w_of(self.ids.crosshair_color_r_canvas, MARGIN)
+            .label(&format!("{:.3}", renderer.crosshair.color.y))
+            .wh(conrod_core::Dimensions::new(200.0, 30.0))
+            .set(self.ids.crosshair_color_g_slider, &mut ui_cell)
+        {
+            renderer.crosshair.color.y = value;
+        }
+
+        conrod_core::widget::Text::new("Blue color")
+            .font_id(ropa_font_id)
+            .padded_w_of(self.ids.crosshair_color_r_canvas, MARGIN)
+            .center_justify()
+            .mid_top_of(self.ids.crosshair_color_b_canvas)
+            .set(self.ids.crosshair_color_b_label, &mut ui_cell);
+
+        for value in conrod_core::widget::Slider::new(renderer.crosshair.color.z, 0f32, 1f32)
+            .mid_bottom_of(self.ids.crosshair_color_b_canvas)
+            .padded_w_of(self.ids.crosshair_color_r_canvas, MARGIN)
+            .label(&format!("{:.3}", renderer.crosshair.color.z))
+            .wh(conrod_core::Dimensions::new(200.0, 30.0))
+            .set(self.ids.crosshair_color_b_slider, &mut ui_cell)
+        {
+            renderer.crosshair.color.z = value;
+        }
+
         conrod_core::widget::Image::new(crosshair_texture_id)
-            .bottom_right_with_margin_on(self.ids.canvas, MARGIN)
+            .middle_of(self.ids.crosshair_preview_canvas)
             .wh(conrod_core::Dimensions::new(200.0, 200.0))
             .set(self.ids.crosshair_preview_image, &mut ui_cell);
 
         for _press in conrod_core::widget::Button::new()
             .label("Back")
-            .label_font_id(ropa_font_id)
-            .bottom_left_with_margin_on(self.ids.canvas, MARGIN)
+            .bottom_left_with_margin_on(self.ids.footer_canvas, MARGIN)
             .wh(conrod_core::Dimensions::new(100.0, 30.0))
             .set(self.ids.back_button, &mut ui_cell)
         {
@@ -351,7 +595,46 @@ impl Scene for SettingsScene {
         _window: &mut Window,
         renderer: &mut Renderer,
         _conrod_handle: &mut ConrodHandle,
-        _audio_context: &mut AudioContext,
+        audio_context: &mut AudioContext,
+        database: &mut Database,
     ) {
+        database
+            .glue
+            .execute(&format!(
+                "UPDATE settings SET \
+                audio_volume = {},\
+                maximum_raymarch_step = {},\
+                ambient_occlusion_sample = {},\
+                crosshair_color_r = {},\
+                crosshair_color_g = {},\
+                crosshair_color_b = {},\
+                center_dot_enable = {},\
+                center_dot_thickness = {},\
+                inner_line_enable = {},\
+                inner_line_thickness = {},\
+                inner_line_length = {},\
+                inner_line_offset = {},\
+                outer_line_enable = {},\
+                outer_line_thickness = {},\
+                outer_line_length = {},\
+                outer_line_offset = {}",
+                audio_context.volume,
+                renderer.rendering_info.queuecount_raymarchmaxstep_aostep.y,
+                renderer.rendering_info.queuecount_raymarchmaxstep_aostep.z,
+                renderer.crosshair.color.x,
+                renderer.crosshair.color.y,
+                renderer.crosshair.color.z,
+                renderer.crosshair.center_dot_enabled,
+                renderer.crosshair.center_dot_thickness,
+                renderer.crosshair.inner_line_enabled,
+                renderer.crosshair.inner_line_thickness,
+                renderer.crosshair.inner_line_length,
+                renderer.crosshair.inner_line_offset,
+                renderer.crosshair.outer_line_enabled,
+                renderer.crosshair.outer_line_thickness,
+                renderer.crosshair.outer_line_length,
+                renderer.crosshair.outer_line_offset,
+            ))
+            .unwrap();
     }
 }

@@ -46,6 +46,10 @@ impl Game {
         );
         let mut window = Window::from(window);
         let mut audio_context = AudioContext::new();
+        let mut database = Database::new();
+        database.init();
+        database.init_settings(&mut audio_context, &mut renderer);
+
         let mut scene_stack = VecDeque::<Box<dyn Scene>>::new();
         let mut first_scene = MainMenuScene::new(&mut renderer, &mut conrod_handle); // ClassicScoreScene::new(&mut renderer, &mut conrod_handle);
 
@@ -55,10 +59,9 @@ impl Game {
             &mut renderer,
             &mut conrod_handle,
             &mut audio_context,
+            &mut database,
         );
         scene_stack.push_back(Box::new(first_scene));
-        let mut database = Database::new();
-        database.init();
         Self {
             window,
             scene_stack,
@@ -152,6 +155,7 @@ impl Game {
                     &mut self.conrod_handle,
                     &mut self.audio_context,
                     control_flow,
+                    &mut self.database,
                 );
 
                 match scene_op {
@@ -163,6 +167,7 @@ impl Game {
                                 &mut self.renderer,
                                 &mut self.conrod_handle,
                                 &mut self.audio_context,
+                                &mut self.database,
                             );
                             self.scene_stack.pop_back();
                         }
@@ -172,6 +177,7 @@ impl Game {
                             &mut self.renderer,
                             &mut self.conrod_handle,
                             &mut self.audio_context,
+                            &mut self.database,
                         );
                     }
                     SceneOp::Push(mut new_scene, message) => {
@@ -181,6 +187,7 @@ impl Game {
                                 &mut self.renderer,
                                 &mut self.conrod_handle,
                                 &mut self.audio_context,
+                                &mut self.database,
                             );
                         }
                         new_scene.init(
@@ -189,6 +196,7 @@ impl Game {
                             &mut self.renderer,
                             &mut self.conrod_handle,
                             &mut self.audio_context,
+                            &mut self.database,
                         );
                         self.scene_stack.push_back(new_scene);
                     }
@@ -198,6 +206,7 @@ impl Game {
                             &mut self.renderer,
                             &mut self.conrod_handle,
                             &mut self.audio_context,
+                            &mut self.database,
                         );
                         self.scene_stack.pop_back();
                         new_scene.init(
@@ -206,6 +215,7 @@ impl Game {
                             &mut self.renderer,
                             &mut self.conrod_handle,
                             &mut self.audio_context,
+                            &mut self.database,
                         );
                         self.scene_stack.push_back(new_scene);
                     }

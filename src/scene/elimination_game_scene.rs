@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::io::{BufReader, Cursor};
 
 use hecs::{Entity, World};
-use instant::{Duration, Instant};
+use instant::Duration;
 use rapier3d::prelude::*;
 use winit::event::{MouseButton, VirtualKeyCode};
 use winit::event_loop::ControlFlow;
@@ -77,7 +77,7 @@ impl Target {
 pub struct Position(nalgebra::Vector3<f32>);
 
 widget_ids! {
-    pub struct ClassicGameSceneIds {
+    pub struct EliminationGameSceneIds {
         // The main canvas
         canvas,
         canvas_duration,
@@ -90,7 +90,7 @@ pub struct Score {
     pub hit: u16,
     pub miss: u16,
     pub score: i32,
-    pub total_shoot_time: f32,
+    pub avg_hit_time: f32,
 }
 
 impl Score {
@@ -99,28 +99,34 @@ impl Score {
             hit: 0,
             miss: 0,
             score: 0,
-            total_shoot_time: 0.0,
+            avg_hit_time: 0.0,
         }
+    }
+
+    pub fn read_message(&mut self, message: &MaybeMessage) -> Option<()> {
+        if let Some(message) = message {
+            self.hit = *message.get("hit")?.to_i32() as u16;
+            self.miss = *message.get("miss")?.to_i32() as u16;
+            self.score = *message.get("score")?.to_i32();
+            self.avg_hit_time = *message.get("avg_hit_time")?.to_f32();
+        }
+        Some(())
     }
 
     pub fn write_message(&self, message: &mut Message) {
         message.insert("hit", Value::I32(self.hit as i32));
         message.insert("miss", Value::I32(self.miss as i32));
         message.insert("score", Value::I32(self.score));
-        message.insert(
-            "avg_hit_time",
-            Value::F32(self.total_shoot_time / self.hit as f32),
-        );
+        message.insert("avg_hit_time", Value::F32(self.avg_hit_time));
     }
 }
 
-pub struct ClassicGameScene {
-    ids: ClassicGameSceneIds,
+pub struct EliminationGameScene {
+    ids: EliminationGameSceneIds,
     world: World,
     physics: GamePhysics,
     player_rigid_body_handle: RigidBodyHandle,
     game_timer: Timer,
-    last_shoot_time_start: Option<Instant>,
     shoot_timer: Timer,
     game_start_timer: Timer,
     score: Score,
@@ -129,7 +135,7 @@ pub struct ClassicGameScene {
     shoot_animation: InOutAnimation,
 }
 
-impl ClassicGameScene {
+impl EliminationGameScene {
     pub fn new(_renderer: &mut Renderer, conrod_handle: &mut ConrodHandle) -> Self {
         let mut world = World::new();
 
@@ -180,12 +186,11 @@ impl ClassicGameScene {
             world,
             physics,
             player_rigid_body_handle,
-            ids: ClassicGameSceneIds::new(conrod_handle.get_ui_mut().widget_id_generator()),
+            ids: EliminationGameSceneIds::new(conrod_handle.get_ui_mut().widget_id_generator()),
             score: Score::new(),
-            last_shoot_time_start: None,
-            game_timer: Timer::new(Duration::new(6, 0)),
-            game_start_timer: Timer::new_finished(),
             shoot_timer: Timer::new_finished(),
+            game_timer: Timer::new(Duration::new(100, 0)),
+            game_start_timer: Timer::new(Duration::new(3, 0)),
             game_running: false,
             rng: SmallRng::from_entropy(),
             shoot_animation: InOutAnimation::new(3.0, 5.0),
@@ -193,7 +198,7 @@ impl ClassicGameScene {
     }
 }
 
-impl Scene for ClassicGameScene {
+impl Scene for EliminationGameScene {
     fn init(
         &mut self,
         _message: MaybeMessage,
@@ -347,7 +352,6 @@ impl Scene for ClassicGameScene {
         if !self.game_running {
             if self.game_start_timer.is_finished() {
                 self.game_timer.start();
-                self.last_shoot_time_start = Some(Instant::now());
                 self.game_running = true;
             } else {
                 self.game_start_timer.update();
@@ -467,22 +471,13 @@ impl Scene for ClassicGameScene {
                     let mut need_to_spawn = false;
                     if let Ok(mut target) = self.world.get_mut::<Target>(entity) {
                         if !target.is_shooted() {
-                            let time_now = Instant::now();
-                            let shoot_time =
-                                time_now.duration_since(self.last_shoot_time_start.unwrap());
-                            let shoot_time_secs = shoot_time.as_secs_f32();
-                            self.last_shoot_time_start = Some(time_now);
-                            self.score.total_shoot_time += shoot_time_secs;
                             need_to_spawn = true;
                             target.shooted();
-                            self.score.score += ((300.0 * (3.0 - shoot_time_secs)) as i32).max(0);
                             self.score.hit += 1;
                         } else {
-                            self.score.score -= 100;
                             self.score.miss += 1;
                         }
                     } else {
-                        self.score.score -= 100;
                         self.score.miss += 1;
                     }
                     if need_to_spawn {
@@ -507,7 +502,6 @@ impl Scene for ClassicGameScene {
                         );
                     }
                 } else {
-                    self.score.score -= 100;
                     self.score.miss += 1;
                 }
             }

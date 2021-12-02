@@ -40,6 +40,7 @@ impl ConrodHandle {
             ))
             .unwrap(),
         );
+        ui.theme.font_id = Some(ropa_font);
 
         font_id_map.insert("noto", noto_font);
         font_id_map.insert("spy", spy_font);
@@ -53,18 +54,18 @@ impl ConrodHandle {
             image::load_from_memory(include_bytes!("../assets/images/title.png"))
                 .unwrap()
                 .to_rgba8();
-        let (logo_w, texture_h) = title_image_rgba.dimensions();
+        let (logo_w, logo_h) = title_image_rgba.dimensions();
         let title_texture = create_image_texture(
             &renderer.device,
             &mut renderer.queue,
             title_image_rgba,
-            renderer.surface_and_window_config.surface.format,
+            wgpu::TextureFormat::Rgba8Unorm,
         );
         let title_image = conrod_wgpu::Image {
             texture: title_texture,
-            texture_format: renderer.surface_and_window_config.surface.format,
+            texture_format: wgpu::TextureFormat::Rgba8Unorm,
             width: logo_w,
-            height: texture_h,
+            height: logo_h,
         };
         image_id_map.insert("title", image_map.insert(title_image));
 
@@ -77,7 +78,7 @@ impl ConrodHandle {
             texture: crosshair_texture,
             texture_format: renderer.surface_and_window_config.surface.format,
             width: logo_w,
-            height: texture_h,
+            height: logo_h,
         };
         image_id_map.insert("crosshair", image_map.insert(crosshair_image));
 

@@ -3,6 +3,9 @@
 #define EPS 0.0001
 #define MAX_DISTANCE 100.0
 
+#define MATERIAL_GUN 0
+#define MATERIAL_SKIN 1
+
 layout(std140, binding = 0) uniform rendering_info {
     vec3 reso_time;
     vec3 cam_pos;
@@ -220,8 +223,8 @@ Distance scene_dist(vec3 pos)
 {
     vec3 gun_pos = vec3(1., -0.5, -5.);
     mat3 rot = rot_x(fov_shootanim.y);
-    Distance m = Distance(sd_silver_horn(pos * rot, gun_pos), 0);
-    m = sd_union(m, Distance(sd_holding_hand(pos * rot, gun_pos + vec3(0.9, -1., 1.7)), 1));
+    Distance m = Distance(sd_silver_horn(pos * rot, gun_pos), MATERIAL_GUN);
+    m = sd_union(m, Distance(sd_holding_hand(pos * rot, gun_pos + vec3(0.9, -1., 1.7)), MATERIAL_SKIN));
     return m;
 }
 
@@ -304,13 +307,13 @@ vec3 lookat(vec2 uv, vec3 pos, vec3 dir, vec3 w_up)
     return normalize(uv.x * right + uv.y * up + dir * 2.0);
 }
 
-vec3 rayViewDir(vec2 size, vec2 coord) {
+vec3 ray_view_dir(vec2 size, vec2 coord) {
     vec2 xy = coord - size / 2.0;
     float z = size.y / tan(fov_shootanim.x / 2.0);
     return normalize(vec3(xy, z));
 }
 
-mat4 viewMatrix(vec3 pos, vec3 dir, vec3 world_up) {
+mat4 view_matrix(vec3 pos, vec3 dir, vec3 world_up) {
     vec3 right = normalize(cross(dir, world_up));
     vec3 up = normalize(cross(dir, right));
     return mat4(
@@ -358,8 +361,8 @@ void main()
     vec3 cam_pos_ = vec3(0.);
     vec3 cam_dir_ = vec3(0., 0., -1.);
 
-    vec3 ray_view_dir = rayViewDir(reso_time.xy, gl_FragCoord.xy);
-    mat4 view_to_world = viewMatrix(cam_pos_, cam_dir_, world_up);
+    vec3 ray_view_dir = ray_view_dir(reso_time.xy, gl_FragCoord.xy);
+    mat4 view_to_world = view_matrix(cam_pos_, cam_dir_, world_up);
 
     vec3 ray_world_dir = (view_to_world * vec4(ray_view_dir, 0.0)).xyz;
 
@@ -374,13 +377,13 @@ void main()
     vec3 ray_hit_pos = cam_pos_ + d.distance * ray_world_dir;
     vec3 normal = get_normal(ray_hit_pos);
 
-    vec3 col = vec3(46., 209., 162.) / 255.;
+    vec3 col = vec3(0.) / 255.;
     switch (d.materialId) {
-        case 0:
-            col = vec3(192. / 255.);
+        case MATERIAL_GUN:
+            col = vec3(0.);
             break;
-        case 1:
-            col = vec3(232., 190., 172.) / 255.;
+        case MATERIAL_SKIN:
+            col = vec3(255., 195., 161.) / 255.;
             break;
         default:
             break;
