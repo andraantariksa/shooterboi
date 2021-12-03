@@ -39,13 +39,3 @@ impl RenderingInfo {
         self.reso_time.y = new_size.height as f32;
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use crate::renderer::rendering_info::RenderingInfo;
-
-    #[test]
-    fn rendering_info_size() {
-        assert_eq!(core::mem::size_of::<RenderingInfo>() % 16, 0);
-    }
-}

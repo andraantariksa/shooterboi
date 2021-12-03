@@ -13,7 +13,7 @@
 #define MATERIAL_YELLOW 1
 #define MATERIAL_WHITE 2
 #define MATERIAL_BLACK 3
-#define MATERIAL_GROUND 4
+#define MATERIAL_CHECKER 4
 #define MATERIAL_RED 5
 
 struct RenderQueue
@@ -286,18 +286,15 @@ vec3 blinn_phong(
     vec3 h = normalize(l + v);
     float diff = max(dot(l, n), 0.0);
     float spec = max(dot(h, n), 0.0);
-
     if (diff < 0.0) {
         // Light not visible from this point on the surface
         return vec3(0.0, 0.0, 0.0);
     }
-
     if (spec < 0.0) {
         // Light reflection in opposite direction as viewer, apply only diffuse
         // component
         return light_intensity * (k_d * diff);
     }
-
     return light_intensity * (k_d * diff + k_s * pow(spec, alpha));
 }
 
@@ -315,7 +312,9 @@ void main()
     vec3 ray_hit_pos = cam_pos + d.distance * ray_world_dir;
     vec3 normal = get_normal(ray_hit_pos);
 
-    vec3 a = texture(sampler2D(checker_texture, checker_sampler), normal.xz).rgb;
+    vec3 checker_texture_xz = texture(sampler2D(checker_texture, checker_sampler), ray_hit_pos.xz).rgb;
+    vec3 checker_texture_xy = texture(sampler2D(checker_texture, checker_sampler), ray_hit_pos.xy).rgb;
+    vec3 checker_texture_yz = texture(sampler2D(checker_texture, checker_sampler), ray_hit_pos.yz).rgb;
 
     if (d.distance > MAX_DISTANCE - EPS) {
         outColor = vec4(skycolor, 1.0);
@@ -333,8 +332,8 @@ void main()
         case MATERIAL_WHITE:
         col = vec3(1.);
         break;
-        case MATERIAL_GROUND:
-        col = a;
+        case MATERIAL_CHECKER:
+        col = checker_texture_yz * abs(normal.x) + checker_texture_xy * abs(normal.z) + checker_texture_xz * abs(normal.y);
         break;
         case MATERIAL_BLACK:
         col = vec3(0.);

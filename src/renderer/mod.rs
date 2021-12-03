@@ -32,8 +32,9 @@ pub enum MaterialType {
     Yellow = 1,
     White = 2,
     Black = 3,
-    Ground = 4,
+    Checker = 4,
     Red = 5,
+    Orange = 6,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -64,21 +65,6 @@ impl RenderQueueData {
             _p3: [0; 1],
             _p4: [0; 2],
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::renderer::{RenderQueueData, ShapeType};
-
-    #[test]
-    fn render_queue_data_size() {
-        assert_eq!(core::mem::size_of::<RenderQueueData>() % 16, 0);
-    }
-
-    #[test]
-    fn shape_type_size() {
-        assert_eq!(core::mem::size_of::<ShapeType>(), 4);
     }
 }
 

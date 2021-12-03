@@ -22,7 +22,7 @@ use crate::renderer::{MaterialType, Renderer, ShapeType};
 use crate::scene::classic_score_scene::ClassicScoreScene;
 use crate::scene::pause_scene::PauseScene;
 use crate::scene::{MaybeMessage, Message, Scene, SceneOp, Value};
-use crate::timer::Timer;
+use crate::timer::{Stopwatch, Timer};
 use crate::util::lerp;
 use crate::window::Window;
 use conrod_core::widget_ids;
@@ -52,7 +52,7 @@ impl Target {
 
     pub fn shooted(&mut self) {
         self.shooted = true;
-        self.delete_timer = Some(Timer::new_start(Duration::new(2, 0)));
+        self.delete_timer = Some(Timer::new(0.8));
     }
 
     pub fn get_material(&self) -> MaterialType {
@@ -63,10 +63,10 @@ impl Target {
         }
     }
 
-    pub fn is_need_to_be_deleted(&mut self) -> bool {
+    pub fn is_need_to_be_deleted(&mut self, delta_time: f32) -> bool {
         match self.delete_timer {
             Some(ref mut timer) => {
-                timer.update();
+                timer.update(delta_time);
                 timer.is_finished()
             }
             None => false,
@@ -109,7 +109,7 @@ impl Score {
         message.insert("score", Value::I32(self.score));
         message.insert(
             "avg_hit_time",
-            Value::F32(self.total_shoot_time / self.hit as f32),
+            Value::F32(self.total_shoot_time / self.hit.max(1) as f32),
         );
     }
 }
@@ -120,7 +120,7 @@ pub struct ClassicGameScene {
     physics: GamePhysics,
     player_rigid_body_handle: RigidBodyHandle,
     game_timer: Timer,
-    last_shoot_time_start: Option<Instant>,
+    delta_shoot_time: Stopwatch,
     shoot_timer: Timer,
     game_start_timer: Timer,
     score: Score,
@@ -182,8 +182,8 @@ impl ClassicGameScene {
             player_rigid_body_handle,
             ids: ClassicGameSceneIds::new(conrod_handle.get_ui_mut().widget_id_generator()),
             score: Score::new(),
-            last_shoot_time_start: None,
-            game_timer: Timer::new(Duration::new(6, 0)),
+            delta_shoot_time: Stopwatch::new(),
+            game_timer: Timer::new(100.0),
             game_start_timer: Timer::new_finished(),
             shoot_timer: Timer::new_finished(),
             game_running: false,
@@ -210,7 +210,7 @@ impl Scene for ClassicGameScene {
             let entity = self.world.reserve_entity();
             let (objects, ref mut bound) = renderer.render_objects.next_static();
             objects.position = nalgebra::Vector3::new(0.0, 0.0, -20.0);
-            objects.shape_type_material = (ShapeType::Box, MaterialType::White);
+            objects.shape_type_material = (ShapeType::Box, MaterialType::Checker);
             objects.shape_data1 = nalgebra::Vector4::new(20.0, 12.0, 1.0, 0.0);
             *bound = ObjectBound::Sphere(20.0);
             self.physics.collider_set.insert(
@@ -230,7 +230,7 @@ impl Scene for ClassicGameScene {
             let entity = self.world.reserve_entity();
             let (objects, ref mut bound) = renderer.render_objects.next_static();
             objects.position = nalgebra::Vector3::new(0.0, 0.0, 10.0);
-            objects.shape_type_material = (ShapeType::Box, MaterialType::White);
+            objects.shape_type_material = (ShapeType::Box, MaterialType::Checker);
             objects.shape_data1 = nalgebra::Vector4::new(20.0, 5.0, 1.0, 0.0);
             *bound = ObjectBound::Sphere(20.0);
             self.physics.collider_set.insert(
@@ -250,7 +250,7 @@ impl Scene for ClassicGameScene {
             let entity = self.world.reserve_entity();
             let (objects, ref mut bound) = renderer.render_objects.next_static();
             objects.position = nalgebra::Vector3::new(-20.0, 0.0, -5.0);
-            objects.shape_type_material = (ShapeType::Box, MaterialType::White);
+            objects.shape_type_material = (ShapeType::Box, MaterialType::Checker);
             objects.shape_data1 = nalgebra::Vector4::new(1.0, 5.0, 15.0, 0.0);
             *bound = ObjectBound::Sphere(15.0);
             self.physics.collider_set.insert(
@@ -270,7 +270,7 @@ impl Scene for ClassicGameScene {
             let entity = self.world.reserve_entity();
             let (objects, ref mut bound) = renderer.render_objects.next_static();
             objects.position = nalgebra::Vector3::new(20.0, 0.0, -5.0);
-            objects.shape_type_material = (ShapeType::Box, MaterialType::White);
+            objects.shape_type_material = (ShapeType::Box, MaterialType::Checker);
             objects.shape_data1 = nalgebra::Vector4::new(1.0, 5.0, 15.0, 0.0);
             *bound = ObjectBound::Sphere(15.0);
             self.physics.collider_set.insert(
@@ -299,8 +299,7 @@ impl Scene for ClassicGameScene {
 
         audio_context.global_sinks_map.remove("bgm");
 
-        self.game_start_timer.reset(Duration::new(3, 0));
-        self.game_start_timer.start();
+        self.game_start_timer.reset(3.0);
         self.game_running = false;
     }
 
@@ -317,8 +316,7 @@ impl Scene for ClassicGameScene {
     ) -> SceneOp {
         renderer.camera.move_direction(input_manager.mouse_movement);
 
-        let timer_duration = self.game_timer.get_duration();
-        let sec = timer_duration.as_secs_f32();
+        let sec = self.game_timer.get_duration();
 
         let mut ui_cell = conrod_handle.get_ui_mut().set_widgets();
         {
@@ -346,28 +344,38 @@ impl Scene for ClassicGameScene {
 
         if !self.game_running {
             if self.game_start_timer.is_finished() {
-                self.game_timer.start();
-                self.last_shoot_time_start = Some(Instant::now());
                 self.game_running = true;
             } else {
-                self.game_start_timer.update();
+                self.game_start_timer.update(delta_time);
                 conrod_core::widget::Text::new(&format!(
                     "{:.1}",
-                    self.game_start_timer.get_duration().as_secs_f32()
+                    self.game_start_timer.get_duration()
                 ))
                 .align_middle_x_of(self.ids.canvas)
                 .align_middle_y_of(self.ids.canvas)
                 .set(self.ids.start_duration_label, &mut ui_cell);
             }
         } else {
-            self.game_timer.update();
-            self.shoot_timer.update();
+            self.game_timer.update(delta_time);
+            self.shoot_timer.update(delta_time);
+            self.delta_shoot_time.update(delta_time);
 
             let mut entity_to_remove = Vec::new();
-            for (id, (target,)) in self.world.query_mut::<(&mut Target,)>() {
-                if target.is_need_to_be_deleted() {
+            for (id, (target, collider_handle)) in
+                self.world.query_mut::<(&mut Target, &ColliderHandle)>()
+            {
+                if target.is_need_to_be_deleted(delta_time) {
                     entity_to_remove.push(id);
+                    self.physics.collider_set.remove(
+                        *collider_handle,
+                        &mut self.physics.island_manager,
+                        &mut self.physics.rigid_body_set,
+                        false,
+                    );
                 }
+            }
+            for entity in entity_to_remove {
+                self.world.despawn(entity).unwrap();
             }
 
             self.shoot_animation.update(delta_time);
@@ -421,13 +429,10 @@ impl Scene for ClassicGameScene {
                 &self.physics.rigid_body_set,
                 &self.physics.collider_set,
             );
-            for entity in entity_to_remove {
-                self.world.despawn(entity).unwrap();
-            }
 
             if input_manager.is_mouse_press(&MouseButton::Left) && self.shoot_timer.is_finished() {
                 self.shoot_animation.trigger();
-                self.shoot_timer.reset(Duration::new(0, 400000000));
+                self.shoot_timer.reset(0.4);
                 let sink = rodio::Sink::try_new(&audio_context.output_stream_handle).unwrap();
                 sink.append(
                     rodio::Decoder::new(BufReader::new(Cursor::new(AUDIO_FILE_SHOOT.to_vec())))
@@ -468,14 +473,12 @@ impl Scene for ClassicGameScene {
                     if let Ok(mut target) = self.world.get_mut::<Target>(entity) {
                         if !target.is_shooted() {
                             let time_now = Instant::now();
-                            let shoot_time =
-                                time_now.duration_since(self.last_shoot_time_start.unwrap());
-                            let shoot_time_secs = shoot_time.as_secs_f32();
-                            self.last_shoot_time_start = Some(time_now);
-                            self.score.total_shoot_time += shoot_time_secs;
+                            let shoot_time = self.delta_shoot_time.get_duration();
+                            self.delta_shoot_time.reset();
+                            self.score.total_shoot_time += shoot_time;
                             need_to_spawn = true;
                             target.shooted();
-                            self.score.score += ((300.0 * (3.0 - shoot_time_secs)) as i32).max(0);
+                            self.score.score += ((300.0 * (3.0 - shoot_time)) as i32).max(0);
                             self.score.hit += 1;
                         } else {
                             self.score.score -= 100;
@@ -487,8 +490,8 @@ impl Scene for ClassicGameScene {
                     }
                     if need_to_spawn {
                         let pos = nalgebra::Vector3::new(
-                            self.rng.sample(Uniform::new(-3.0, 3.0)),
-                            self.rng.sample(Uniform::new(0.5, 3.0)),
+                            self.rng.sample(Uniform::new(-5.0, 5.0)),
+                            self.rng.sample(Uniform::new(0.5, 5.0)),
                             -10.0,
                         );
                         let new_entity = self.world.reserve_entity();

@@ -94,15 +94,16 @@ impl GameSceneRenderer {
         let image = image::load_from_memory(include_bytes!("../../assets/images/checker.png"))
             .unwrap()
             .to_rgba8();
+        let texture_size = wgpu::Extent3d {
+            width: image.width(),
+            height: image.height(),
+            depth_or_array_layers: 1,
+        };
         let ground_texture = device.create_texture_with_data(
-            &queue,
+            queue,
             &wgpu::TextureDescriptor {
                 label: Some("Ground texture"),
-                size: wgpu::Extent3d {
-                    width: image.width(),
-                    height: image.height(),
-                    depth_or_array_layers: 1,
-                },
+                size: texture_size,
                 mip_level_count: 1,
                 sample_count: 1,
                 dimension: wgpu::TextureDimension::D2,
@@ -111,6 +112,35 @@ impl GameSceneRenderer {
             },
             &image.into_raw()[..],
         );
+        // let texture_size = wgpu::Extent3d {
+        //     width: image.width(),
+        //     height: image.height(),
+        //     depth_or_array_layers: 1,
+        // };
+        // let ground_texture = device.create_texture(&wgpu::TextureDescriptor {
+        //     label: Some("Ground texture"),
+        //     size: texture_size,
+        //     mip_level_count: 1,
+        //     sample_count: 1,
+        //     dimension: wgpu::TextureDimension::D2,
+        //     format: wgpu::TextureFormat::Rgba8Unorm,
+        //     usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+        // });
+        // queue.write_texture(
+        //     wgpu::ImageCopyTexture {
+        //         texture: &ground_texture,
+        //         mip_level: 0,
+        //         aspect: wgpu::TextureAspect::All,
+        //         origin: wgpu::Origin3d::ZERO,
+        //     },
+        //     &image.into_raw()[..],
+        //     wgpu::ImageDataLayout {
+        //         offset: 0,
+        //         bytes_per_row: std::num::NonZeroU32::new(4 * texture_size.width),
+        //         rows_per_image: std::num::NonZeroU32::new(texture_size.height),
+        //     },
+        //     texture_size,
+        // );
         let ground_texture_view = ground_texture.create_view(&wgpu::TextureViewDescriptor {
             label: Some("Ground texture view"),
             format: Some(wgpu::TextureFormat::Rgba8Unorm),
@@ -123,9 +153,9 @@ impl GameSceneRenderer {
         });
         let texture_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
             label: Some("Texture sampler"),
-            address_mode_u: wgpu::AddressMode::ClampToEdge,
-            address_mode_v: wgpu::AddressMode::ClampToEdge,
-            address_mode_w: wgpu::AddressMode::ClampToEdge,
+            address_mode_u: wgpu::AddressMode::Repeat,
+            address_mode_v: wgpu::AddressMode::Repeat,
+            address_mode_w: wgpu::AddressMode::Repeat,
             mag_filter: wgpu::FilterMode::Linear,
             min_filter: wgpu::FilterMode::Nearest,
             mipmap_filter: wgpu::FilterMode::Nearest,

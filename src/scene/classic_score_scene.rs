@@ -1,6 +1,8 @@
 use chrono::NaiveDateTime;
 use conrod_core::widget::envelope_editor::EnvelopePoint;
+use conrod_core::widget::Text;
 use conrod_core::{Colorable, Labelable, Positionable, Sizeable, Widget};
+use std::fmt::{Display, Formatter};
 use std::time::UNIX_EPOCH;
 use winit::event_loop::ControlFlow;
 
@@ -9,6 +11,7 @@ use crate::database::Database;
 use crate::gui::ConrodHandle;
 use crate::input_manager::InputManager;
 use crate::renderer::Renderer;
+use crate::scene::main_menu_scene::play_bgm;
 use crate::scene::{
     MaybeMessage, Message, Scene, SceneOp, Value, BUTTON_HEIGHT, BUTTON_WIDTH, GAP_BETWEEN_ITEM,
     MARGIN,
@@ -49,7 +52,7 @@ widget_ids! {
     }
 }
 
-pub struct ClassicScoreDisplay {
+pub struct ClassicGameScoreDisplay {
     pub accuracy: f32,
     pub hit: u16,
     pub miss: u16,
@@ -58,7 +61,7 @@ pub struct ClassicScoreDisplay {
     pub created_at: NaiveDateTime,
 }
 
-impl ClassicScoreDisplay {
+impl ClassicGameScoreDisplay {
     pub fn new() -> Self {
         Self {
             accuracy: 0.0,
@@ -81,9 +84,19 @@ impl ClassicScoreDisplay {
     }
 }
 
+impl Display for ClassicGameScoreDisplay {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        writeln!(
+            f,
+            "Score: {}\nAccuracy: {}\nHit: {}\nMiss: {}\nAverage hit time: {}\n{}",
+            self.score, self.accuracy, self.hit, self.miss, self.avg_hit_time, self.created_at
+        )
+    }
+}
+
 pub struct ClassicScoreScene {
     ids: ClassicScoreSceneIds,
-    score: ClassicScoreDisplay,
+    score: ClassicGameScoreDisplay,
 }
 
 impl ClassicScoreScene {
@@ -91,7 +104,7 @@ impl ClassicScoreScene {
         let mut ids = ClassicScoreSceneIds::new(conrod_handle.get_ui_mut().widget_id_generator());
         Self {
             ids,
-            score: ClassicScoreDisplay::new(),
+            score: ClassicGameScoreDisplay::new(),
         }
     }
 }
@@ -103,7 +116,7 @@ impl Scene for ClassicScoreScene {
         _window: &mut Window,
         renderer: &mut Renderer,
         _conrod_handle: &mut ConrodHandle,
-        _audio_context: &mut AudioContext,
+        audio_context: &mut AudioContext,
         database: &mut Database,
     ) {
         renderer.is_render_gui = true;
@@ -150,7 +163,7 @@ impl Scene for ClassicScoreScene {
 
             conrod_core::widget::Canvas::new().set(self.ids.canvas, &mut ui_cell);
 
-            conrod_core::widget::Text::new("Training Report")
+            Text::new("Training Report")
                 .align_middle_x()
                 .mid_top_with_margin_on(self.ids.canvas, MARGIN)
                 .set(self.ids.title_label, &mut ui_cell);
@@ -187,52 +200,52 @@ impl Scene for ClassicScoreScene {
                 .w(ITEM_WIDTH)
                 .set(self.ids.miss_canvas, &mut ui_cell);
 
-            conrod_core::widget::Text::new("Accuracy")
+            Text::new("Accuracy")
                 .mid_left_of(self.ids.accuracy_canvas)
                 .left_justify()
                 .set(self.ids.accuracy_label, &mut ui_cell);
 
-            conrod_core::widget::Text::new(&format!("{:.1}%", self.score.accuracy))
+            Text::new(&format!("{:.1}%", self.score.accuracy))
                 .mid_right_of(self.ids.accuracy_canvas)
                 .left_justify()
                 .set(self.ids.accuracy_value_label, &mut ui_cell);
 
-            conrod_core::widget::Text::new("Hit")
+            Text::new("Hit")
                 .mid_left_of(self.ids.hit_canvas)
                 .left_justify()
                 .set(self.ids.hit_label, &mut ui_cell);
 
-            conrod_core::widget::Text::new(&format!("{}", self.score.hit))
+            Text::new(&format!("{}", self.score.hit))
                 .mid_right_of(self.ids.hit_canvas)
                 .left_justify()
                 .set(self.ids.hit_value_label, &mut ui_cell);
 
-            conrod_core::widget::Text::new("Score")
+            Text::new("Score")
                 .mid_left_of(self.ids.score_canvas)
                 .left_justify()
                 .set(self.ids.score_label, &mut ui_cell);
 
-            conrod_core::widget::Text::new(&format!("{}", self.score.score))
+            Text::new(&format!("{}", self.score.score))
                 .mid_right_of(self.ids.score_canvas)
                 .left_justify()
                 .set(self.ids.score_value_label, &mut ui_cell);
 
-            conrod_core::widget::Text::new("Avg hit time")
+            Text::new("Avg hit time")
                 .mid_left_of(self.ids.avg_hit_time_canvas)
                 .left_justify()
                 .set(self.ids.avg_hit_time_label, &mut ui_cell);
 
-            conrod_core::widget::Text::new(&format!("{:.3}s", self.score.avg_hit_time))
+            Text::new(&format!("{:.3}s", self.score.avg_hit_time))
                 .mid_right_of(self.ids.avg_hit_time_canvas)
                 .left_justify()
                 .set(self.ids.avg_hit_time_value_label, &mut ui_cell);
 
-            conrod_core::widget::Text::new("Miss")
+            Text::new("Miss")
                 .mid_left_of(self.ids.miss_canvas)
                 .left_justify()
                 .set(self.ids.miss_label, &mut ui_cell);
 
-            conrod_core::widget::Text::new(&format!("{}", self.score.miss))
+            Text::new(&format!("{}", self.score.miss))
                 .mid_right_of(self.ids.miss_canvas)
                 .left_justify()
                 .set(self.ids.miss_value_label, &mut ui_cell);

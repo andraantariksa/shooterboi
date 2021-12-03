@@ -9,6 +9,7 @@ use crate::input_manager::InputManager;
 use crate::renderer::Renderer;
 
 use crate::database::Database;
+use crate::scene::main_menu_scene::play_bgm;
 use crate::scene::{MaybeMessage, Scene, SceneOp, Value, BUTTON_HEIGHT, BUTTON_WIDTH};
 use crate::window::Window;
 use conrod_core::widget_ids;
@@ -40,11 +41,11 @@ impl QuitConfirmScene {
 impl Scene for QuitConfirmScene {
     fn init(
         &mut self,
-        _message: MaybeMessage,
+        message: MaybeMessage,
         _window: &mut Window,
         renderer: &mut Renderer,
         _conrod_handle: &mut ConrodHandle,
-        _audio_context: &mut AudioContext,
+        audio_context: &mut AudioContext,
         database: &mut Database,
     ) {
         renderer.is_render_gui = true;

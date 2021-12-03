@@ -1,6 +1,6 @@
 use crate::audio::AudioContext;
 use crate::renderer::Renderer;
-use crate::scene::classic_score_scene::ClassicScoreDisplay;
+use crate::scene::classic_score_scene::ClassicGameScoreDisplay;
 use chrono::{NaiveDate, NaiveDateTime, Utc};
 use gluesql::ast::DataType;
 use gluesql::data::Value;
@@ -87,7 +87,7 @@ impl Database {
         };
     }
 
-    pub fn read_classic_score(&mut self) -> Vec<ClassicScoreDisplay> {
+    pub fn read_classic_game_score(&mut self) -> Vec<ClassicGameScoreDisplay> {
         let output = self
             .glue
             .execute("SELECT * FROM classic_game_score")
@@ -95,56 +95,59 @@ impl Database {
         let mut score_rows = Vec::new();
         match output {
             Payload::Select { labels, rows } => {
-                let mut classic_score = ClassicScoreDisplay {
-                    score: 0,
-                    accuracy: 0.0,
-                    miss: 0,
-                    avg_hit_time: 0.0,
-                    created_at: NaiveDateTime::from_timestamp(0, 0),
-                    hit: 0,
-                };
-                for (idx, label) in labels.iter().enumerate() {
-                    match label.as_str() {
-                        "accuracy" => {
-                            classic_score.accuracy = match rows[0][idx] {
-                                Value::F64(x) => x,
-                                _ => unreachable!(),
-                            } as f32;
+                for row in rows {
+                    let mut classic_score = ClassicGameScoreDisplay {
+                        score: 0,
+                        accuracy: 0.0,
+                        miss: 0,
+                        avg_hit_time: 0.0,
+                        created_at: NaiveDateTime::from_timestamp(0, 0),
+                        hit: 0,
+                    };
+                    for (idx, label) in labels.iter().enumerate() {
+                        match label.as_str() {
+                            "accuracy" => {
+                                classic_score.accuracy = match row[idx] {
+                                    Value::F64(x) => x,
+                                    _ => unreachable!(),
+                                } as f32;
+                            }
+                            "hit" => {
+                                classic_score.hit = match row[idx] {
+                                    Value::I64(x) => x,
+                                    _ => unreachable!(),
+                                } as u16;
+                            }
+                            "miss" => {
+                                classic_score.miss = match row[idx] {
+                                    Value::I64(x) => x,
+                                    _ => unreachable!(),
+                                } as u16;
+                            }
+                            "score" => {
+                                classic_score.score = match row[idx] {
+                                    Value::I64(x) => x,
+                                    _ => unreachable!(),
+                                } as i32;
+                            }
+                            "avg_hit_time" => {
+                                classic_score.avg_hit_time = match row[idx] {
+                                    Value::F64(x) => x,
+                                    _ => unreachable!(),
+                                }
+                                    as f32;
+                            }
+                            "created_at" => {
+                                classic_score.created_at = match row[idx] {
+                                    Value::Timestamp(x) => x,
+                                    _ => unreachable!(),
+                                };
+                            }
+                            _ => unreachable!(),
                         }
-                        "hit" => {
-                            classic_score.hit = match rows[0][idx] {
-                                Value::F64(x) => x,
-                                _ => unreachable!(),
-                            } as u16;
-                        }
-                        "miss" => {
-                            classic_score.miss = match rows[0][idx] {
-                                Value::F64(x) => x,
-                                _ => unreachable!(),
-                            } as u16;
-                        }
-                        "score" => {
-                            classic_score.score = match rows[0][idx] {
-                                Value::F64(x) => x,
-                                _ => unreachable!(),
-                            } as i32;
-                        }
-                        "avg_hit_time" => {
-                            classic_score.avg_hit_time = match rows[0][idx] {
-                                Value::F64(x) => x,
-                                _ => unreachable!(),
-                            } as f32;
-                        }
-                        "created_at" => {
-                            classic_score.created_at = match rows[0][idx] {
-                                Value::Timestamp(x) => x,
-                                _ => unreachable!(),
-                            };
-                        }
-                        _ => unreachable!(),
                     }
+                    score_rows.push(classic_score);
                 }
-                score_rows.push(classic_score);
             }
             _ => {}
         };

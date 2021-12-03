@@ -380,7 +380,7 @@ void main()
     vec3 col = vec3(0.) / 255.;
     switch (d.materialId) {
         case MATERIAL_GUN:
-            col = vec3(0.);
+            col = vec3(196.) / 255.;
             break;
         case MATERIAL_SKIN:
             col = vec3(255., 195., 161.) / 255.;

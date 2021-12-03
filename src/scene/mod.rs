@@ -10,7 +10,10 @@ use crate::renderer::Renderer;
 use crate::window::Window;
 
 pub mod classic_game_scene;
+pub mod classic_game_scores_scene;
 pub mod classic_score_scene;
+pub mod dodge_and_destroy_game_scene;
+pub mod dodge_and_destroy_score_scene;
 pub mod elimination_game_scene;
 pub mod elimination_score_scene;
 pub mod exit_confirm_scene;
@@ -23,6 +26,7 @@ pub mod settings_scene;
 const BUTTON_WIDTH: f64 = 160.0;
 const BUTTON_HEIGHT: f64 = 40.0;
 
+pub const MARGIN: conrod_core::Scalar = 15.0;
 const GAP_BETWEEN_ITEM: f64 = 25.0;
 
 pub enum Value {
@@ -114,5 +118,3 @@ pub trait Scene {
         database: &mut Database,
     );
 }
-
-pub const MARGIN: conrod_core::Scalar = 15.0;

@@ -9,6 +9,7 @@ use crate::gui::ConrodHandle;
 use crate::input_manager::InputManager;
 use crate::renderer::vertex::CoordColorVertex;
 use crate::renderer::Renderer;
+use crate::scene::main_menu_scene::play_bgm;
 use crate::scene::{MaybeMessage, Scene, SceneOp, Value, MARGIN};
 use crate::util::{any_sized_as_u8_slice, any_slice_as_u8_slice};
 use crate::window::Window;
@@ -122,11 +123,11 @@ fn settings_item_canvas() -> conrod_core::widget::Canvas<'static> {
 impl Scene for SettingsScene {
     fn init(
         &mut self,
-        _message: MaybeMessage,
+        message: MaybeMessage,
         _window: &mut Window,
         renderer: &mut Renderer,
         _conrod_handle: &mut ConrodHandle,
-        _audio_context: &mut AudioContext,
+        audio_context: &mut AudioContext,
         database: &mut Database,
     ) {
         renderer.is_render_gui = true;

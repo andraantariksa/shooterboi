@@ -9,11 +9,14 @@ use crate::gui::ConrodHandle;
 use crate::input_manager::InputManager;
 use crate::renderer::Renderer;
 use crate::scene::classic_game_scene::ClassicGameScene;
+use crate::scene::classic_score_scene::ClassicGameScoreDisplay;
 use crate::scene::exit_confirm_scene::QuitConfirmScene;
 use crate::scene::game_selection_scene::GameSelectionScene;
 use crate::scene::guide_scene::GuideScene;
 use crate::scene::settings_scene::SettingsScene;
-use crate::scene::{MaybeMessage, Scene, SceneOp, Value, BUTTON_HEIGHT, BUTTON_WIDTH, MARGIN};
+use crate::scene::{
+    MaybeMessage, Message, Scene, SceneOp, Value, BUTTON_HEIGHT, BUTTON_WIDTH, MARGIN,
+};
 use crate::window::Window;
 use conrod_core::widget_ids;
 use rodio::Source;
@@ -31,14 +34,54 @@ widget_ids! {
     }
 }
 
+pub struct Scores {
+    classic_game: Vec<ClassicGameScoreDisplay>,
+}
+
+impl Scores {
+    fn new() -> Self {
+        Self {
+            classic_game: Vec::new(),
+        }
+    }
+}
+
 pub struct MainMenuScene {
     ids: MainMenuSceneIds,
+    scores: Scores,
+}
+
+pub fn play_bgm(message: &MaybeMessage, audio_context: &mut AudioContext) {
+    let play_bgm = || {
+        if let Some(ref msg) = message {
+            let value = msg.get("start_bgm")?;
+            Some(match value {
+                Value::Bool(x) => x.clone(),
+                _ => unreachable!(),
+            })
+        } else {
+            None
+        }
+    };
+    if play_bgm().is_none() {
+        let sink = rodio::Sink::try_new(&audio_context.output_stream_handle).unwrap();
+        sink.append(
+            rodio::Decoder::new(BufReader::new(Cursor::new(AUDIO_FILE_AWESOMENESS.to_vec())))
+                .unwrap()
+                .repeat_infinite(),
+        );
+        sink.set_volume(audio_context.get_volume());
+        audio_context
+            .global_sinks_map
+            .insert("bgm", Sink::Regular(sink));
+    }
 }
 
 impl MainMenuScene {
     pub fn new(_renderer: &mut Renderer, conrod_handle: &mut ConrodHandle) -> Self {
         Self {
             ids: MainMenuSceneIds::new(conrod_handle.get_ui_mut().widget_id_generator()),
+            scores: Scores::new(),
         }
     }
 }
@@ -56,47 +99,9 @@ impl Scene for MainMenuScene {
         renderer.is_render_gui = true;
         renderer.is_render_game = false;
 
-        println!("Init main menu");
-        if let Some(message) = message {
-            if let Some(is_start) = message.get("start_bgm") {
-                if let Value::Bool(false) = is_start {
-                } else {
-                    let sink = rodio::Sink::try_new(&audio_context.output_stream_handle).unwrap();
-                    sink.append(
-                        rodio::Decoder::new(BufReader::new(Cursor::new(
-                            AUDIO_FILE_AWESOMENESS.to_vec(),
-                        )))
-                        .unwrap()
-                        .repeat_infinite(),
-                    );
-                    audio_context
-                        .global_sinks_map
-                        .insert("bgm", Sink::Regular(sink));
-                }
-            } else {
-                let sink = rodio::Sink::try_new(&audio_context.output_stream_handle).unwrap();
-                sink.append(
-                    rodio::Decoder::new(BufReader::new(Cursor::new(
-                        AUDIO_FILE_AWESOMENESS.to_vec(),
-                    )))
-                    .unwrap()
-                    .repeat_infinite(),
-                );
-                audio_context
-                    .global_sinks_map
-                    .insert("bgm", Sink::Regular(sink));
-            }
-        } else {
-            let sink = rodio::Sink::try_new(&audio_context.output_stream_handle).unwrap();
-            sink.append(
-                rodio::Decoder::new(BufReader::new(Cursor::new(AUDIO_FILE_AWESOMENESS.to_vec())))
-                    .unwrap()
-                    .repeat_infinite(),
-            );
-            audio_context
-                .global_sinks_map
-                .insert("bgm", Sink::Regular(sink));
-        }
+        self.scores.classic_game = database.read_classic_game_score();
+
+        play_bgm(&message, audio_context);
     }
 
     fn update(
