@@ -37,10 +37,9 @@ layout(std140, binding = 0) uniform rendering_info {
 #ifdef IS_WEB
 layout(std140, binding = 1) uniform render_queue {
 #else
-// std430
 layout(std430, binding = 1) readonly buffer render_queue {
 #endif
-    RenderQueue queue[50];
+    RenderQueue queue[70];
 };
 
 layout(binding = 2) uniform sampler checker_sampler;

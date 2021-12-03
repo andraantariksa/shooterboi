@@ -64,6 +64,16 @@ impl AudioContext {
         }
     }
 
+    pub fn push(&mut self, mut sink: Sink) {
+        sink.set_volume(self.volume);
+        self.global_sinks_array.push(sink);
+    }
+
+    pub fn insert(&mut self, key: &'static str, mut sink: Sink) {
+        sink.set_volume(self.volume);
+        self.global_sinks_map.insert(key, sink);
+    }
+
     pub fn clear(&mut self) {
         self.global_sinks_map.retain(|_k, v| !v.empty());
         self.global_sinks_array.retain(|v| !v.empty());

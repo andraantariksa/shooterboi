@@ -4,6 +4,7 @@ mod animation;
 mod audio;
 mod camera;
 mod database;
+mod frustum;
 mod game;
 mod gui;
 mod input_manager;

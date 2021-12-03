@@ -112,35 +112,6 @@ impl GameSceneRenderer {
             },
             &image.into_raw()[..],
         );
-        // let texture_size = wgpu::Extent3d {
-        //     width: image.width(),
-        //     height: image.height(),
-        //     depth_or_array_layers: 1,
-        // };
-        // let ground_texture = device.create_texture(&wgpu::TextureDescriptor {
-        //     label: Some("Ground texture"),
-        //     size: texture_size,
-        //     mip_level_count: 1,
-        //     sample_count: 1,
-        //     dimension: wgpu::TextureDimension::D2,
-        //     format: wgpu::TextureFormat::Rgba8Unorm,
-        //     usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-        // });
-        // queue.write_texture(
-        //     wgpu::ImageCopyTexture {
-        //         texture: &ground_texture,
-        //         mip_level: 0,
-        //         aspect: wgpu::TextureAspect::All,
-        //         origin: wgpu::Origin3d::ZERO,
-        //     },
-        //     &image.into_raw()[..],
-        //     wgpu::ImageDataLayout {
-        //         offset: 0,
-        //         bytes_per_row: std::num::NonZeroU32::new(4 * texture_size.width),
-        //         rows_per_image: std::num::NonZeroU32::new(texture_size.height),
-        //     },
-        //     texture_size,
-        // );
         let ground_texture_view = ground_texture.create_view(&wgpu::TextureViewDescriptor {
             label: Some("Ground texture view"),
             format: Some(wgpu::TextureFormat::Rgba8Unorm),

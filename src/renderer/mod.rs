@@ -4,7 +4,8 @@ use winit::window::Window;
 use conrod_renderer::ConrodSceneRenderer;
 use game_renderer::GameSceneRenderer;
 
-use crate::camera::{Camera, Frustum, ObjectBound};
+use crate::camera::Camera;
+use crate::frustum::{Frustum, ObjectBound};
 use crate::gui::ConrodHandle;
 use crate::renderer::crosshair::Crosshair;
 use crate::renderer::rendering_info::RenderingInfo;
@@ -75,14 +76,12 @@ pub struct SurfaceAndWindowConfig {
 
 pub struct RenderObjects {
     render_objects: Vec<(RenderQueueData, ObjectBound)>,
-    counter: usize,
     render_objects_static: Vec<(RenderQueueData, ObjectBound)>,
 }
 
 impl RenderObjects {
     pub fn new() -> Self {
         Self {
-            counter: 0,
             render_objects: Vec::new(),
             render_objects_static: Vec::new(),
         }
@@ -118,8 +117,8 @@ impl RenderObjects {
     pub fn get_objects_and_active_len(
         &mut self,
         frustum: &Frustum,
-    ) -> ([RenderQueueData; 50], usize) {
-        let mut resulted_objects = [RenderQueueData::new_none(); 50];
+    ) -> ([RenderQueueData; 70], usize) {
+        let mut resulted_objects = [RenderQueueData::new_none(); 70];
         let mut index = 0;
         for (object, bound) in self.render_objects_static.iter() {
             if frustum.is_on_frustum(&object.position, bound) {

@@ -1,4 +1,6 @@
+use crate::window::Window;
 use std::collections::HashSet;
+use winit::dpi::PhysicalPosition;
 use winit::event::{ElementState, KeyboardInput, MouseButton, VirtualKeyCode, WindowEvent};
 
 pub struct InputManager {
@@ -20,8 +22,31 @@ impl InputManager {
         }
     }
 
-    pub fn process(&mut self, event: &WindowEvent) -> bool {
+    pub fn process(&mut self, event: &WindowEvent, window: &Window) -> bool {
         match event {
+            WindowEvent::CursorMoved { position, .. } => {
+                #[cfg(not(target_arch = "wasm32"))]
+                if window.is_cursor_grabbed() {
+                    let window_size = window.inner_size();
+                    let center = nalgebra::Vector2::<f32>::new(
+                        window_size.width as f32 / 2.0,
+                        window_size.height as f32 / 2.0,
+                    );
+
+                    let new_pos =
+                        nalgebra::Vector2::<f32>::new(position.x as f32, position.y as f32);
+
+                    self.mouse_movement += center - new_pos;
+
+                    window
+                        .set_cursor_position(PhysicalPosition {
+                            x: center.x,
+                            y: center.y,
+                        })
+                        .unwrap();
+                }
+                true
+            }
             WindowEvent::KeyboardInput {
                 input:
                     KeyboardInput {

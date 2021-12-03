@@ -21,7 +21,7 @@ pub struct Game {
     scene_stack: VecDeque<Box<dyn Scene>>,
     renderer: Renderer,
     last_time: Instant,
-    running_time: Instant,
+    running_time: f32,
     window: Window,
     input_manager: InputManager,
     conrod_handle: ConrodHandle,
@@ -32,7 +32,6 @@ pub struct Game {
 impl Game {
     pub fn new(window: WinitWindow) -> Self {
         let mut renderer = pollster::block_on(Renderer::new(&window));
-        // self.window.set_is_cursor_grabbed(true);
         let mut conrod_handle = ConrodHandle::new(&mut renderer);
         conrod_handle.get_ui_mut().handle_event(
             convert_event::<()>(
@@ -69,7 +68,7 @@ impl Game {
             renderer,
             input_manager: InputManager::new(),
             last_time: Instant::now(),
-            running_time: Instant::now(),
+            running_time: 0.0,
             audio_context,
             database,
         }
@@ -81,32 +80,10 @@ impl Game {
         }
         match event {
             Event::WindowEvent { event, window_id } if *window_id == self.window.id() => {
-                self.input_manager.process(event);
+                self.input_manager.process(event, &self.window);
                 match event {
                     WindowEvent::CloseRequested => {
                         *control_flow = ControlFlow::Exit;
-                    }
-                    WindowEvent::CursorMoved { position, .. } => {
-                        #[cfg(not(target_arch = "wasm32"))]
-                        if self.window.is_cursor_grabbed() {
-                            let window_size = self.window.inner_size();
-                            let center = nalgebra::Vector2::<f32>::new(
-                                window_size.width as f32 / 2.0,
-                                window_size.height as f32 / 2.0,
-                            );
-
-                            let new_pos =
-                                nalgebra::Vector2::<f32>::new(position.x as f32, position.y as f32);
-
-                            self.input_manager.mouse_movement += center - new_pos;
-
-                            self.window
-                                .set_cursor_position(PhysicalPosition {
-                                    x: center.x,
-                                    y: center.y,
-                                })
-                                .unwrap();
-                        }
                     }
                     WindowEvent::Resized(physical_size) => {
                         self.renderer
@@ -123,29 +100,24 @@ impl Game {
                 let current_time = Instant::now();
                 let delta_time = current_time.duration_since(self.last_time).as_secs_f32();
                 self.last_time = current_time;
+                self.running_time += delta_time;
 
-                // #[cfg(target_arch = "wasm32")]
                 if self.window.is_cursor_grabbed() {
-                    {
-                        let mut dir_diff = nalgebra::Vector2::new(0.0, 0.0);
-                        if self.input_manager.is_keyboard_press(&VirtualKeyCode::Left) {
-                            dir_diff.x += 400.0 * delta_time;
-                        } else if self.input_manager.is_keyboard_press(&VirtualKeyCode::Right) {
-                            dir_diff.x -= 400.0 * delta_time;
-                        }
-
-                        if self.input_manager.is_keyboard_press(&VirtualKeyCode::Up) {
-                            dir_diff.y += 400.0 * delta_time;
-                        } else if self.input_manager.is_keyboard_press(&VirtualKeyCode::Down) {
-                            dir_diff.y -= 400.0 * delta_time;
-                        }
-
-                        self.input_manager.mouse_movement += dir_diff;
+                    let mut dir_diff = nalgebra::Vector2::new(0.0, 0.0);
+                    if self.input_manager.is_keyboard_press(&VirtualKeyCode::Left) {
+                        dir_diff.x += 400.0 * delta_time;
+                    } else if self.input_manager.is_keyboard_press(&VirtualKeyCode::Right) {
+                        dir_diff.x -= 400.0 * delta_time;
                     }
-                }
 
-                // const MAX_FRAME_TIME: f32 = 0.2;
-                // const FIXED_TIMESTEP: f32 = 1.0 / 20.0;
+                    if self.input_manager.is_keyboard_press(&VirtualKeyCode::Up) {
+                        dir_diff.y += 400.0 * delta_time;
+                    } else if self.input_manager.is_keyboard_press(&VirtualKeyCode::Down) {
+                        dir_diff.y -= 400.0 * delta_time;
+                    }
+
+                    self.input_manager.mouse_movement += dir_diff;
+                }
 
                 let scene_op = self.scene_stack.back_mut().unwrap().update(
                     &mut self.window,
@@ -229,10 +201,10 @@ impl Game {
                     &mut self.audio_context,
                 );
 
-                match self.renderer.render(
-                    self.running_time.elapsed().as_secs_f32(),
-                    &mut self.conrod_handle,
-                ) {
+                match self
+                    .renderer
+                    .render(self.running_time, &mut self.conrod_handle)
+                {
                     Ok(_) => {}
                     // Reconfigure the surface if lost
                     Err(wgpu::SurfaceError::Lost) => self.renderer.resize(
@@ -243,9 +215,9 @@ impl Game {
                         self.window.scale_factor(),
                     ),
                     // The system is out of memory, we should probably quit
-                    Err(wgpu::SurfaceError::OutOfMemory) => *control_flow = ControlFlow::Exit,
+                    Err(wgpu::SurfaceError::OutOfMemory) => panic!("Out of memory"),
                     // All other errors (Outdated, Timeout) should be resolved by the next frame
-                    Err(e) => eprintln!("{:?}", e),
+                    Err(e) => {}
                 };
 
                 self.input_manager.clear();
