@@ -15,6 +15,7 @@
 #define MATERIAL_BLACK 3
 #define MATERIAL_CHECKER 4
 #define MATERIAL_RED 5
+#define MATERIAL_ORANGE 6
 
 struct RenderQueue
 {
@@ -324,25 +325,28 @@ void main()
     vec3 col = vec3(46., 209., 162.) / 255.;
     switch (d.materialId) {
         case MATERIAL_RED:
-        col = vec3(1., 0., 0.);
-        break;
+            col = vec3(1., 0., 0.);
+            break;
         case MATERIAL_YELLOW:
-        col = vec3(230., 255., 110.) / 255.;
-        break;
+            col = vec3(230., 255., 110.) / 255.;
+            break;
         case MATERIAL_WHITE:
-        col = vec3(1.);
-        break;
+            col = vec3(1.);
+            break;
         case MATERIAL_CHECKER:
-        col = checker_texture_yz * abs(normal.x) + checker_texture_xy * abs(normal.z) + checker_texture_xz * abs(normal.y);
-        break;
+            col = checker_texture_yz * abs(normal.x) + checker_texture_xy * abs(normal.z) + checker_texture_xz * abs(normal.y);
+            break;
         case MATERIAL_BLACK:
-        col = vec3(0.);
-        break;
+            col = vec3(0.);
+            break;
         case MATERIAL_GREEN:
-        col = vec3(0., 1., 0.);
-        break;
+            col = vec3(0., 1., 0.);
+            break;
+        case MATERIAL_ORANGE:
+            col = vec3(1.0, 0.30, 0.0);
+            break;
         default:
-        break;
+            break;
     }
 
     const vec3 ambient_light = skycolor * col * 0.5;

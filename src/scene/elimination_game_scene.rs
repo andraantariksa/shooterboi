@@ -1,6 +1,7 @@
 use conrod_core::widget::envelope_editor::EnvelopePoint;
 use conrod_core::{Colorable, Positionable, Sizeable, Widget};
 use std::collections::HashMap;
+use std::primitive;
 
 use std::io::{BufReader, Cursor};
 
@@ -35,13 +36,15 @@ struct Label(&'static str);
 
 pub struct Target {
     shooted: bool,
+    is_fake: bool,
     delete_timer: Option<Timer>,
 }
 
 impl Target {
-    fn new() -> Self {
+    fn new(fake: bool) -> Self {
         Self {
             shooted: false,
+            is_fake: fake,
             delete_timer: None,
         }
     }
@@ -59,7 +62,11 @@ impl Target {
         if self.shooted {
             MaterialType::Yellow
         } else {
-            MaterialType::Red
+            if self.is_fake {
+                MaterialType::Orange
+            } else {
+                MaterialType::Red
+            }
         }
     }
 
@@ -217,7 +224,7 @@ impl EliminationGameScene {
             shoot_timer: Timer::new_finished(),
             game_running: false,
             rng,
-            shoot_animation: InOutAnimation::new(3.0, 5.0),
+            shoot_animation: InOutAnimation::new(3.0, 5.0)
         }
     }
 }
@@ -325,25 +332,53 @@ impl Scene for EliminationGameScene {
         }
 
         {
-            let entity = self.world.reserve_entity();
-            let pos = nalgebra::Vector3::new(
-                self.rng.sample(Uniform::new(-7.0, 7.0)),
-                self.rng.sample(Uniform::new(0.5, 5.0)),
-                -10.0,
-            );
-            self.world.spawn_at(
-                entity,
-                (
-                    Position(pos),
-                    self.physics.collider_set.insert(
-                        ColliderBuilder::new(SharedShape::ball(0.5))
-                            .user_data(entity.to_bits() as u128)
-                            .translation(pos)
-                            .build(),
-                    ),
-                    Target::new(),
-                ),
-            );
+            let distance_radius = 8.0;
+
+            for stack in 0..5 {
+                let num_target = 10;
+                for n in 0..num_target {
+                    let offset = self.rng.sample(Uniform::new(-0.25, 0.25));
+                    let t = 2.0 * std::f32::consts::PI * (n as f32) / (num_target as f32) + offset;
+                    let entity = self.world.reserve_entity();
+                    let pos = nalgebra::Vector3::new(
+                        // self.rng.sample(Uniform::new(-7.0, 7.0)),
+                        distance_radius * t.cos(),
+                        (stack + 1) as f32,
+                        distance_radius * t.sin(),
+                    );
+
+                    if offset > 0.0 {
+                        self.world.spawn_at(
+                            entity,
+                            (
+                                Position(pos),
+                                self.physics.collider_set.insert(
+                                    ColliderBuilder::new(SharedShape::ball(0.5))
+                                        .user_data(entity.to_bits() as u128)
+                                        .translation(pos)
+                                        .build(),
+                                ),
+                                Target::new(false),
+                            ),
+                        );
+                    }
+                    else {
+                        self.world.spawn_at(
+                            entity,
+                            (
+                                Position(pos),
+                                self.physics.collider_set.insert(
+                                    ColliderBuilder::new(SharedShape::ball(0.5))
+                                        .user_data(entity.to_bits() as u128)
+                                        .translation(pos)
+                                        .build(),
+                                ),
+                                Target::new(true),
+                            ),
+                        );
+                    }
+                }
+            }
         }
 
         window.set_is_cursor_grabbed(true);
@@ -386,7 +421,7 @@ impl Scene for EliminationGameScene {
                 (sec / 60.0) as i32,
                 (sec % 60.0) as i32
             ))
-            .rgba(1.0, 1.0, 1.0, 1.0)
+            .rgba(0.1, 0.1, 0.1, 1.0)
             .middle_of(self.ids.canvas_duration)
             .set(self.ids.duration_label, &mut ui_cell);
         }
@@ -402,6 +437,7 @@ impl Scene for EliminationGameScene {
                     "{:.1}",
                     self.game_start_timer.get_duration()
                 ))
+                .rgba(0.1, 0.1, 0.1, 1.0)
                 .align_middle_x_of(self.ids.canvas)
                 .align_middle_y_of(self.ids.canvas)
                 .set(self.ids.start_duration_label, &mut ui_cell);
@@ -412,7 +448,7 @@ impl Scene for EliminationGameScene {
 
             self.spawn_new_target.update(delta_time);
 
-            let mut entity_to_remove = Vec::new();
+            let mut entity_to_remove = Vec::new(); // DYNAMIC ALLOCATION SHOULDN'T BE HERE!!
             for (id, (target, collider_handle)) in
                 self.world.query_mut::<(&mut Target, &ColliderHandle)>()
             {
@@ -426,10 +462,12 @@ impl Scene for EliminationGameScene {
                     );
                 }
             }
+
             for entity in entity_to_remove {
                 self.world.despawn(entity).unwrap();
             }
 
+            /*
             let mut entity_to_remove = Vec::new();
             for (id, (target, collider_handle)) in
                 self.world.query_mut::<(&mut FakeTarget, &ColliderHandle)>()
@@ -447,31 +485,7 @@ impl Scene for EliminationGameScene {
             for entity in entity_to_remove {
                 self.world.despawn(entity).unwrap();
             }
-
-            if self.spawn_new_target.is_finished() {
-                self.spawn_new_target.reset(1.0);
-                let entity = self.world.reserve_entity();
-                for i in 0..2 {
-                    let pos = nalgebra::Vector3::new(
-                        self.rng.sample(Uniform::new(-7.0, 7.0)),
-                        self.rng.sample(Uniform::new(0.5, 5.0)),
-                        -10.0,
-                    );
-                    self.world.spawn_at(
-                        entity,
-                        (
-                            Position(pos),
-                            self.physics.collider_set.insert(
-                                ColliderBuilder::new(SharedShape::ball(0.5))
-                                    .user_data(entity.to_bits() as u128)
-                                    .translation(pos)
-                                    .build(),
-                            ),
-                            Target::new(),
-                        ),
-                    );
-                }
-            }
+            */
 
             self.shoot_animation.update(delta_time);
             renderer.rendering_info.fov_shootanim.y = lerp(
@@ -553,6 +567,7 @@ impl Scene for EliminationGameScene {
                 ) {
                     let collider = self.physics.collider_set.get(handle).unwrap();
                     let entity = Entity::from_bits(collider.user_data as u64);
+
                     if let Ok(target_pos) = self.world.get::<Position>(entity) {
                         let sink =
                             rodio::Sink::try_new(&audio_context.output_stream_handle).unwrap();
@@ -564,14 +579,13 @@ impl Scene for EliminationGameScene {
                         );
                         audio_context.global_sinks_array.push(Sink::Regular(sink));
                     }
-                    let mut need_to_spawn = false;
+
                     if let Ok(mut target) = self.world.get_mut::<Target>(entity) {
                         if !target.is_shooted() {
-                            let time_now = Instant::now();
+                            //let time_now = Instant::now();
                             let shoot_time = self.delta_shoot_time.get_duration();
                             self.delta_shoot_time.reset();
                             self.score.total_shoot_time += shoot_time;
-                            need_to_spawn = true;
                             target.shooted();
                             self.score.score += ((300.0 * (3.0 - shoot_time)) as i32).max(0);
                             self.score.hit += 1;
@@ -582,27 +596,6 @@ impl Scene for EliminationGameScene {
                     } else {
                         self.score.score -= 100;
                         self.score.miss += 1;
-                    }
-                    if need_to_spawn {
-                        let pos = nalgebra::Vector3::new(
-                            self.rng.sample(Uniform::new(-3.0, 3.0)),
-                            self.rng.sample(Uniform::new(0.5, 3.0)),
-                            -10.0,
-                        );
-                        let new_entity = self.world.reserve_entity();
-                        self.world.spawn_at(
-                            new_entity,
-                            (
-                                Position(pos),
-                                self.physics.collider_set.insert(
-                                    ColliderBuilder::new(SharedShape::ball(0.5))
-                                        .user_data(new_entity.to_bits() as u128)
-                                        .translation(pos)
-                                        .build(),
-                                ),
-                                Target::new(),
-                            ),
-                        );
                     }
                 } else {
                     self.score.score -= 100;
@@ -639,10 +632,17 @@ impl Scene for EliminationGameScene {
         conrod_handle: &mut ConrodHandle,
         audio_context: &mut AudioContext,
     ) {
+        let mut num_rendered = 0;
+
         for (_id, (position, collider_handle, target)) in
             self.world
                 .query_mut::<(&Position, &ColliderHandle, &Target)>()
         {
+            // just in case
+            if num_rendered > 50 {
+                break;
+            }
+
             let collider = self.physics.collider_set.get_mut(*collider_handle).unwrap();
             collider.set_translation(position.0);
             let (objects, ref mut bound) = renderer.render_objects.next();
@@ -659,6 +659,8 @@ impl Scene for EliminationGameScene {
             objects.shape_data2 = objects.shape_data1 * -1.0;
 
             *bound = ObjectBound::Sphere(0.5);
+
+            num_rendered += 1;
         }
     }
 
