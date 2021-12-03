@@ -1,3 +1,4 @@
 /target
 /dist
+/db
 /src/shaders/*.spv
