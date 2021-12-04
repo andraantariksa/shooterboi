@@ -8,6 +8,7 @@
 #define SHAPE_TYPE_BOX 1
 #define SHAPE_TYPE_SPHERE 2
 #define SHAPE_TYPE_CYLINDER 3
+#define SHAPE_TYPE_GHOST 4
 
 #define MATERIAL_GREEN 0
 #define MATERIAL_YELLOW 1
@@ -43,8 +44,16 @@ layout(std430, binding = 1) readonly buffer render_queue {
     RenderQueue queue[70];
 };
 
-layout(binding = 2) uniform sampler checker_sampler;
-layout(binding = 3) uniform texture2D checker_texture;
+#ifdef IS_WEB
+layout(std140, binding = 2) uniform maze_data {
+#else
+layout(std430, binding = 2) readonly buffer maze_data {
+#endif
+    float maze[200][200];
+};
+
+layout(binding = 3) uniform sampler checker_sampler;
+layout(binding = 4) uniform texture2D checker_texture;
 
 layout(location = 0) out vec4 outColor;
 
@@ -65,6 +74,11 @@ Distance sd_union(Distance d1, Distance d2)
     return d1.distance < d2.distance ? d1 : d2;
 }
 
+Distance sd_union_loose(Distance d1, Distance d2, float f)
+{
+    return d1.distance < d2.distance * f ? d1 : d2;
+}
+
 Distance sd_intersect(Distance d1, Distance d2)
 {
     return d1.distance > d2.distance ? d1 : d2;
@@ -75,12 +89,6 @@ float sd_capsule_line(vec3 p, vec3 a, vec3 b, float r)
     vec3 pa = p - a, ba = b - a;
     float h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0);
     return length(pa - ba * h) - r;
-}
-
-float sd_terrain(vec3 pos)
-{
-
-    return 0.0;
 }
 
 float sd_plane(vec3 pos, vec3 n, float h)
@@ -105,6 +113,43 @@ float sd_box(vec3 pos, vec3 size)
     return max(d.x, max(d.y, d.z));
 }
 
+float noise(vec2 pos)
+{
+    return abs(fract(sin(dot(pos ,vec2(19.9*pos.x,28.633*pos.y))) * 1341.9453*pos.x));
+}
+
+//const float slopeUB= 2.;
+//const float g = sin(atan(1.,slopeUB));
+float sd_maze(vec3 p) {
+//    uint x_r = uint(round(p.x));
+//    uint z_r = uint(round(p.z));
+
+//    float x_a = maze[z_r][uint(floor(p.x))];
+//    float x_b = maze[z_r][uint(ceil(p.x))];
+//    float z_a = maze[uint(floor(p.z))][x_r];
+//    float z_b = maze[uint(ceil(p.z))][x_r];
+//    float h = mix(x_a, x_b, fract(p.x)) + mix(z_a, z_b, fract(p.z));
+
+    float x_f = floor(p.x);
+    float z_f = floor(p.z);
+    float x_c = ceil(p.x);
+    float z_c = ceil(p.z);
+    float wx = (p.x - x_f) / (x_c - x_f);
+    float wz = (p.z - z_f) / (z_c - z_f);
+
+    uint x_f_ = uint(x_f);
+    uint z_f_ = uint(z_f);
+    uint x_c_ = uint(x_c);
+    uint z_c_ = uint(z_c);
+
+    float c0 = mix(maze[x_f_][z_f_], maze[x_c_][z_f_], wx);
+    float c1 = mix(maze[x_f_][z_c_], maze[x_c_][z_c_], wx);
+
+    float h = mix(c0, c1, wz);
+//    return (p.y-h)*g;
+    return (p.y-h)*3.0;
+}
+
 mat3 rot_z(float angle)
 {
     float s = sin(angle);
@@ -112,10 +157,29 @@ mat3 rot_z(float angle)
     return mat3(c, -s, 0, s, c, 0, 0, 0, 1);
 }
 
+mat3 rot_x(float angle)
+{
+    float s = sin(angle);
+    float c = cos(angle);
+    return mat3(1, 0, 0, 0, c, -s, 0, s, c);
+}
+
+mat2 rotmat(float angle)
+{
+    float c = cos(angle);
+    float s = sin(angle);
+    return mat2(c, s, -s, c);
+}
+
 float smin(float a, float b, float k)
 {
     float h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0);
     return mix(b, a, h) - k * h * (1.0 - h);
+}
+
+float smax(float a,float b, float k)
+{
+    return -smin(-a,-b,k);
 }
 
 float sd_cylinder(vec3 p, vec3 a, vec3 b, float r)
@@ -132,6 +196,112 @@ float sd_cylinder(vec3 p, vec3 a, vec3 b, float r)
     return sign(d)*sqrt(abs(d))/baba;
 }
 
+float sd_ghost(vec3 p)
+{
+    //float an=.5*.5*2.*6. +iMouse.x/iResolution.x*6.;
+    //p.xz=mat2(cos(an),sin(an),sin(an),-cos(an))*p.xz;
+
+    float time = reso_time.z;
+    p *= rot_x(0.35);
+    float time2=time*2.4;
+
+    p.y+=2.3;
+    p.xy*=rotmat(cos(time2+1.)*.04);
+    p.y-=2.3;
+
+    vec3 op=p;
+
+    vec3 p2=p;
+    p2.xy*=rotmat(cos(time2)*.1);
+
+    vec3 p3=p;
+    p3.xy*=rotmat(cos(time2-.0-length(p)/2.)*.13);
+
+    float d=1e4;
+    p.x=abs(p.x);
+    p2.x=abs(p2.x);
+    p3.x=abs(p3.x);
+
+    d=smin(length(p2-vec3(-.75,0.,-.1))-.4,length(p2-vec3(.75,0.,-.1))-.5,2.);
+    d=smin(d,length(p2-vec3(0,0.4,-.1))-.9,1.6);
+    d+=.1;
+
+    // Ears 1
+    //d=smin(d,distance(vec3(.7,clamp(p3.y,0.,2.2),0.),p3.xyz)-.4,.14);
+    //d=smax(d,-(length(p3-vec3(.7,1.7,-0.5))-.5),.2);
+
+    // Neck
+    d=smin(d,distance(vec3(0.,clamp(p.y,-1.6,-1.1),0.),p.xyz)-.6,.04);
+
+    // Legs
+    vec3 p4=op;
+    float ld=-.75;
+    p4.y-=ld;
+    p4.yz*=rotmat(cos(time*2.+3.1415926/1.*0.)*.1);
+    p4.y+=ld;
+    p4.y-=max(0.,cos(time*2.+3.1415926/2.))*.1;
+    d=smin(d,distance(vec3(.3,clamp(p4.y,-2.6,-2.),0.),p4.xyz)-.3,.1);
+    p4=op;
+    p4.y-=ld;
+    p4.yz*=rotmat(cos(time*2.+3.1415926/1.*1.)*.1);
+    p4.y+=ld;
+    p4.y-=max(0.,cos(time*2.+3.1415926/2.+3.1415926/1.*1.))*.1;
+    d=smin(d,distance(vec3(.3,clamp(p4.y,-2.6,-2.),0.),p4.xyz*vec3(-1,1,1))-.3,.1);
+
+    // Belly
+    d=smin(d,distance(vec3(0.,-1.5,-.2),p)-.5+cos(time*3.)*.03,.4);
+
+    // Ears 2
+    //d=smin(d,distance(vec3(1.1,2.3,-.1),p3)-.2,.8);
+
+    // Tail
+    //d=smin(d,distance(vec3(0,-1.7,.6),p)-.3,.1);
+
+    vec3 q=vec3(0.35,.4,-1);
+
+    /*
+        if(mod(time-1.,4.)>.04)
+        {
+            d=smax(d,-(cylinder(p2-q,normalize(q-p2),.3,.1)-.0001),.05);
+            d=smin(d,(length(p2-q*.9)-.2),.24);
+
+            // Eye pupils
+            if(op.x>0.)
+                pupdist=(length(p2-vec3(.39,.32,-1.))-.2);
+            else
+                pupdist=(length(p2-vec3(.28,.32,-1.02))-.2);
+
+            d=smin(d,pupdist,.005);
+        }
+    */
+
+    // Nose
+    d=smin(d,(length(p2-vec3(0,.1,-1.02))-.2),.02);
+
+    // Mouth (two states)
+    float d3=smax(-(length(p-vec3(-.05,-.29,-1.02))-.1),-(length(p-vec3(.05,-.29,-1.02))-.1),.1);
+
+    float d2=max(p2.z,distance(p2,vec3(clamp(p2.x,0.,.3),-.2,clamp(p2.z,-2.,2.)))+.01);
+
+    float time4=time/8.;
+    float gg=smoothstep(0.,1.,clamp((min(fract(time4),1.-fract(time4))-.25)*64.,0.,1.));
+    d=smax(d,mix(-d2,d3,gg),.1);
+
+    // Tooth
+    //d=min(d,(length(p-vec3(.0,-.2,-1.02))-.08));
+
+    p.y+=.2;
+    p.xy*=rotmat(.4+cos(time2*2.)*.02);
+
+    // Arms
+    float armd=smin(distance(vec3(.2,clamp(p.y,-1.8,-0.),0.),p.xyz)-.2,
+    distance(p,vec3(0.2,-1.7,0))-.2,.2);
+
+    d=smin(d,armd,.05);
+
+    return d;
+}
+
 vec3 repeat(vec3 pos, vec3 c)
 {
     return mod(pos + 0.5 * c, c) - 0.5 * c;
@@ -140,6 +310,11 @@ vec3 repeat(vec3 pos, vec3 c)
 Distance scene_dist(vec3 pos)
 {
     Distance m = Distance(sd_plane(pos, vec3(0., 1., 0.), 0), 4);
+//    m = sd_union_loose(m,
+//            Distance(
+//                sd_maze(pos),
+//                    1),
+//            0.8);
 
     for (uint i = 0u; i < queuecount_raymarchmaxstep_aostep.x; i++) {
         switch (queue[i].shape_type_material_id.x) {
@@ -159,6 +334,14 @@ Distance scene_dist(vec3 pos)
                                 queue[i].shape_data1.x),
                                 queue[i].shape_type_material_id.y));
                 break;
+            case SHAPE_TYPE_GHOST:
+                const float scale = 0.5;
+                m = sd_union(m,
+                    Distance(
+                        sd_ghost(
+                            (pos - queue[i].position) / scale) * scale,
+                            queue[i].shape_type_material_id.y));
+                            break;
             case SHAPE_TYPE_CYLINDER:
                 m = sd_union(m,
                     Distance(

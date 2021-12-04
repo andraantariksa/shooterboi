@@ -13,7 +13,6 @@ use crate::input_manager::InputManager;
 use crate::renderer::Renderer;
 use crate::scene::classic_game_scene::ClassicGameScene;
 use crate::scene::classic_game_scores_scene::ClassicGameScoresScene;
-use crate::scene::elimination_game_scene::EliminationGameScene;
 use crate::scene::exit_confirm_scene::QuitConfirmScene;
 use crate::scene::guide_scene::GuideScene;
 use crate::scene::settings_scene::SettingsScene;
@@ -224,8 +223,6 @@ impl Scene for GameSelectionScene {
             scene_op = SceneOp::Push(
                 match self.selected_game_mode_idx {
                     0 => Box::new(ClassicGameScene::new(renderer, conrod_handle)),
-                    1 => Box::new(EliminationGameScene::new(renderer, conrod_handle)),
-                    2 => Box::new(ClassicGameScene::new(renderer, conrod_handle)),
                     _ => unreachable!(),
                 },
                 None,

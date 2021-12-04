@@ -24,6 +24,7 @@ pub enum ShapeType {
     Box = 1,
     Sphere = 2,
     Cylinder = 3,
+    Ghost = 4,
 }
 
 #[derive(Debug, Copy, Clone)]

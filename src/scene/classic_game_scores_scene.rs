@@ -13,7 +13,6 @@ use crate::input_manager::InputManager;
 use crate::renderer::Renderer;
 use crate::scene::classic_game_scene::ClassicGameScene;
 use crate::scene::classic_score_scene::ClassicGameScoreDisplay;
-use crate::scene::elimination_game_scene::EliminationGameScene;
 use crate::scene::exit_confirm_scene::QuitConfirmScene;
 use crate::scene::guide_scene::GuideScene;
 use crate::scene::settings_scene::SettingsScene;

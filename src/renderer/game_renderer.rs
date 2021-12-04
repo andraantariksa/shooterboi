@@ -3,6 +3,7 @@ use wgpu::{Device, SurfaceConfiguration};
 
 use crate::camera::Camera;
 use crate::gui::ConrodHandle;
+use crate::maze::Maze;
 use crate::renderer::crosshair::Crosshair;
 use crate::renderer::rendering_info::RenderingInfo;
 use crate::renderer::vertex::{CoordColorVertex, CoordVertex, QUAD_VERTICES};
@@ -76,6 +77,17 @@ impl GameSceneRenderer {
                     .get_objects_and_active_len(&camera.get_frustum())
                     .0,
             ),
+            usage: if cfg!(target_arch = "wasm32") {
+                wgpu::BufferUsages::UNIFORM
+            } else {
+                wgpu::BufferUsages::STORAGE
+            } | wgpu::BufferUsages::COPY_DST,
+        });
+
+        let maze = Maze::new();
+        let maze_data_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Maze data"),
+            contents: any_sized_as_u8_slice(maze.get_raw()),
             usage: if cfg!(target_arch = "wasm32") {
                 wgpu::BufferUsages::UNIFORM
             } else {
@@ -168,6 +180,20 @@ impl GameSceneRenderer {
                     wgpu::BindGroupLayoutEntry {
                         count: None,
                         binding: 2,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: if cfg!(target_arch = "wasm32") {
+                                wgpu::BufferBindingType::Uniform
+                            } else {
+                                wgpu::BufferBindingType::Storage { read_only: true }
+                            },
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        count: None,
+                        binding: 3,
                         ty: wgpu::BindingType::Sampler {
                             filtering: true,
                             comparison: false,
@@ -176,7 +202,7 @@ impl GameSceneRenderer {
                     },
                     wgpu::BindGroupLayoutEntry {
                         count: None,
-                        binding: 3,
+                        binding: 4,
                         ty: wgpu::BindingType::Texture {
                             multisampled: false,
                             sample_type: wgpu::TextureSampleType::Float { filterable: false },
@@ -208,10 +234,14 @@ impl GameSceneRenderer {
                 },
                 wgpu::BindGroupEntry {
                     binding: 2,
-                    resource: wgpu::BindingResource::Sampler(&texture_sampler),
+                    resource: maze_data_buffer.as_entire_binding(),
                 },
                 wgpu::BindGroupEntry {
                     binding: 3,
+                    resource: wgpu::BindingResource::Sampler(&texture_sampler),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 4,
                     resource: wgpu::BindingResource::TextureView(&ground_texture_view),
                 },
             ],
