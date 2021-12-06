@@ -19,7 +19,9 @@ use crate::frustum::ObjectBound;
 use crate::gui::ConrodHandle;
 use crate::input_manager::InputManager;
 use crate::physics::GamePhysics;
-use crate::renderer::{MaterialType, Renderer, ShapeType};
+use crate::renderer::render_objects::MaterialType;
+use crate::renderer::render_objects::ShapeType;
+use crate::renderer::Renderer;
 use crate::scene::classic_score_scene::ClassicScoreScene;
 use crate::scene::pause_scene::PauseScene;
 use crate::scene::{MaybeMessage, Message, Scene, SceneOp, Value};
@@ -224,7 +226,7 @@ impl EliminationGameScene {
             shoot_timer: Timer::new_finished(),
             game_running: false,
             rng,
-            shoot_animation: InOutAnimation::new(3.0, 5.0)
+            shoot_animation: InOutAnimation::new(3.0, 5.0),
         }
     }
 }
@@ -246,7 +248,8 @@ impl Scene for EliminationGameScene {
             let entity = self.world.reserve_entity();
             let (objects, ref mut bound) = renderer.render_objects.next_static();
             objects.position = nalgebra::Vector3::new(0.0, 0.0, -20.0);
-            objects.shape_type_material = (ShapeType::Box, MaterialType::White);
+            objects.shape_type_material_ids.0 = ShapeType::Box;
+            objects.shape_type_material_ids.1 = MaterialType::White;
             objects.shape_data1 = nalgebra::Vector4::new(20.0, 12.0, 1.0, 0.0);
             *bound = ObjectBound::Sphere(20.0);
             self.physics.collider_set.insert(
@@ -266,7 +269,8 @@ impl Scene for EliminationGameScene {
             let entity = self.world.reserve_entity();
             let (objects, ref mut bound) = renderer.render_objects.next_static();
             objects.position = nalgebra::Vector3::new(0.0, 0.0, 10.0);
-            objects.shape_type_material = (ShapeType::Box, MaterialType::White);
+            objects.shape_type_material_ids.0 = ShapeType::Box;
+            objects.shape_type_material_ids.1 = MaterialType::White;
             objects.shape_data1 = nalgebra::Vector4::new(20.0, 5.0, 1.0, 0.0);
             *bound = ObjectBound::Sphere(20.0);
             self.physics.collider_set.insert(
@@ -286,7 +290,8 @@ impl Scene for EliminationGameScene {
             let entity = self.world.reserve_entity();
             let (objects, ref mut bound) = renderer.render_objects.next_static();
             objects.position = nalgebra::Vector3::new(-20.0, 0.0, -5.0);
-            objects.shape_type_material = (ShapeType::Box, MaterialType::White);
+            objects.shape_type_material_ids.0 = ShapeType::Box;
+            objects.shape_type_material_ids.1 = MaterialType::White;
             objects.shape_data1 = nalgebra::Vector4::new(1.0, 5.0, 15.0, 0.0);
             *bound = ObjectBound::Sphere(15.0);
             self.physics.collider_set.insert(
@@ -306,7 +311,8 @@ impl Scene for EliminationGameScene {
             let entity = self.world.reserve_entity();
             let (objects, ref mut bound) = renderer.render_objects.next_static();
             objects.position = nalgebra::Vector3::new(20.0, 0.0, -5.0);
-            objects.shape_type_material = (ShapeType::Box, MaterialType::White);
+            objects.shape_type_material_ids.0 = ShapeType::Box;
+            objects.shape_type_material_ids.1 = MaterialType::White;
             objects.shape_data1 = nalgebra::Vector4::new(1.0, 5.0, 15.0, 0.0);
             *bound = ObjectBound::Sphere(15.0);
             self.physics.collider_set.insert(
@@ -361,8 +367,7 @@ impl Scene for EliminationGameScene {
                                 Target::new(false),
                             ),
                         );
-                    }
-                    else {
+                    } else {
                         self.world.spawn_at(
                             entity,
                             (
@@ -647,7 +652,8 @@ impl Scene for EliminationGameScene {
             collider.set_translation(position.0);
             let (objects, ref mut bound) = renderer.render_objects.next();
             objects.position = position.0;
-            objects.shape_type_material = (ShapeType::Sphere, target.get_material());
+            objects.shape_type_material_ids.0 = ShapeType::Sphere;
+            objects.shape_type_material_ids.1 = target.get_material();
             // let cam_to_obj = nalgebra::Unit::new_normalize(position.0 - renderer.camera.position);
             // let inner_cam_to_obj = cam_to_obj.into_inner() * -0.1;
 

@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use std::io::{BufReader, Cursor};
 
-use hecs::{Entity, World};
+use hecs::{Entity, Ref, World};
 use instant::{Duration, Instant};
 use rapier3d::prelude::*;
 use winit::event::{MouseButton, VirtualKeyCode};
@@ -14,24 +14,37 @@ use crate::animation::InOutAnimation;
 use crate::audio::{AudioContext, AUDIO_FILE_SHOOT};
 use crate::audio::{Sink, AUDIO_FILE_SHOOTED};
 use crate::database::Database;
+use crate::enemy::gunman::Gunman;
+use crate::enemy::swordman::Swordman;
+use crate::enemy::HasMaterial;
 use crate::frustum::ObjectBound;
 use crate::gui::ConrodHandle;
 use crate::input_manager::InputManager;
 use crate::physics::GamePhysics;
-use crate::renderer::{MaterialType, Renderer, ShapeType};
+use crate::renderer::render_objects::MaterialType;
+use crate::renderer::render_objects::ShapeType;
+use crate::renderer::Renderer;
 use crate::scene::classic_score_scene::ClassicScoreScene;
 use crate::scene::pause_scene::PauseScene;
 use crate::scene::{MaybeMessage, Message, Scene, SceneOp, Value};
+use crate::systems::player_movement::update_player_position;
 use crate::timer::{Stopwatch, Timer};
 use crate::util::lerp;
 use crate::window::Window;
 use conrod_core::widget_ids;
+use nalgebra::{Point3, Vector2, Vector3};
 use rand::distributions::Uniform;
 use rand::prelude::SmallRng;
 use rand::{Rng, RngCore, SeedableRng};
 
-#[derive(Debug)]
-struct Label(&'static str);
+// #[derive(Debug)]
+// struct Label(&'static str);
+
+enum Label {
+    Wall,
+    Gunman,
+    Target,
+}
 
 pub struct Target {
     shooted: bool,
@@ -74,53 +87,10 @@ impl Target {
     }
 }
 
-pub struct FakeTarget {
-    shooted: bool,
-    delete_timer: Option<Timer>,
-    lifetime_timer: Timer,
-}
-
-impl FakeTarget {
-    fn new() -> Self {
-        Self {
-            shooted: false,
-            delete_timer: None,
-            lifetime_timer: Timer::new(3.0),
-        }
-    }
-
-    pub fn is_shooted(&self) -> bool {
-        self.shooted
-    }
-
-    pub fn shooted(&mut self) {
-        self.shooted = true;
-        self.delete_timer = Some(Timer::new(0.8));
-    }
-
-    pub fn get_material(&self) -> MaterialType {
-        if self.shooted {
-            MaterialType::Yellow
-        } else {
-            MaterialType::Orange
-        }
-    }
-
-    pub fn is_need_to_be_deleted(&mut self, delta_time: f32) -> bool {
-        match self.delete_timer {
-            Some(ref mut timer) => {
-                timer.update(delta_time);
-                timer.is_finished()
-            }
-            None => false,
-        }
-    }
-}
-
 pub struct Position(nalgebra::Vector3<f32>);
 
 widget_ids! {
-    pub struct EliminationGameSceneIds {
+    pub struct DodgeAndDestroyGameSceneIds {
         // The main canvas
         canvas,
         canvas_duration,
@@ -152,13 +122,13 @@ impl Score {
         message.insert("score", Value::I32(self.score));
         message.insert(
             "avg_hit_time",
-            Value::F32(self.total_shoot_time / self.hit as f32),
+            Value::F32(self.total_shoot_time / self.hit.max(1) as f32),
         );
     }
 }
 
-pub struct EliminationGameScene {
-    ids: EliminationGameSceneIds,
+pub struct DodgeAndDestroyGameScene {
+    ids: DodgeAndDestroyGameSceneIds,
     world: World,
     physics: GamePhysics,
     player_rigid_body_handle: RigidBodyHandle,
@@ -166,14 +136,13 @@ pub struct EliminationGameScene {
     delta_shoot_time: Stopwatch,
     shoot_timer: Timer,
     game_start_timer: Timer,
-    spawn_new_target: Timer,
     score: Score,
     game_running: bool,
     rng: SmallRng,
     shoot_animation: InOutAnimation,
 }
 
-impl EliminationGameScene {
+impl DodgeAndDestroyGameScene {
     pub fn new(_renderer: &mut Renderer, conrod_handle: &mut ConrodHandle) -> Self {
         let mut world = World::new();
 
@@ -193,36 +162,58 @@ impl EliminationGameScene {
         let player_rigid_body_handle = physics.rigid_body_set.insert(
             RigidBodyBuilder::new(RigidBodyType::Dynamic)
                 .translation(nalgebra::Vector3::new(0.0, 3.0, 0.0))
+                .lock_rotations()
                 .build(),
         );
         physics.collider_set.insert_with_parent(
-            ColliderBuilder::new(SharedShape::cuboid(0.5, 0.5, 0.5)).build(),
+            ColliderBuilder::new(SharedShape::capsule(
+                Point3::<f32>::new(0.0, -1.0, 0.0),
+                Point3::<f32>::new(0.0, 0.5, 0.0),
+                0.5,
+            ))
+            .friction(999.0)
+            .build(),
             player_rigid_body_handle,
             &mut physics.rigid_body_set,
         );
         world.spawn((player_rigid_body_handle,));
 
-        let mut rng = SmallRng::from_entropy();
+        {
+            let entity = world.reserve_entity();
+            let pos = nalgebra::Vector3::new(0.0, 5.0, -10.0);
+            world.spawn_at(
+                entity,
+                (
+                    Position(pos),
+                    physics.collider_set.insert(
+                        ColliderBuilder::new(SharedShape::ball(0.5))
+                            .user_data(entity.to_bits() as u128)
+                            .translation(pos)
+                            .build(),
+                    ),
+                    Target::new(),
+                ),
+            );
+        }
 
         Self {
             world,
             physics,
             player_rigid_body_handle,
-            ids: EliminationGameSceneIds::new(conrod_handle.get_ui_mut().widget_id_generator()),
+            ids: DodgeAndDestroyGameSceneIds::new(conrod_handle.get_ui_mut().widget_id_generator()),
             score: Score::new(),
             delta_shoot_time: Stopwatch::new(),
             game_timer: Timer::new(100.0),
-            spawn_new_target: Timer::new(1.0),
             game_start_timer: Timer::new_finished(),
             shoot_timer: Timer::new_finished(),
             game_running: false,
-            rng,
+            rng: SmallRng::from_entropy(),
             shoot_animation: InOutAnimation::new(3.0, 5.0),
         }
     }
 }
 
-impl Scene for EliminationGameScene {
+impl Scene for DodgeAndDestroyGameScene {
     fn init(
         &mut self,
         _message: MaybeMessage,
@@ -237,9 +228,33 @@ impl Scene for EliminationGameScene {
 
         {
             let entity = self.world.reserve_entity();
+            let rigid_body_handle = self.physics.rigid_body_set.insert(
+                RigidBodyBuilder::new(RigidBodyType::Dynamic)
+                    .translation(Vector3::<f32>::new(0.0, 2.0, -2.0))
+                    .lock_rotations()
+                    .build(),
+            );
+            self.physics.collider_set.insert_with_parent(
+                ColliderBuilder::new(SharedShape::capsule(
+                    Point3::<f32>::new(0.0, 1.0, 0.0),
+                    Point3::<f32>::new(0.0, -0.5, 0.0),
+                    0.5,
+                ))
+                .user_data(entity.to_bits() as u128)
+                .build(),
+                rigid_body_handle,
+                &mut self.physics.rigid_body_set,
+            );
+            self.world
+                .spawn_at(entity, (Gunman::new(), rigid_body_handle, Label::Gunman));
+        }
+
+        {
+            let entity = self.world.reserve_entity();
             let (objects, ref mut bound) = renderer.render_objects.next_static();
             objects.position = nalgebra::Vector3::new(0.0, 0.0, -20.0);
-            objects.shape_type_material = (ShapeType::Box, MaterialType::White);
+            objects.shape_type_material_ids.0 = ShapeType::Box;
+            objects.shape_type_material_ids.1 = MaterialType::Checker;
             objects.shape_data1 = nalgebra::Vector4::new(20.0, 12.0, 1.0, 0.0);
             *bound = ObjectBound::Sphere(20.0);
             self.physics.collider_set.insert(
@@ -252,14 +267,15 @@ impl Scene for EliminationGameScene {
                 .user_data(entity.to_bits() as u128)
                 .build(),
             );
-            self.world.spawn_at(entity, (Label("Wall"),));
+            self.world.spawn_at(entity, (Label::Wall,));
         }
 
         {
             let entity = self.world.reserve_entity();
             let (objects, ref mut bound) = renderer.render_objects.next_static();
             objects.position = nalgebra::Vector3::new(0.0, 0.0, 10.0);
-            objects.shape_type_material = (ShapeType::Box, MaterialType::White);
+            objects.shape_type_material_ids.0 = ShapeType::Box;
+            objects.shape_type_material_ids.1 = MaterialType::Checker;
             objects.shape_data1 = nalgebra::Vector4::new(20.0, 5.0, 1.0, 0.0);
             *bound = ObjectBound::Sphere(20.0);
             self.physics.collider_set.insert(
@@ -272,14 +288,15 @@ impl Scene for EliminationGameScene {
                 .user_data(entity.to_bits() as u128)
                 .build(),
             );
-            self.world.spawn_at(entity, (Label("Wall"),));
+            self.world.spawn_at(entity, (Label::Wall,));
         }
 
         {
             let entity = self.world.reserve_entity();
             let (objects, ref mut bound) = renderer.render_objects.next_static();
             objects.position = nalgebra::Vector3::new(-20.0, 0.0, -5.0);
-            objects.shape_type_material = (ShapeType::Box, MaterialType::White);
+            objects.shape_type_material_ids.0 = ShapeType::Box;
+            objects.shape_type_material_ids.1 = MaterialType::Checker;
             objects.shape_data1 = nalgebra::Vector4::new(1.0, 5.0, 15.0, 0.0);
             *bound = ObjectBound::Sphere(15.0);
             self.physics.collider_set.insert(
@@ -292,14 +309,15 @@ impl Scene for EliminationGameScene {
                 .user_data(entity.to_bits() as u128)
                 .build(),
             );
-            self.world.spawn_at(entity, (Label("Wall"),));
+            self.world.spawn_at(entity, (Label::Wall,));
         }
 
         {
             let entity = self.world.reserve_entity();
             let (objects, ref mut bound) = renderer.render_objects.next_static();
             objects.position = nalgebra::Vector3::new(20.0, 0.0, -5.0);
-            objects.shape_type_material = (ShapeType::Box, MaterialType::White);
+            objects.shape_type_material_ids.0 = ShapeType::Box;
+            objects.shape_type_material_ids.1 = MaterialType::Checker;
             objects.shape_data1 = nalgebra::Vector4::new(1.0, 5.0, 15.0, 0.0);
             *bound = ObjectBound::Sphere(15.0);
             self.physics.collider_set.insert(
@@ -312,7 +330,7 @@ impl Scene for EliminationGameScene {
                 .user_data(entity.to_bits() as u128)
                 .build(),
             );
-            self.world.spawn_at(entity, (Label("Wall"),));
+            self.world.spawn_at(entity, (Label::Wall,));
         }
 
         {
@@ -324,33 +342,11 @@ impl Scene for EliminationGameScene {
             renderer.camera.position = *player_rigid_body.translation();
         }
 
-        {
-            let entity = self.world.reserve_entity();
-            let pos = nalgebra::Vector3::new(
-                self.rng.sample(Uniform::new(-7.0, 7.0)),
-                self.rng.sample(Uniform::new(0.5, 5.0)),
-                -10.0,
-            );
-            self.world.spawn_at(
-                entity,
-                (
-                    Position(pos),
-                    self.physics.collider_set.insert(
-                        ColliderBuilder::new(SharedShape::ball(0.5))
-                            .user_data(entity.to_bits() as u128)
-                            .translation(pos)
-                            .build(),
-                    ),
-                    Target::new(),
-                ),
-            );
-        }
-
         window.set_is_cursor_grabbed(true);
 
         audio_context.global_sinks_map.remove("bgm");
 
-        self.game_start_timer.reset(3.0);
+        // self.game_start_timer.reset(3.0);
         self.game_running = false;
     }
 
@@ -409,8 +405,7 @@ impl Scene for EliminationGameScene {
         } else {
             self.game_timer.update(delta_time);
             self.shoot_timer.update(delta_time);
-
-            self.spawn_new_target.update(delta_time);
+            self.delta_shoot_time.update(delta_time);
 
             let mut entity_to_remove = Vec::new();
             for (id, (target, collider_handle)) in
@@ -428,49 +423,6 @@ impl Scene for EliminationGameScene {
             }
             for entity in entity_to_remove {
                 self.world.despawn(entity).unwrap();
-            }
-
-            let mut entity_to_remove = Vec::new();
-            for (id, (target, collider_handle)) in
-                self.world.query_mut::<(&mut FakeTarget, &ColliderHandle)>()
-            {
-                if target.is_need_to_be_deleted(delta_time) {
-                    entity_to_remove.push(id);
-                    self.physics.collider_set.remove(
-                        *collider_handle,
-                        &mut self.physics.island_manager,
-                        &mut self.physics.rigid_body_set,
-                        false,
-                    );
-                }
-            }
-            for entity in entity_to_remove {
-                self.world.despawn(entity).unwrap();
-            }
-
-            if self.spawn_new_target.is_finished() {
-                self.spawn_new_target.reset(1.0);
-                let entity = self.world.reserve_entity();
-                for i in 0..2 {
-                    let pos = nalgebra::Vector3::new(
-                        self.rng.sample(Uniform::new(-7.0, 7.0)),
-                        self.rng.sample(Uniform::new(0.5, 5.0)),
-                        -10.0,
-                    );
-                    self.world.spawn_at(
-                        entity,
-                        (
-                            Position(pos),
-                            self.physics.collider_set.insert(
-                                ColliderBuilder::new(SharedShape::ball(0.5))
-                                    .user_data(entity.to_bits() as u128)
-                                    .translation(pos)
-                                    .build(),
-                            ),
-                            Target::new(),
-                        ),
-                    );
-                }
             }
 
             self.shoot_animation.update(delta_time);
@@ -494,30 +446,31 @@ impl Scene for EliminationGameScene {
                 &(),
             );
 
-            let player_rigid_body = self
-                .physics
-                .rigid_body_set
-                .get_mut(self.player_rigid_body_handle)
-                .unwrap();
-            renderer.camera.position = *player_rigid_body.translation();
+            let player_position;
+            {
+                let player_rigid_body = self
+                    .physics
+                    .rigid_body_set
+                    .get_mut(self.player_rigid_body_handle)
+                    .unwrap();
+                renderer.camera.position = *player_rigid_body.translation();
 
-            // if input_manager.is_keyboard_press(&VirtualKeyCode::A) {
-            //     renderer.camera.position -=
-            //         3.0 * delta_time * *renderer.camera.get_direction_right();
-            // } else if input_manager.is_keyboard_press(&VirtualKeyCode::D) {
-            //     renderer.camera.position +=
-            //         3.0 * delta_time * *renderer.camera.get_direction_right();
-            // }
-            //
-            // if input_manager.is_keyboard_press(&VirtualKeyCode::W) {
-            //     renderer.camera.position +=
-            //         3.0 * delta_time * *renderer.camera.get_direction_without_pitch();
-            // } else if input_manager.is_keyboard_press(&VirtualKeyCode::S) {
-            //     renderer.camera.position -=
-            //         3.0 * delta_time * *renderer.camera.get_direction_without_pitch();
-            // }
+                update_player_position(delta_time, input_manager, &mut renderer.camera);
 
-            player_rigid_body.set_translation(renderer.camera.position, false);
+                player_rigid_body.set_translation(renderer.camera.position, true);
+                player_position = *player_rigid_body.translation();
+            }
+
+            for (_id, (gunman, rb_handle)) in
+                self.world.query_mut::<(&mut Gunman, &RigidBodyHandle)>()
+            {
+                let gunman_rigid_body = self.physics.rigid_body_set.get(*rb_handle).unwrap();
+                gunman.update(
+                    delta_time,
+                    gunman_rigid_body.translation(),
+                    &player_position,
+                );
+            }
 
             self.physics.query_pipeline.update(
                 &self.physics.island_manager,
@@ -565,28 +518,35 @@ impl Scene for EliminationGameScene {
                         audio_context.global_sinks_array.push(Sink::Regular(sink));
                     }
                     let mut need_to_spawn = false;
-                    if let Ok(mut target) = self.world.get_mut::<Target>(entity) {
-                        if !target.is_shooted() {
-                            let time_now = Instant::now();
-                            let shoot_time = self.delta_shoot_time.get_duration();
-                            self.delta_shoot_time.reset();
-                            self.score.total_shoot_time += shoot_time;
-                            need_to_spawn = true;
-                            target.shooted();
-                            self.score.score += ((300.0 * (3.0 - shoot_time)) as i32).max(0);
-                            self.score.hit += 1;
-                        } else {
-                            self.score.score -= 100;
-                            self.score.miss += 1;
-                        }
-                    } else {
-                        self.score.score -= 100;
-                        self.score.miss += 1;
+
+                    if let Ok(label) = self.world.get::<Label>(entity) {
+                        match *label {
+                            Label::Target => {
+                                if let Ok(mut target) = self.world.get_mut::<Target>(entity) {
+                                    if !target.is_shooted() {
+                                        let time_now = Instant::now();
+                                        let shoot_time = self.delta_shoot_time.get_duration();
+                                        self.delta_shoot_time.reset();
+                                        self.score.total_shoot_time += shoot_time;
+                                        need_to_spawn = true;
+                                        target.shooted();
+                                        self.score.score +=
+                                            ((300.0 * (3.0 - shoot_time)) as i32).max(0);
+                                        self.score.hit += 1;
+                                    }
+                                }
+                            }
+                            Label::Gunman => {
+                                let mut gunman = self.world.get_mut::<Gunman>(entity).unwrap();
+                                gunman.hit();
+                            }
+                            _ => {}
+                        };
                     }
                     if need_to_spawn {
                         let pos = nalgebra::Vector3::new(
-                            self.rng.sample(Uniform::new(-3.0, 3.0)),
-                            self.rng.sample(Uniform::new(0.5, 3.0)),
+                            self.rng.sample(Uniform::new(-5.0, 5.0)),
+                            self.rng.sample(Uniform::new(0.5, 5.0)),
                             -10.0,
                         );
                         let new_entity = self.world.reserve_entity();
@@ -639,6 +599,19 @@ impl Scene for EliminationGameScene {
         conrod_handle: &mut ConrodHandle,
         audio_context: &mut AudioContext,
     ) {
+        for (_id, (gunman, rb_handle)) in self.world.query_mut::<(&Gunman, &RigidBodyHandle)>() {
+            let rb = self.physics.rigid_body_set.get(*rb_handle).unwrap();
+
+            let (objects, ref mut bound) = renderer.render_objects.next();
+            objects.position = *rb.translation();
+            objects.shape_data2.y = gunman.get_rotation();
+            objects.shape_type_material_ids.0 = ShapeType::Gunman;
+            objects.shape_type_material_ids.1 = gunman.get_material();
+            objects.shape_type_material_ids.2 = MaterialType::Black;
+
+            *bound = ObjectBound::None;
+        }
+
         for (_id, (position, collider_handle, target)) in
             self.world
                 .query_mut::<(&Position, &ColliderHandle, &Target)>()
@@ -647,7 +620,8 @@ impl Scene for EliminationGameScene {
             collider.set_translation(position.0);
             let (objects, ref mut bound) = renderer.render_objects.next();
             objects.position = position.0;
-            objects.shape_type_material = (ShapeType::Sphere, target.get_material());
+            objects.shape_type_material_ids.0 = ShapeType::Sphere;
+            objects.shape_type_material_ids.1 = target.get_material();
             // let cam_to_obj = nalgebra::Unit::new_normalize(position.0 - renderer.camera.position);
             // let inner_cam_to_obj = cam_to_obj.into_inner() * -0.1;
 

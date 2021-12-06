@@ -72,7 +72,7 @@ fn main() -> BuildScriptResult<()> {
         //     "cargo:rerun-if-changed={}",
         //     shader.src_path.as_os_str().to_str().unwrap()
         // );
-        // println!("cargo:warning=Compiling {}", shader.src);
+        println!("cargo:warning=Compiling {:?}", shader.src_path.to_str());
         let compiled = compiler.compile_into_spirv(
             &shader.src,
             shader.kind,

@@ -8,6 +8,8 @@
 #define SHAPE_TYPE_BOX 1
 #define SHAPE_TYPE_SPHERE 2
 #define SHAPE_TYPE_CYLINDER 3
+#define SHAPE_TYPE_SWORDMAN 4
+#define SHAPE_TYPE_GUNMAN 5
 
 #define MATERIAL_GREEN 0
 #define MATERIAL_YELLOW 1
@@ -24,7 +26,7 @@ struct RenderQueue
     vec3 rotation;
     vec4 shape_data1;
     vec4 shape_data2;
-    uvec2 shape_type_material_id;
+    uvec4 shape_type_materials_id;
 };
 
 layout(std140, binding = 0) uniform rendering_info {
@@ -70,17 +72,45 @@ Distance sd_intersect(Distance d1, Distance d2)
     return d1.distance > d2.distance ? d1 : d2;
 }
 
+mat3 rot_z(float rad)
+{
+    float s = sin(rad);
+    float c = cos(rad);
+    return mat3(
+    c, -s, 0,
+    s, c, 0,
+    0, 0, 1);
+}
+
+mat3 rot_y(float rad) {
+    float c = cos(rad);
+    float s = sin(rad);
+    return mat3(
+    c, 0.0, -s,
+    0.0, 1.0, 0.0,
+    s, 0.0, c);
+}
+
+mat3 rot_x(float rad) {
+    float c = cos(rad);
+    float s = sin(rad);
+    return mat3(
+    1., 0., 0.,
+    0., c, -s,
+    0., s, c);
+}
+
+float smin(float a, float b, float k)
+{
+    float h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0);
+    return mix(b, a, h) - k * h * (1.0 - h);
+}
+
 float sd_capsule_line(vec3 p, vec3 a, vec3 b, float r)
 {
     vec3 pa = p - a, ba = b - a;
     float h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0);
     return length(pa - ba * h) - r;
-}
-
-float sd_terrain(vec3 pos)
-{
-
-    return 0.0;
 }
 
 float sd_plane(vec3 pos, vec3 n, float h)
@@ -93,10 +123,10 @@ float sd_sphere(vec3 pos, float rad)
     return length(pos) - rad;
 }
 
-float sd_round_box(vec3 p, vec3 b)
+float sd_round_box(vec3 p, vec3 b, float r)
 {
     vec3 q = abs(p) - b;
-    return length(max(q, 0.0)) + min(max(q.x, max(q.y, q.z)), 0.0);
+    return length(max(q,0.0)) + min(max(q.x,max(q.y,q.z)),0.0) - r;
 }
 
 float sd_box(vec3 pos, vec3 size)
@@ -105,17 +135,95 @@ float sd_box(vec3 pos, vec3 size)
     return max(d.x, max(d.y, d.z));
 }
 
-mat3 rot_z(float angle)
+float sd_capsule(vec3 p, vec3 a, vec3 b, float r)
 {
-    float s = sin(angle);
-    float c = cos(angle);
-    return mat3(c, -s, 0, s, c, 0, 0, 0, 1);
+    vec3 pa = p - a, ba = b - a;
+    float h = clamp( dot(pa,ba)/dot(ba,ba), 0.0, 1.0 );
+    return length( pa - ba*h ) - r;
 }
 
-float smin(float a, float b, float k)
+// Arm - Common
+const float arm_rad = .4;
+const float arm_length = 2.3;
+const vec3 arm_r_or = vec3(1.1, 1.6, 0.);
+
+Distance sd_gunman(vec3 p, float shootanim, uint material_man, uint material_gun)
 {
-    float h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0);
-    return mix(b, a, h) - k * h * (1.0 - h);
+    // Head
+    float d = sd_sphere(p - vec3(0., 3.1, 0.), 1.);
+    // Body
+    d = min(d, sd_round_box(p, vec3(.3, 1.4, .4), .7));
+    // Arm Left
+    const vec3 arm_l_or = vec3(-1.1, 1.4, 0.);
+    const vec3 arm_l_v = vec3(0., -1., 0.);
+    d = min(d, sd_capsule(p, arm_l_or, arm_l_or + arm_l_v * arm_length, arm_rad));
+    // Arm Right
+    const vec3 arm_r_1_end = arm_r_or + vec3(0., 0., arm_length / 2.);
+    //// First joint
+    d = min(d, sd_capsule(p, arm_r_or, arm_r_1_end, arm_rad));
+    //// Second joint
+    const vec3 arm_r_2_v = vec3(0., 0., 1.) * rot_x(shootanim);
+    const vec3 arm_r_2_end = arm_r_1_end + arm_r_2_v * (arm_length / 2.);
+    // Arm Left
+    d = min(d, sd_capsule(p, arm_r_1_end, arm_r_2_end, arm_rad));
+    // Leg symetric
+    const float leg_length = 2.5;
+    const vec3 leg_or = vec3(.5, -2., .0);
+    const vec3 leg_v = vec3(0., -1., 0.);
+    vec3 p_leg = p;
+    p_leg.x = abs(p_leg.x);
+    d = min(d, sd_capsule(p_leg, leg_or, leg_or + leg_v * leg_length, .4));
+
+    const mat3 rot_shootanim_neg = rot_x(-shootanim);
+
+
+    // Pistol
+    const vec3 p_pistol = (p - arm_r_2_end) * rot_shootanim_neg;
+    const float holder_y = .4;
+    const float holder_z = .2;
+    float e = sd_box(p_pistol - vec3(0., arm_rad, 0.), vec3(.1, holder_y, holder_z));
+
+    const float upper_z = .8;
+    const float upper_offset_z = -.1;
+    e = min(e, sd_box(p_pistol - vec3(0., arm_rad + holder_y, upper_z - holder_z + upper_offset_z), vec3(.1, .2, upper_z)));
+
+    return sd_union(Distance(d, material_man), Distance(e, material_gun));
+}
+
+Distance sd_swordman(vec3 p, float swordanim, uint material_man, uint material_sword)
+{
+    // Head
+    float d = sd_sphere(p - vec3(0., 3.1, 0.), 1.);
+    // Body
+    d = min(d, sd_round_box(p, vec3(.3, 1.4, .4), .7));
+    // Arm Left
+    const vec3 arm_l_or = vec3(-1.1, 1.4, 0.);
+    const vec3 arm_l_v = vec3(0., -1., 0.);
+    d = min(d, sd_capsule(p, arm_l_or, arm_l_or + arm_l_v * arm_length, arm_rad));
+    // Arm right
+    const vec3 arm_r_1_end = arm_r_or + vec3(0., 0., arm_length / 2.);
+    //// First joint
+    d = min(d, sd_capsule(p, arm_r_or, arm_r_1_end, arm_rad));
+    //// Second joint
+    const vec3 arm_r_2_v = vec3(0., 0., 1.) * rot_x(swordanim);
+    const vec3 arm_r_2_end = arm_r_1_end + arm_r_2_v * (arm_length / 2.);
+    // Arm Left
+    d = min(d, sd_capsule(p, arm_r_1_end, arm_r_2_end, arm_rad));
+    // Leg symetric
+    const float leg_length = 2.5;
+    const vec3 leg_or = vec3(.5, -2., .0);
+    const vec3 leg_v = vec3(0., -1., 0.);
+    vec3 leg_p = p;
+    leg_p.x = abs(leg_p.x);
+    d = min(d, sd_capsule(leg_p, leg_or, leg_or + leg_v * leg_length, .4));
+
+    // Sword
+    const vec3 p_sword = (p - arm_r_2_end) * rot_x(-swordanim - 0.4);
+    const float holder_y = 2.8;
+    float e = sd_box(p_sword - vec3(0., holder_y * .7, 0.), vec3(.1, holder_y, .2));
+    e = min(e, sd_box(p_sword  - vec3(0., holder_y * .15, 0.), vec3(.5, .1, .4)));
+
+    return sd_union(Distance(d, material_man), Distance(e, material_sword));
 }
 
 float sd_cylinder(vec3 p, vec3 a, vec3 b, float r)
@@ -142,14 +250,14 @@ Distance scene_dist(vec3 pos)
     Distance m = Distance(sd_plane(pos, vec3(0., 1., 0.), 0), 4);
 
     for (uint i = 0u; i < queuecount_raymarchmaxstep_aostep.x; i++) {
-        switch (queue[i].shape_type_material_id.x) {
+        switch (queue[i].shape_type_materials_id.x) {
             case SHAPE_TYPE_BOX:
                 m = sd_union(m,
                     Distance(
                         sd_box(
                             pos - queue[i].position,
                             queue[i].shape_data1.xyz),
-                            queue[i].shape_type_material_id.y));
+                            queue[i].shape_type_materials_id.y));
                 break;
             case SHAPE_TYPE_SPHERE:
                 m = sd_union(m,
@@ -157,7 +265,7 @@ Distance scene_dist(vec3 pos)
                             sd_sphere(
                                 pos - queue[i].position,
                                 queue[i].shape_data1.x),
-                                queue[i].shape_type_material_id.y));
+                                queue[i].shape_type_materials_id.y));
                 break;
             case SHAPE_TYPE_CYLINDER:
                 m = sd_union(m,
@@ -167,7 +275,25 @@ Distance scene_dist(vec3 pos)
                             queue[i].shape_data1.xyz,
                             queue[i].shape_data2.xyz,
                             queue[i].shape_data1.w),
-                            queue[i].shape_type_material_id.y));
+                            queue[i].shape_type_materials_id.y));
+                break;
+            case SHAPE_TYPE_GUNMAN:
+                const float s = 0.2;
+                Distance d = sd_gunman(
+                    (pos - queue[i].position) / s * rot_y(queue[i].shape_data2.y),
+                    queue[i].shape_data2.x,
+                    queue[i].shape_type_materials_id.y,
+                    queue[i].shape_type_materials_id.z);
+                d.distance *= s;
+                m = sd_union(m, d);
+                break;
+            case SHAPE_TYPE_SWORDMAN:
+                m = sd_union(m,
+                    sd_swordman(
+                        (pos - queue[i].position),
+                        queue[i].shape_data2.x,
+                        queue[i].shape_type_materials_id.y,
+                        queue[i].shape_type_materials_id.z));
                 break;
             default:
                 break;

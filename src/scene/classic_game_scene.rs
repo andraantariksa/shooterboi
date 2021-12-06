@@ -18,7 +18,9 @@ use crate::frustum::ObjectBound;
 use crate::gui::ConrodHandle;
 use crate::input_manager::InputManager;
 use crate::physics::GamePhysics;
-use crate::renderer::{MaterialType, Renderer, ShapeType};
+use crate::renderer::render_objects::MaterialType;
+use crate::renderer::render_objects::ShapeType;
+use crate::renderer::Renderer;
 use crate::scene::classic_score_scene::ClassicScoreScene;
 use crate::scene::pause_scene::PauseScene;
 use crate::scene::{MaybeMessage, Message, Scene, SceneOp, Value};
@@ -210,7 +212,8 @@ impl Scene for ClassicGameScene {
             let entity = self.world.reserve_entity();
             let (objects, ref mut bound) = renderer.render_objects.next_static();
             objects.position = nalgebra::Vector3::new(0.0, 0.0, -20.0);
-            objects.shape_type_material = (ShapeType::Box, MaterialType::Checker);
+            objects.shape_type_material_ids.0 = ShapeType::Box;
+            objects.shape_type_material_ids.1 = MaterialType::Checker;
             objects.shape_data1 = nalgebra::Vector4::new(20.0, 12.0, 1.0, 0.0);
             *bound = ObjectBound::Sphere(20.0);
             self.physics.collider_set.insert(
@@ -230,7 +233,8 @@ impl Scene for ClassicGameScene {
             let entity = self.world.reserve_entity();
             let (objects, ref mut bound) = renderer.render_objects.next_static();
             objects.position = nalgebra::Vector3::new(0.0, 0.0, 10.0);
-            objects.shape_type_material = (ShapeType::Box, MaterialType::Checker);
+            objects.shape_type_material_ids.0 = ShapeType::Box;
+            objects.shape_type_material_ids.1 = MaterialType::Checker;
             objects.shape_data1 = nalgebra::Vector4::new(20.0, 5.0, 1.0, 0.0);
             *bound = ObjectBound::Sphere(20.0);
             self.physics.collider_set.insert(
@@ -250,7 +254,8 @@ impl Scene for ClassicGameScene {
             let entity = self.world.reserve_entity();
             let (objects, ref mut bound) = renderer.render_objects.next_static();
             objects.position = nalgebra::Vector3::new(-20.0, 0.0, -5.0);
-            objects.shape_type_material = (ShapeType::Box, MaterialType::Checker);
+            objects.shape_type_material_ids.0 = ShapeType::Box;
+            objects.shape_type_material_ids.1 = MaterialType::Checker;
             objects.shape_data1 = nalgebra::Vector4::new(1.0, 5.0, 15.0, 0.0);
             *bound = ObjectBound::Sphere(15.0);
             self.physics.collider_set.insert(
@@ -270,7 +275,8 @@ impl Scene for ClassicGameScene {
             let entity = self.world.reserve_entity();
             let (objects, ref mut bound) = renderer.render_objects.next_static();
             objects.position = nalgebra::Vector3::new(20.0, 0.0, -5.0);
-            objects.shape_type_material = (ShapeType::Box, MaterialType::Checker);
+            objects.shape_type_material_ids.0 = ShapeType::Box;
+            objects.shape_type_material_ids.1 = MaterialType::Checker;
             objects.shape_data1 = nalgebra::Vector4::new(1.0, 5.0, 15.0, 0.0);
             *bound = ObjectBound::Sphere(15.0);
             self.physics.collider_set.insert(
@@ -544,27 +550,27 @@ impl Scene for ClassicGameScene {
         conrod_handle: &mut ConrodHandle,
         audio_context: &mut AudioContext,
     ) {
-        for (_id, (position, collider_handle, target)) in
-            self.world
-                .query_mut::<(&Position, &ColliderHandle, &Target)>()
-        {
-            let collider = self.physics.collider_set.get_mut(*collider_handle).unwrap();
-            collider.set_translation(position.0);
-            let (objects, ref mut bound) = renderer.render_objects.next();
-            objects.position = position.0;
-            objects.shape_type_material = (ShapeType::Sphere, target.get_material());
-            // let cam_to_obj = nalgebra::Unit::new_normalize(position.0 - renderer.camera.position);
-            // let inner_cam_to_obj = cam_to_obj.into_inner() * -0.1;
-
-            // objects.shape_data1.x = inner_cam_to_obj.x;
-            // objects.shape_data1.y = inner_cam_to_obj.y;
-            // objects.shape_data1.z = inner_cam_to_obj.z;
-            objects.shape_data1.x = collider.shape().as_ball().unwrap().radius;
-
-            objects.shape_data2 = objects.shape_data1 * -1.0;
-
-            *bound = ObjectBound::Sphere(0.5);
-        }
+        // for (_id, (position, collider_handle, target)) in
+        //     self.world
+        //         .query_mut::<(&Position, &ColliderHandle, &Target)>()
+        // {
+        //     let collider = self.physics.collider_set.get_mut(*collider_handle).unwrap();
+        //     collider.set_translation(position.0);
+        //     let (objects, ref mut bound) = renderer.render_objects.next();
+        //     objects.position = position.0;
+        //     objects.shape_type_material_ids = (ShapeType::Sphere, target.get_material());
+        //     // let cam_to_obj = nalgebra::Unit::new_normalize(position.0 - renderer.camera.position);
+        //     // let inner_cam_to_obj = cam_to_obj.into_inner() * -0.1;
+        //
+        //     // objects.shape_data1.x = inner_cam_to_obj.x;
+        //     // objects.shape_data1.y = inner_cam_to_obj.y;
+        //     // objects.shape_data1.z = inner_cam_to_obj.z;
+        //     objects.shape_data1.x = collider.shape().as_ball().unwrap().radius;
+        //
+        //     objects.shape_data2 = objects.shape_data1 * -1.0;
+        //
+        //     *bound = ObjectBound::Sphere(0.5);
+        // }
     }
 
     fn deinit(

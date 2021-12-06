@@ -5,6 +5,7 @@ use crate::input_manager::InputManager;
 use crate::renderer::Renderer;
 use crate::scene::classic_game_scene::ClassicGameScene;
 use crate::scene::classic_score_scene::ClassicScoreScene;
+use crate::scene::dodge_and_destroy_game_scene::DodgeAndDestroyGameScene;
 use crate::scene::{main_menu_scene::MainMenuScene, Scene, SceneOp, Value};
 use crate::window::Window;
 use instant::{Duration, Instant};
@@ -50,7 +51,8 @@ impl Game {
         database.init_settings(&mut audio_context, &mut renderer);
 
         let mut scene_stack = VecDeque::<Box<dyn Scene>>::new();
-        let mut first_scene = MainMenuScene::new(&mut renderer, &mut conrod_handle); // ClassicScoreScene::new(&mut renderer, &mut conrod_handle);
+        //let mut first_scene = MainMenuScene::new(&mut renderer, &mut conrod_handle); // ClassicScoreScene::new(&mut renderer, &mut conrod_handle);
+        let mut first_scene = DodgeAndDestroyGameScene::new(&mut renderer, &mut conrod_handle);
 
         first_scene.init(
             None,
