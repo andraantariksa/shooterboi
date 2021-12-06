@@ -3,7 +3,7 @@ use crate::enemy::{HasMaterial, HITTED_MATERIAL_DURATION};
 use crate::physics::GamePhysics;
 use crate::renderer::render_objects::MaterialType;
 use hecs::World;
-use nalgebra::{Point3, Vector3};
+use nalgebra::{Point3, Vector3, Unit};
 use rapier3d::prelude::{
     ColliderBuilder, ColliderHandle, RigidBodyBuilder, RigidBodyHandle, RigidBodyType, SharedShape,
 };
@@ -23,6 +23,7 @@ pub enum EnemyMaterialState {
 pub struct Gunman {
     state: EnemyState,
     rotation: f32,
+    dir: Vector3<f32>,
     material_state: EnemyMaterialState,
 }
 
@@ -31,6 +32,7 @@ impl Gunman {
         Self {
             state: EnemyState::FollowInvisible,
             rotation: 0.0,
+            dir: Vector3::new(0.0, 1.0, 0.0),
             material_state: EnemyMaterialState::None,
         }
     }
@@ -46,19 +48,33 @@ impl Gunman {
             _ => {}
         };
 
-        let x_diff = player_pos.x - obj_pos.x;
-        let z_diff = player_pos.z - obj_pos.z;
-        let target_angle: f32 = x_diff.atan2(z_diff);
-        let delta_angle = target_angle - self.rotation;
-        println!("delta_angle {}", delta_angle);
-        if delta_angle > 0.01 {
-            self.rotation += if delta_angle > 0.0 {
-                -3.0 * delta_time
-            } else {
-                3.0 * delta_time
-            };
-            self.rotation %= std::f32::consts::PI;
+        let move_speed = 5.0; // Change this, if you feel the enemy rotation is too slow.
+        let current_dir = Unit::new_normalize(player_pos - obj_pos);
+
+        // This can be normalized. However, since the player
+        // can't move fast, the enemy rotation velocity wouldn't
+        // change much, so the normalized version of this vector is optional.
+        let delta_dir = *current_dir - self.dir;
+
+        let mut is_moving = false;
+
+        if delta_dir.x.abs() > 0.01 {
+            self.dir.x += delta_dir.x * delta_time * move_speed;
+            is_moving |= true;
         }
+
+        if delta_dir.z.abs() > 0.01 {
+            self.dir.z += delta_dir.z * delta_time * move_speed;
+            is_moving |= true;
+        }
+
+        if is_moving {
+            self.rotation = self.dir.x.atan2(self.dir.z);
+        }
+    }
+
+    pub fn get_direction(&self) -> Vector3<f32> {
+        return self.dir;
     }
 
     pub fn get_rotation(&self) -> f32 {

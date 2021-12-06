@@ -19,6 +19,8 @@
 #define MATERIAL_RED 5
 #define MATERIAL_ORANGE 6
 
+#define DEBUG_POSITION 0
+
 struct RenderQueue
 {
     vec3 position;
@@ -485,6 +487,9 @@ void main()
         vec3(0.0, 10.0, 0.0),
         vec3(0.4),
         normal);
+#if DEBUG_POSITION == 1
+    color += ray_hit_pos * 0.3;
+#endif
     color *= ambient_ocl(ray_hit_pos, normal);
     outColor = vec4(color, 1.0);
 }
