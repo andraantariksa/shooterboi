@@ -35,7 +35,12 @@ impl Gunman {
         }
     }
 
-    pub fn update(&mut self, delta_time: f32, obj_pos: &Vector3<f32>, player_pos: &Vector3<f32>) {
+    pub fn update(
+        &mut self,
+        delta_time: f32,
+        obj_pos: &mut Vector3<f32>,
+        player_pos: &Vector3<f32>,
+    ) {
         match self.material_state {
             EnemyMaterialState::Hitted(ref mut duration) => {
                 *duration -= delta_time;
@@ -50,14 +55,12 @@ impl Gunman {
         let z_diff = player_pos.z - obj_pos.z;
         let target_angle: f32 = x_diff.atan2(z_diff);
         let delta_angle = target_angle - self.rotation;
-        println!("delta_angle {}", delta_angle);
-        if delta_angle > 0.01 {
+        if delta_angle.abs() > 0.01 {
             self.rotation += if delta_angle > 0.0 {
                 -3.0 * delta_time
             } else {
                 3.0 * delta_time
             };
-            self.rotation %= std::f32::consts::PI;
         }
     }
 

@@ -278,22 +278,28 @@ Distance scene_dist(vec3 pos)
                             queue[i].shape_type_materials_id.y));
                 break;
             case SHAPE_TYPE_GUNMAN:
-                const float s = 0.2;
-                Distance d = sd_gunman(
-                    (pos - queue[i].position) / s * rot_y(queue[i].shape_data2.y),
-                    queue[i].shape_data2.x,
-                    queue[i].shape_type_materials_id.y,
-                    queue[i].shape_type_materials_id.z);
-                d.distance *= s;
-                m = sd_union(m, d);
-                break;
-            case SHAPE_TYPE_SWORDMAN:
-                m = sd_union(m,
-                    sd_swordman(
-                        (pos - queue[i].position),
+                {
+                    const float s = 0.2;
+                    Distance d = sd_gunman(
+                        (pos - queue[i].position) / s * rot_y(queue[i].shape_data2.y),
                         queue[i].shape_data2.x,
                         queue[i].shape_type_materials_id.y,
-                        queue[i].shape_type_materials_id.z));
+                        queue[i].shape_type_materials_id.z);
+                    d.distance *= s;
+                    m = sd_union(m, d);
+                }
+                break;
+            case SHAPE_TYPE_SWORDMAN:
+                {
+                    const float s = 0.2;
+                    Distance d = sd_swordman(
+                        (pos - queue[i].position) / s * rot_y(queue[i].shape_data2.y),
+                        queue[i].shape_data2.x,
+                        queue[i].shape_type_materials_id.y,
+                        queue[i].shape_type_materials_id.z);
+                    d.distance *= s;
+                    m = sd_union(m, d);
+                }
                 break;
             default:
                 break;

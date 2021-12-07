@@ -37,13 +37,14 @@ use rand::distributions::Uniform;
 use rand::prelude::SmallRng;
 use rand::{Rng, RngCore, SeedableRng};
 
-// #[derive(Debug)]
 // struct Label(&'static str);
 
+#[derive(Debug)]
 enum Label {
     Wall,
     Gunman,
     Target,
+    Swordman,
 }
 
 pub struct Target {
@@ -230,7 +231,7 @@ impl Scene for DodgeAndDestroyGameScene {
             let entity = self.world.reserve_entity();
             let rigid_body_handle = self.physics.rigid_body_set.insert(
                 RigidBodyBuilder::new(RigidBodyType::Dynamic)
-                    .translation(Vector3::<f32>::new(0.0, 2.0, -2.0))
+                    .translation(Vector3::<f32>::new(2.0, 2.0, -2.0))
                     .lock_rotations()
                     .build(),
             );
@@ -247,6 +248,31 @@ impl Scene for DodgeAndDestroyGameScene {
             );
             self.world
                 .spawn_at(entity, (Gunman::new(), rigid_body_handle, Label::Gunman));
+        }
+
+        {
+            let entity = self.world.reserve_entity();
+            let rigid_body_handle = self.physics.rigid_body_set.insert(
+                RigidBodyBuilder::new(RigidBodyType::Dynamic)
+                    .translation(Vector3::<f32>::new(-2.0, 2.0, -2.0))
+                    .lock_rotations()
+                    .build(),
+            );
+            self.physics.collider_set.insert_with_parent(
+                ColliderBuilder::new(SharedShape::capsule(
+                    Point3::<f32>::new(0.0, 1.0, 0.0),
+                    Point3::<f32>::new(0.0, -0.5, 0.0),
+                    0.5,
+                ))
+                .user_data(entity.to_bits() as u128)
+                .build(),
+                rigid_body_handle,
+                &mut self.physics.rigid_body_set,
+            );
+            self.world.spawn_at(
+                entity,
+                (Swordman::new(), rigid_body_handle, Label::Swordman),
+            );
         }
 
         {
@@ -464,12 +490,18 @@ impl Scene for DodgeAndDestroyGameScene {
             for (_id, (gunman, rb_handle)) in
                 self.world.query_mut::<(&mut Gunman, &RigidBodyHandle)>()
             {
-                let gunman_rigid_body = self.physics.rigid_body_set.get(*rb_handle).unwrap();
-                gunman.update(
-                    delta_time,
-                    gunman_rigid_body.translation(),
-                    &player_position,
-                );
+                let gunman_rigid_body = self.physics.rigid_body_set.get_mut(*rb_handle).unwrap();
+                let mut gunman_pos = *gunman_rigid_body.translation();
+                gunman.update(delta_time, &mut gunman_pos, &player_position);
+                gunman_rigid_body.set_translation(gunman_pos, true);
+            }
+            for (_id, (swordman, rb_handle)) in
+                self.world.query_mut::<(&mut Swordman, &RigidBodyHandle)>()
+            {
+                let swordman_rigid_body = self.physics.rigid_body_set.get_mut(*rb_handle).unwrap();
+                let mut swordman_pos = *swordman_rigid_body.translation();
+                swordman.update(delta_time, &mut swordman_pos, &player_position);
+                swordman_rigid_body.set_translation(swordman_pos, true);
             }
 
             self.physics.query_pipeline.update(
@@ -608,6 +640,20 @@ impl Scene for DodgeAndDestroyGameScene {
             objects.shape_type_material_ids.0 = ShapeType::Gunman;
             objects.shape_type_material_ids.1 = gunman.get_material();
             objects.shape_type_material_ids.2 = MaterialType::Black;
+
+            *bound = ObjectBound::None;
+        }
+
+        for (_id, (swordman, rb_handle)) in self.world.query_mut::<(&Swordman, &RigidBodyHandle)>()
+        {
+            let rb = self.physics.rigid_body_set.get(*rb_handle).unwrap();
+
+            let (objects, ref mut bound) = renderer.render_objects.next();
+            objects.position = *rb.translation();
+            objects.shape_data2.y = swordman.get_rotation();
+            objects.shape_type_material_ids.0 = ShapeType::Swordman;
+            objects.shape_type_material_ids.1 = swordman.get_material();
+            objects.shape_type_material_ids.2 = MaterialType::Green;
 
             *bound = ObjectBound::None;
         }
