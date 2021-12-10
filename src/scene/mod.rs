@@ -101,11 +101,11 @@ pub trait Scene {
 
     fn prerender(
         &mut self,
-        renderer: &mut Renderer,
-        input_manager: &InputManager,
-        delta_time: f32,
-        conrod_handle: &mut ConrodHandle,
-        audio_context: &mut AudioContext,
+        _renderer: &mut Renderer,
+        _input_manager: &InputManager,
+        _delta_time: f32,
+        _conrod_handle: &mut ConrodHandle,
+        _audio_context: &mut AudioContext,
     ) {
     }
 

@@ -6,7 +6,7 @@ use game_renderer::GameSceneRenderer;
 use render_objects::RenderObjects;
 
 use crate::camera::Camera;
-use crate::frustum::{Frustum, ObjectBound};
+
 use crate::gui::ConrodHandle;
 use crate::renderer::crosshair::Crosshair;
 use crate::renderer::rendering_info::RenderingInfo;

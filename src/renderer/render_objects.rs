@@ -1,4 +1,5 @@
 use crate::frustum::{Frustum, ObjectBound};
+use nalgebra::{Matrix4, Vector3, Vector4};
 
 #[derive(Debug, Copy, Clone)]
 #[repr(u32)]
@@ -21,18 +22,19 @@ pub enum MaterialType {
     Checker = 4,
     Red = 5,
     Orange = 6,
+    Crate = 7,
+    Pebbles = 8,
 }
 
 #[derive(Debug, Copy, Clone)]
 pub struct RenderQueueData {
-    pub position: nalgebra::Vector3<f32>,
+    pub position: Vector3<f32>,
     _p1: [i32; 1],
-    pub scale: nalgebra::Vector3<f32>,
+    pub scale: Vector3<f32>,
     _p2: [i32; 1],
-    pub rotation: nalgebra::Vector3<f32>,
-    _p3: [i32; 1],
-    pub shape_data1: nalgebra::Vector4<f32>,
-    pub shape_data2: nalgebra::Vector4<f32>,
+    pub rotation: Matrix4<f32>,
+    pub shape_data1: Vector4<f32>,
+    pub shape_data2: Vector4<f32>,
     pub shape_type_material_ids: (ShapeType, MaterialType, MaterialType, MaterialType),
 }
 
@@ -41,7 +43,7 @@ impl RenderQueueData {
         Self {
             position: nalgebra::Vector3::new(0.0, 0.0, 0.0),
             scale: nalgebra::Vector3::new(0.0, 0.0, 0.0),
-            rotation: nalgebra::Vector3::new(0.0, 0.0, 0.0),
+            rotation: Matrix4::identity(),
             shape_type_material_ids: (
                 ShapeType::None,
                 MaterialType::Red,
@@ -52,7 +54,6 @@ impl RenderQueueData {
             shape_data2: nalgebra::Vector4::new(0.0, 0.0, 0.0, 0.0),
             _p1: [0; 1],
             _p2: [0; 1],
-            _p3: [0; 1],
         }
     }
 }

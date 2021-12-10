@@ -1,12 +1,12 @@
 use conrod_core::widget::envelope_editor::EnvelopePoint;
 use conrod_core::{Colorable, Positionable, Sizeable, Widget};
 use std::collections::HashMap;
-use std::primitive;
+
 
 use std::io::{BufReader, Cursor};
 
 use hecs::{Entity, World};
-use instant::{Duration, Instant};
+
 use rapier3d::prelude::*;
 use winit::event::{MouseButton, VirtualKeyCode};
 use winit::event_loop::ControlFlow;
@@ -29,9 +29,10 @@ use crate::timer::{Stopwatch, Timer};
 use crate::util::lerp;
 use crate::window::Window;
 use conrod_core::widget_ids;
+
 use rand::distributions::Uniform;
 use rand::prelude::SmallRng;
-use rand::{Rng, RngCore, SeedableRng};
+use rand::{Rng, SeedableRng};
 
 #[derive(Debug)]
 struct Label(&'static str);
@@ -63,12 +64,10 @@ impl Target {
     pub fn get_material(&self) -> MaterialType {
         if self.shooted {
             MaterialType::Yellow
+        } else if self.is_fake {
+            MaterialType::Orange
         } else {
-            if self.is_fake {
-                MaterialType::Orange
-            } else {
-                MaterialType::Red
-            }
+            MaterialType::Red
         }
     }
 
@@ -211,7 +210,7 @@ impl EliminationGameScene {
         );
         world.spawn((player_rigid_body_handle,));
 
-        let mut rng = SmallRng::from_entropy();
+        let rng = SmallRng::from_entropy();
 
         Self {
             world,
@@ -239,7 +238,7 @@ impl Scene for EliminationGameScene {
         renderer: &mut Renderer,
         _conrod_handle: &mut ConrodHandle,
         audio_context: &mut AudioContext,
-        database: &mut Database,
+        _database: &mut Database,
     ) {
         renderer.is_render_gui = true;
         renderer.is_render_game = true;
@@ -396,14 +395,14 @@ impl Scene for EliminationGameScene {
 
     fn update(
         &mut self,
-        window: &mut Window,
+        _window: &mut Window,
         renderer: &mut Renderer,
         input_manager: &InputManager,
         delta_time: f32,
         conrod_handle: &mut ConrodHandle,
         audio_context: &mut AudioContext,
         _control_flow: &mut ControlFlow,
-        database: &mut Database,
+        _database: &mut Database,
     ) -> SceneOp {
         renderer.camera.move_direction(input_manager.mouse_movement);
 
@@ -573,7 +572,7 @@ impl Scene for EliminationGameScene {
                     let collider = self.physics.collider_set.get(handle).unwrap();
                     let entity = Entity::from_bits(collider.user_data as u64);
 
-                    if let Ok(target_pos) = self.world.get::<Position>(entity) {
+                    if let Ok(_target_pos) = self.world.get::<Position>(entity) {
                         let sink =
                             rodio::Sink::try_new(&audio_context.output_stream_handle).unwrap();
                         sink.append(
@@ -632,10 +631,10 @@ impl Scene for EliminationGameScene {
     fn prerender(
         &mut self,
         renderer: &mut Renderer,
-        input_manager: &InputManager,
-        delta_time: f32,
-        conrod_handle: &mut ConrodHandle,
-        audio_context: &mut AudioContext,
+        _input_manager: &InputManager,
+        _delta_time: f32,
+        _conrod_handle: &mut ConrodHandle,
+        _audio_context: &mut AudioContext,
     ) {
         let mut num_rendered = 0;
 
@@ -676,7 +675,7 @@ impl Scene for EliminationGameScene {
         renderer: &mut Renderer,
         _conrod_handle: &mut ConrodHandle,
         _audio_context: &mut AudioContext,
-        database: &mut Database,
+        _database: &mut Database,
     ) {
         renderer.rendering_info.fov_shootanim.y = 0.0;
         renderer.render_objects.clear();

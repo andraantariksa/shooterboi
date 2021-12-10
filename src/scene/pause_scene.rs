@@ -42,7 +42,7 @@ impl Scene for PauseScene {
         renderer: &mut Renderer,
         _conrod_handle: &mut ConrodHandle,
         _audio_context: &mut AudioContext,
-        database: &mut Database,
+        _database: &mut Database,
     ) {
         renderer.is_render_gui = true;
         renderer.is_render_game = false;
@@ -50,14 +50,14 @@ impl Scene for PauseScene {
 
     fn update(
         &mut self,
-        window: &mut Window,
+        _window: &mut Window,
         renderer: &mut Renderer,
         _input_manager: &InputManager,
         _delta_time: f32,
         conrod_handle: &mut ConrodHandle,
         _audio_context: &mut AudioContext,
         _control_flow: &mut ControlFlow,
-        database: &mut Database,
+        _database: &mut Database,
     ) -> SceneOp {
         let mut scene_op = SceneOp::None;
 
@@ -111,7 +111,7 @@ impl Scene for PauseScene {
         _renderer: &mut Renderer,
         _conrod_handle: &mut ConrodHandle,
         _audio_context: &mut AudioContext,
-        database: &mut Database,
+        _database: &mut Database,
     ) {
     }
 }

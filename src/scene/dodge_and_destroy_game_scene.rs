@@ -4,19 +4,21 @@ use std::collections::HashMap;
 
 use std::io::{BufReader, Cursor};
 
-use hecs::{Entity, Ref, World};
-use instant::{Duration, Instant};
+use hecs::{Entity, World};
+use instant::Instant;
 use rapier3d::prelude::*;
 use winit::event::{MouseButton, VirtualKeyCode};
 use winit::event_loop::ControlFlow;
 
 use crate::animation::InOutAnimation;
+use crate::audio::Sink;
 use crate::audio::{AudioContext, AUDIO_FILE_SHOOT};
-use crate::audio::{Sink, AUDIO_FILE_SHOOTED};
 use crate::database::Database;
 use crate::enemy::gunman::Gunman;
 use crate::enemy::swordman::Swordman;
 use crate::enemy::HasMaterial;
+use crate::entity::target::Target;
+use crate::entity::Crate;
 use crate::frustum::ObjectBound;
 use crate::gui::ConrodHandle;
 use crate::input_manager::InputManager;
@@ -27,17 +29,17 @@ use crate::renderer::Renderer;
 use crate::scene::classic_score_scene::ClassicScoreScene;
 use crate::scene::pause_scene::PauseScene;
 use crate::scene::{MaybeMessage, Message, Scene, SceneOp, Value};
-use crate::systems::player_movement::update_player_position;
+use crate::systems::setup_player_collider::setup_player_collider;
+use crate::systems::spawn_target::spawn_target;
+use crate::systems::update_player_movement::update_player_position;
 use crate::timer::{Stopwatch, Timer};
 use crate::util::lerp;
 use crate::window::Window;
 use conrod_core::widget_ids;
-use nalgebra::{Point3, Vector2, Vector3};
+use nalgebra::{Point3, Vector3};
 use rand::distributions::Uniform;
 use rand::prelude::SmallRng;
-use rand::{Rng, RngCore, SeedableRng};
-
-// struct Label(&'static str);
+use rand::{Rng, SeedableRng};
 
 #[derive(Debug)]
 enum Label {
@@ -45,50 +47,8 @@ enum Label {
     Gunman,
     Target,
     Swordman,
+    Crate,
 }
-
-pub struct Target {
-    shooted: bool,
-    delete_timer: Option<Timer>,
-}
-
-impl Target {
-    fn new() -> Self {
-        Self {
-            shooted: false,
-            delete_timer: None,
-        }
-    }
-
-    pub fn is_shooted(&self) -> bool {
-        self.shooted
-    }
-
-    pub fn shooted(&mut self) {
-        self.shooted = true;
-        self.delete_timer = Some(Timer::new(0.8));
-    }
-
-    pub fn get_material(&self) -> MaterialType {
-        if self.shooted {
-            MaterialType::Yellow
-        } else {
-            MaterialType::Red
-        }
-    }
-
-    pub fn is_need_to_be_deleted(&mut self, delta_time: f32) -> bool {
-        match self.delete_timer {
-            Some(ref mut timer) => {
-                timer.update(delta_time);
-                timer.is_finished()
-            }
-            None => false,
-        }
-    }
-}
-
-pub struct Position(nalgebra::Vector3<f32>);
 
 widget_ids! {
     pub struct DodgeAndDestroyGameSceneIds {
@@ -141,59 +101,74 @@ pub struct DodgeAndDestroyGameScene {
     game_running: bool,
     rng: SmallRng,
     shoot_animation: InOutAnimation,
+    entity_to_remove: Vec<Entity>,
 }
 
 impl DodgeAndDestroyGameScene {
     pub fn new(_renderer: &mut Renderer, conrod_handle: &mut ConrodHandle) -> Self {
         let mut world = World::new();
-
         let mut physics = GamePhysics::new();
 
         // Ground
-        let ground_rigid_body_handle = physics
-            .rigid_body_set
-            .insert(RigidBodyBuilder::new(RigidBodyType::Static).build());
-        physics.collider_set.insert_with_parent(
-            ColliderBuilder::new(SharedShape::cuboid(999.999, 0.01, 999.999)).build(),
-            ground_rigid_body_handle,
-            &mut physics.rigid_body_set,
-        );
-
-        // Player
-        let player_rigid_body_handle = physics.rigid_body_set.insert(
-            RigidBodyBuilder::new(RigidBodyType::Dynamic)
-                .translation(nalgebra::Vector3::new(0.0, 3.0, 0.0))
-                .lock_rotations()
+        physics.collider_set.insert(
+            ColliderBuilder::new(SharedShape::cuboid(999.999, 0.1, 999.999))
+                .translation(Vector3::new(0.0, 0.05, 0.0))
                 .build(),
         );
-        physics.collider_set.insert_with_parent(
-            ColliderBuilder::new(SharedShape::capsule(
-                Point3::<f32>::new(0.0, -1.0, 0.0),
-                Point3::<f32>::new(0.0, 0.5, 0.0),
-                0.5,
-            ))
-            .friction(999.0)
-            .build(),
-            player_rigid_body_handle,
-            &mut physics.rigid_body_set,
+
+        let player_rigid_body_handle = setup_player_collider(&mut physics);
+
+        spawn_target(
+            &mut world,
+            &mut physics,
+            Vector3::new(0.0, 5.0, -10.0),
+            Target::new(),
         );
-        world.spawn((player_rigid_body_handle,));
 
         {
             let entity = world.reserve_entity();
-            let pos = nalgebra::Vector3::new(0.0, 5.0, -10.0);
+            let rigid_body_handle = physics.rigid_body_set.insert(
+                RigidBodyBuilder::new(RigidBodyType::Dynamic)
+                    .translation(Vector3::<f32>::new(2.0, 2.0, -2.0))
+                    .lock_rotations()
+                    .build(),
+            );
+            physics.collider_set.insert_with_parent(
+                ColliderBuilder::new(SharedShape::capsule(
+                    Point3::<f32>::new(0.0, 1.0, 0.0),
+                    Point3::<f32>::new(0.0, -0.5, 0.0),
+                    0.5,
+                ))
+                .user_data(entity.to_bits() as u128)
+                .build(),
+                rigid_body_handle,
+                &mut physics.rigid_body_set,
+            );
+            world.spawn_at(entity, (Gunman::new(), rigid_body_handle, Label::Gunman));
+        }
+
+        {
+            let entity = world.reserve_entity();
+            let rigid_body_handle = physics.rigid_body_set.insert(
+                RigidBodyBuilder::new(RigidBodyType::Dynamic)
+                    .translation(Vector3::<f32>::new(-2.0, 2.0, -2.0))
+                    .lock_rotations()
+                    .build(),
+            );
+            physics.collider_set.insert_with_parent(
+                ColliderBuilder::new(SharedShape::capsule(
+                    Point3::<f32>::new(0.0, 1.0, 0.0),
+                    Point3::<f32>::new(0.0, -0.5, 0.0),
+                    0.5,
+                ))
+                .user_data(entity.to_bits() as u128)
+                .build(),
+                rigid_body_handle,
+                &mut physics.rigid_body_set,
+            );
             world.spawn_at(
                 entity,
-                (
-                    Position(pos),
-                    physics.collider_set.insert(
-                        ColliderBuilder::new(SharedShape::ball(0.5))
-                            .user_data(entity.to_bits() as u128)
-                            .translation(pos)
-                            .build(),
-                    ),
-                    Target::new(),
-                ),
+                (Swordman::new(), rigid_body_handle, Label::Swordman),
             );
         }
 
@@ -210,6 +185,7 @@ impl DodgeAndDestroyGameScene {
             game_running: false,
             rng: SmallRng::from_entropy(),
             shoot_animation: InOutAnimation::new(3.0, 5.0),
+            entity_to_remove: Vec::new(),
         }
     }
 }
@@ -222,142 +198,94 @@ impl Scene for DodgeAndDestroyGameScene {
         renderer: &mut Renderer,
         _conrod_handle: &mut ConrodHandle,
         audio_context: &mut AudioContext,
-        database: &mut Database,
+        _database: &mut Database,
     ) {
         renderer.is_render_gui = true;
         renderer.is_render_game = true;
-
-        {
-            let entity = self.world.reserve_entity();
-            let rigid_body_handle = self.physics.rigid_body_set.insert(
-                RigidBodyBuilder::new(RigidBodyType::Dynamic)
-                    .translation(Vector3::<f32>::new(2.0, 2.0, -2.0))
-                    .lock_rotations()
-                    .build(),
-            );
-            self.physics.collider_set.insert_with_parent(
-                ColliderBuilder::new(SharedShape::capsule(
-                    Point3::<f32>::new(0.0, 1.0, 0.0),
-                    Point3::<f32>::new(0.0, -0.5, 0.0),
-                    0.5,
-                ))
-                .user_data(entity.to_bits() as u128)
-                .build(),
-                rigid_body_handle,
-                &mut self.physics.rigid_body_set,
-            );
-            self.world
-                .spawn_at(entity, (Gunman::new(), rigid_body_handle, Label::Gunman));
-        }
-
-        {
-            let entity = self.world.reserve_entity();
-            let rigid_body_handle = self.physics.rigid_body_set.insert(
-                RigidBodyBuilder::new(RigidBodyType::Dynamic)
-                    .translation(Vector3::<f32>::new(-2.0, 2.0, -2.0))
-                    .lock_rotations()
-                    .build(),
-            );
-            self.physics.collider_set.insert_with_parent(
-                ColliderBuilder::new(SharedShape::capsule(
-                    Point3::<f32>::new(0.0, 1.0, 0.0),
-                    Point3::<f32>::new(0.0, -0.5, 0.0),
-                    0.5,
-                ))
-                .user_data(entity.to_bits() as u128)
-                .build(),
-                rigid_body_handle,
-                &mut self.physics.rigid_body_set,
-            );
-            self.world.spawn_at(
-                entity,
-                (Swordman::new(), rigid_body_handle, Label::Swordman),
-            );
-        }
-
-        {
-            let entity = self.world.reserve_entity();
-            let (objects, ref mut bound) = renderer.render_objects.next_static();
-            objects.position = nalgebra::Vector3::new(0.0, 0.0, -20.0);
-            objects.shape_type_material_ids.0 = ShapeType::Box;
-            objects.shape_type_material_ids.1 = MaterialType::Checker;
-            objects.shape_data1 = nalgebra::Vector4::new(20.0, 12.0, 1.0, 0.0);
-            *bound = ObjectBound::Sphere(20.0);
-            self.physics.collider_set.insert(
-                ColliderBuilder::new(SharedShape::cuboid(
-                    objects.shape_data1.x,
-                    objects.shape_data1.y,
-                    objects.shape_data1.z,
-                ))
-                .translation(objects.position)
-                .user_data(entity.to_bits() as u128)
-                .build(),
-            );
-            self.world.spawn_at(entity, (Label::Wall,));
-        }
-
-        {
-            let entity = self.world.reserve_entity();
-            let (objects, ref mut bound) = renderer.render_objects.next_static();
-            objects.position = nalgebra::Vector3::new(0.0, 0.0, 10.0);
-            objects.shape_type_material_ids.0 = ShapeType::Box;
-            objects.shape_type_material_ids.1 = MaterialType::Checker;
-            objects.shape_data1 = nalgebra::Vector4::new(20.0, 5.0, 1.0, 0.0);
-            *bound = ObjectBound::Sphere(20.0);
-            self.physics.collider_set.insert(
-                ColliderBuilder::new(SharedShape::cuboid(
-                    objects.shape_data1.x,
-                    objects.shape_data1.y,
-                    objects.shape_data1.z,
-                ))
-                .translation(objects.position)
-                .user_data(entity.to_bits() as u128)
-                .build(),
-            );
-            self.world.spawn_at(entity, (Label::Wall,));
-        }
-
-        {
-            let entity = self.world.reserve_entity();
-            let (objects, ref mut bound) = renderer.render_objects.next_static();
-            objects.position = nalgebra::Vector3::new(-20.0, 0.0, -5.0);
-            objects.shape_type_material_ids.0 = ShapeType::Box;
-            objects.shape_type_material_ids.1 = MaterialType::Checker;
-            objects.shape_data1 = nalgebra::Vector4::new(1.0, 5.0, 15.0, 0.0);
-            *bound = ObjectBound::Sphere(15.0);
-            self.physics.collider_set.insert(
-                ColliderBuilder::new(SharedShape::cuboid(
-                    objects.shape_data1.x,
-                    objects.shape_data1.y,
-                    objects.shape_data1.z,
-                ))
-                .translation(objects.position)
-                .user_data(entity.to_bits() as u128)
-                .build(),
-            );
-            self.world.spawn_at(entity, (Label::Wall,));
-        }
-
-        {
-            let entity = self.world.reserve_entity();
-            let (objects, ref mut bound) = renderer.render_objects.next_static();
-            objects.position = nalgebra::Vector3::new(20.0, 0.0, -5.0);
-            objects.shape_type_material_ids.0 = ShapeType::Box;
-            objects.shape_type_material_ids.1 = MaterialType::Checker;
-            objects.shape_data1 = nalgebra::Vector4::new(1.0, 5.0, 15.0, 0.0);
-            *bound = ObjectBound::Sphere(15.0);
-            self.physics.collider_set.insert(
-                ColliderBuilder::new(SharedShape::cuboid(
-                    objects.shape_data1.x,
-                    objects.shape_data1.y,
-                    objects.shape_data1.z,
-                ))
-                .translation(objects.position)
-                .user_data(entity.to_bits() as u128)
-                .build(),
-            );
-            self.world.spawn_at(entity, (Label::Wall,));
-        }
+        //
+        // {
+        //     let entity = self.world.reserve_entity();
+        //     let (objects, ref mut bound) = renderer.render_objects.next_static();
+        //     objects.position = nalgebra::Vector3::new(0.0, 0.0, -20.0);
+        //     objects.shape_type_material_ids.0 = ShapeType::Box;
+        //     objects.shape_type_material_ids.1 = MaterialType::Checker;
+        //     objects.shape_data1 = nalgebra::Vector4::new(20.0, 12.0, 1.0, 0.0);
+        //     *bound = ObjectBound::Sphere(20.0);
+        //     self.physics.collider_set.insert(
+        //         ColliderBuilder::new(SharedShape::cuboid(
+        //             objects.shape_data1.x,
+        //             objects.shape_data1.y,
+        //             objects.shape_data1.z,
+        //         ))
+        //         .translation(objects.position)
+        //         .user_data(entity.to_bits() as u128)
+        //         .build(),
+        //     );
+        //     self.world.spawn_at(entity, (Label::Wall,));
+        // }
+        //
+        // {
+        //     let entity = self.world.reserve_entity();
+        //     let (objects, ref mut bound) = renderer.render_objects.next_static();
+        //     objects.position = nalgebra::Vector3::new(0.0, 0.0, 10.0);
+        //     objects.shape_type_material_ids.0 = ShapeType::Box;
+        //     objects.shape_type_material_ids.1 = MaterialType::Checker;
+        //     objects.shape_data1 = nalgebra::Vector4::new(20.0, 5.0, 1.0, 0.0);
+        //     *bound = ObjectBound::Sphere(20.0);
+        //     self.physics.collider_set.insert(
+        //         ColliderBuilder::new(SharedShape::cuboid(
+        //             objects.shape_data1.x,
+        //             objects.shape_data1.y,
+        //             objects.shape_data1.z,
+        //         ))
+        //         .translation(objects.position)
+        //         .user_data(entity.to_bits() as u128)
+        //         .build(),
+        //     );
+        //     self.world.spawn_at(entity, (Label::Wall,));
+        // }
+        //
+        // {
+        //     let entity = self.world.reserve_entity();
+        //     let (objects, ref mut bound) = renderer.render_objects.next_static();
+        //     objects.position = nalgebra::Vector3::new(-20.0, 0.0, -5.0);
+        //     objects.shape_type_material_ids.0 = ShapeType::Box;
+        //     objects.shape_type_material_ids.1 = MaterialType::Checker;
+        //     objects.shape_data1 = nalgebra::Vector4::new(1.0, 5.0, 15.0, 0.0);
+        //     *bound = ObjectBound::Sphere(15.0);
+        //     self.physics.collider_set.insert(
+        //         ColliderBuilder::new(SharedShape::cuboid(
+        //             objects.shape_data1.x,
+        //             objects.shape_data1.y,
+        //             objects.shape_data1.z,
+        //         ))
+        //         .translation(objects.position)
+        //         .user_data(entity.to_bits() as u128)
+        //         .build(),
+        //     );
+        //     self.world.spawn_at(entity, (Label::Wall,));
+        // }
+        //
+        // {
+        //     let entity = self.world.reserve_entity();
+        //     let (objects, ref mut bound) = renderer.render_objects.next_static();
+        //     objects.position = nalgebra::Vector3::new(20.0, 0.0, -5.0);
+        //     objects.shape_type_material_ids.0 = ShapeType::Box;
+        //     objects.shape_type_material_ids.1 = MaterialType::Checker;
+        //     objects.shape_data1 = nalgebra::Vector4::new(1.0, 5.0, 15.0, 0.0);
+        //     *bound = ObjectBound::Sphere(15.0);
+        //     self.physics.collider_set.insert(
+        //         ColliderBuilder::new(SharedShape::cuboid(
+        //             objects.shape_data1.x,
+        //             objects.shape_data1.y,
+        //             objects.shape_data1.z,
+        //         ))
+        //         .translation(objects.position)
+        //         .user_data(entity.to_bits() as u128)
+        //         .build(),
+        //     );
+        //     self.world.spawn_at(entity, (Label::Wall,));
+        // }
 
         {
             let player_rigid_body = self
@@ -368,24 +296,41 @@ impl Scene for DodgeAndDestroyGameScene {
             renderer.camera.position = *player_rigid_body.translation();
         }
 
+        {
+            let entity = self.world.reserve_entity();
+            let rb_handle = self.physics.rigid_body_set.insert(
+                RigidBodyBuilder::new(RigidBodyType::Dynamic)
+                    .user_data(entity.to_bits() as u128)
+                    .build(),
+            );
+            self.physics.collider_set.insert_with_parent(
+                ColliderBuilder::new(SharedShape::cuboid(1.0, 1.0, 1.0))
+                    .user_data(entity.to_bits() as u128)
+                    .build(),
+                rb_handle,
+                &mut self.physics.rigid_body_set,
+            );
+            self.world
+                .spawn_at(entity, (Label::Crate, Crate, rb_handle));
+        }
+
         window.set_is_cursor_grabbed(true);
 
         audio_context.global_sinks_map.remove("bgm");
 
-        // self.game_start_timer.reset(3.0);
         self.game_running = false;
     }
 
     fn update(
         &mut self,
-        window: &mut Window,
+        _window: &mut Window,
         renderer: &mut Renderer,
         input_manager: &InputManager,
         delta_time: f32,
         conrod_handle: &mut ConrodHandle,
         audio_context: &mut AudioContext,
         _control_flow: &mut ControlFlow,
-        database: &mut Database,
+        _database: &mut Database,
     ) -> SceneOp {
         renderer.camera.move_direction(input_manager.mouse_movement);
 
@@ -433,12 +378,11 @@ impl Scene for DodgeAndDestroyGameScene {
             self.shoot_timer.update(delta_time);
             self.delta_shoot_time.update(delta_time);
 
-            let mut entity_to_remove = Vec::new();
             for (id, (target, collider_handle)) in
                 self.world.query_mut::<(&mut Target, &ColliderHandle)>()
             {
                 if target.is_need_to_be_deleted(delta_time) {
-                    entity_to_remove.push(id);
+                    self.entity_to_remove.push(id);
                     self.physics.collider_set.remove(
                         *collider_handle,
                         &mut self.physics.island_manager,
@@ -447,9 +391,10 @@ impl Scene for DodgeAndDestroyGameScene {
                     );
                 }
             }
-            for entity in entity_to_remove {
-                self.world.despawn(entity).unwrap();
+            for entity in self.entity_to_remove.iter() {
+                self.world.despawn(*entity).unwrap();
             }
+            self.entity_to_remove.clear();
 
             self.shoot_animation.update(delta_time);
             renderer.rendering_info.fov_shootanim.y = lerp(
@@ -457,7 +402,6 @@ impl Scene for DodgeAndDestroyGameScene {
                 -20.0f32.to_radians(),
                 self.shoot_animation.get_value(),
             );
-
             self.physics.physics_pipeline.step(
                 &self.physics.gravity,
                 &self.physics.integration_parameters,
@@ -472,20 +416,13 @@ impl Scene for DodgeAndDestroyGameScene {
                 &(),
             );
 
-            let player_position;
-            {
-                let player_rigid_body = self
-                    .physics
-                    .rigid_body_set
-                    .get_mut(self.player_rigid_body_handle)
-                    .unwrap();
-                renderer.camera.position = *player_rigid_body.translation();
-
-                update_player_position(delta_time, input_manager, &mut renderer.camera);
-
-                player_rigid_body.set_translation(renderer.camera.position, true);
-                player_position = *player_rigid_body.translation();
-            }
+            let player_position = update_player_position(
+                delta_time,
+                input_manager,
+                &mut renderer.camera,
+                &mut self.physics,
+                self.player_rigid_body_handle,
+            );
 
             for (_id, (gunman, rb_handle)) in
                 self.world.query_mut::<(&mut Gunman, &RigidBodyHandle)>()
@@ -538,17 +475,17 @@ impl Scene for DodgeAndDestroyGameScene {
                 ) {
                     let collider = self.physics.collider_set.get(handle).unwrap();
                     let entity = Entity::from_bits(collider.user_data as u64);
-                    if let Ok(target_pos) = self.world.get::<Position>(entity) {
-                        let sink =
-                            rodio::Sink::try_new(&audio_context.output_stream_handle).unwrap();
-                        sink.append(
-                            rodio::Decoder::new(BufReader::new(Cursor::new(
-                                AUDIO_FILE_SHOOTED.to_vec(),
-                            )))
-                            .unwrap(),
-                        );
-                        audio_context.global_sinks_array.push(Sink::Regular(sink));
-                    }
+                    // if let Ok(target_pos) = self.world.get::<Position>(entity) {
+                    //     let sink =
+                    //         rodio::Sink::try_new(&audio_context.output_stream_handle).unwrap();
+                    //     sink.append(
+                    //         rodio::Decoder::new(BufReader::new(Cursor::new(
+                    //             AUDIO_FILE_SHOOTED.to_vec(),
+                    //         )))
+                    //         .unwrap(),
+                    //     );
+                    //     audio_context.global_sinks_array.push(Sink::Regular(sink));
+                    // }
                     let mut need_to_spawn = false;
 
                     if let Ok(label) = self.world.get::<Label>(entity) {
@@ -556,7 +493,7 @@ impl Scene for DodgeAndDestroyGameScene {
                             Label::Target => {
                                 if let Ok(mut target) = self.world.get_mut::<Target>(entity) {
                                     if !target.is_shooted() {
-                                        let time_now = Instant::now();
+                                        let _time_now = Instant::now();
                                         let shoot_time = self.delta_shoot_time.get_duration();
                                         self.delta_shoot_time.reset();
                                         self.score.total_shoot_time += shoot_time;
@@ -572,6 +509,10 @@ impl Scene for DodgeAndDestroyGameScene {
                                 let mut gunman = self.world.get_mut::<Gunman>(entity).unwrap();
                                 gunman.hit();
                             }
+                            Label::Swordman => {
+                                let mut swordman = self.world.get_mut::<Swordman>(entity).unwrap();
+                                swordman.hit();
+                            }
                             _ => {}
                         };
                     }
@@ -585,7 +526,6 @@ impl Scene for DodgeAndDestroyGameScene {
                         self.world.spawn_at(
                             new_entity,
                             (
-                                Position(pos),
                                 self.physics.collider_set.insert(
                                     ColliderBuilder::new(SharedShape::ball(0.5))
                                         .user_data(new_entity.to_bits() as u128)
@@ -626,10 +566,10 @@ impl Scene for DodgeAndDestroyGameScene {
     fn prerender(
         &mut self,
         renderer: &mut Renderer,
-        input_manager: &InputManager,
-        delta_time: f32,
-        conrod_handle: &mut ConrodHandle,
-        audio_context: &mut AudioContext,
+        _input_manager: &InputManager,
+        _delta_time: f32,
+        _conrod_handle: &mut ConrodHandle,
+        _audio_context: &mut AudioContext,
     ) {
         for (_id, (gunman, rb_handle)) in self.world.query_mut::<(&Gunman, &RigidBodyHandle)>() {
             let rb = self.physics.rigid_body_set.get(*rb_handle).unwrap();
@@ -640,6 +580,7 @@ impl Scene for DodgeAndDestroyGameScene {
             objects.shape_type_material_ids.0 = ShapeType::Gunman;
             objects.shape_type_material_ids.1 = gunman.get_material();
             objects.shape_type_material_ids.2 = MaterialType::Black;
+            objects.rotation = rb.rotation().to_homogeneous();
 
             *bound = ObjectBound::None;
         }
@@ -654,18 +595,39 @@ impl Scene for DodgeAndDestroyGameScene {
             objects.shape_type_material_ids.0 = ShapeType::Swordman;
             objects.shape_type_material_ids.1 = swordman.get_material();
             objects.shape_type_material_ids.2 = MaterialType::Green;
+            objects.rotation = rb.rotation().to_homogeneous();
 
             *bound = ObjectBound::None;
         }
 
-        for (_id, (position, collider_handle, target)) in
-            self.world
-                .query_mut::<(&Position, &ColliderHandle, &Target)>()
-        {
-            let collider = self.physics.collider_set.get_mut(*collider_handle).unwrap();
-            collider.set_translation(position.0);
+        for (_id, (_crate, rb_handle)) in self.world.query_mut::<(&Crate, &RigidBodyHandle)>() {
+            let rb = self.physics.rigid_body_set.get(*rb_handle).unwrap();
+            let collider = self.physics.collider_set.get(rb.colliders()[0]).unwrap();
+
             let (objects, ref mut bound) = renderer.render_objects.next();
-            objects.position = position.0;
+            objects.position = *rb.translation();
+            objects.shape_type_material_ids.0 = ShapeType::Box;
+            objects.shape_type_material_ids.1 = MaterialType::Crate;
+            objects.rotation = rb.rotation().to_homogeneous();
+
+            let shape = collider.shape().as_cuboid().unwrap();
+            objects.shape_data1.x = shape.half_extents.x;
+            objects.shape_data1.y = shape.half_extents.y;
+            objects.shape_data1.z = shape.half_extents.z;
+
+            *bound = ObjectBound::Sphere(
+                (objects.shape_data1.x.powf(2.0)
+                    * objects.shape_data1.y.powf(2.0)
+                    * objects.shape_data1.z.powf(2.0))
+                .sqrt(),
+            );
+        }
+
+        for (_id, (collider_handle, target)) in self.world.query_mut::<(&ColliderHandle, &Target)>()
+        {
+            let collider = self.physics.collider_set.get(*collider_handle).unwrap();
+            let (objects, ref mut bound) = renderer.render_objects.next();
+            objects.position = *collider.translation();
             objects.shape_type_material_ids.0 = ShapeType::Sphere;
             objects.shape_type_material_ids.1 = target.get_material();
             // let cam_to_obj = nalgebra::Unit::new_normalize(position.0 - renderer.camera.position);
@@ -688,7 +650,7 @@ impl Scene for DodgeAndDestroyGameScene {
         renderer: &mut Renderer,
         _conrod_handle: &mut ConrodHandle,
         _audio_context: &mut AudioContext,
-        database: &mut Database,
+        _database: &mut Database,
     ) {
         renderer.rendering_info.fov_shootanim.y = 0.0;
         renderer.render_objects.clear();

@@ -1,6 +1,6 @@
 use conrod_core::widget::envelope_editor::EnvelopePoint;
 use conrod_core::widget::{Button, Canvas, Text};
-use conrod_core::{Colorable, Labelable, Positionable, Sizeable, Widget};
+use conrod_core::{Labelable, Positionable, Sizeable, Widget};
 use winit::event_loop::ControlFlow;
 
 use crate::audio::AudioContext;
@@ -54,7 +54,7 @@ pub struct EliminationScoreScene {
 
 impl EliminationScoreScene {
     pub fn new(_renderer: &mut Renderer, conrod_handle: &mut ConrodHandle) -> Self {
-        let mut ids =
+        let ids =
             EliminationScoreSceneIds::new(conrod_handle.get_ui_mut().widget_id_generator());
         Self {
             ids,
@@ -66,12 +66,12 @@ impl EliminationScoreScene {
 impl Scene for EliminationScoreScene {
     fn init(
         &mut self,
-        message: MaybeMessage,
+        _message: MaybeMessage,
         _window: &mut Window,
         renderer: &mut Renderer,
         _conrod_handle: &mut ConrodHandle,
         _audio_context: &mut AudioContext,
-        database: &mut Database,
+        _database: &mut Database,
     ) {
         renderer.is_render_gui = true;
         renderer.is_render_game = false;
@@ -81,14 +81,14 @@ impl Scene for EliminationScoreScene {
 
     fn update(
         &mut self,
-        window: &mut Window,
+        _window: &mut Window,
         _renderer: &mut Renderer,
         input_manager: &InputManager,
         _delta_time: f32,
         conrod_handle: &mut ConrodHandle,
         _audio_context: &mut AudioContext,
-        control_flow: &mut ControlFlow,
-        database: &mut Database,
+        _control_flow: &mut ControlFlow,
+        _database: &mut Database,
     ) -> SceneOp {
         let mut scene_op = SceneOp::None;
 
@@ -230,7 +230,7 @@ impl Scene for EliminationScoreScene {
         _renderer: &mut Renderer,
         _conrod_handle: &mut ConrodHandle,
         _audio_context: &mut AudioContext,
-        database: &mut Database,
+        _database: &mut Database,
     ) {
     }
 }

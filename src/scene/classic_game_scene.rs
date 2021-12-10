@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::io::{BufReader, Cursor};
 
 use hecs::{Entity, World};
-use instant::{Duration, Instant};
+use instant::Instant;
 use rapier3d::prelude::*;
 use winit::event::{MouseButton, VirtualKeyCode};
 use winit::event_loop::ControlFlow;
@@ -14,69 +14,34 @@ use crate::animation::InOutAnimation;
 use crate::audio::{AudioContext, AUDIO_FILE_SHOOT};
 use crate::audio::{Sink, AUDIO_FILE_SHOOTED};
 use crate::database::Database;
+use crate::entity::target::Target;
+
 use crate::frustum::ObjectBound;
 use crate::gui::ConrodHandle;
 use crate::input_manager::InputManager;
 use crate::physics::GamePhysics;
-use crate::renderer::render_objects::MaterialType;
-use crate::renderer::render_objects::ShapeType;
+
+use crate::renderer::render_objects::{MaterialType, ShapeType};
 use crate::renderer::Renderer;
 use crate::scene::classic_score_scene::ClassicScoreScene;
 use crate::scene::pause_scene::PauseScene;
 use crate::scene::{MaybeMessage, Message, Scene, SceneOp, Value};
+use crate::systems::setup_player_collider::setup_player_collider;
+use crate::systems::spawn_target::spawn_target;
+use crate::systems::update_player_movement::update_player_position;
 use crate::timer::{Stopwatch, Timer};
 use crate::util::lerp;
 use crate::window::Window;
 use conrod_core::widget_ids;
+use nalgebra::Vector3;
 use rand::distributions::Uniform;
 use rand::prelude::SmallRng;
-use rand::{Rng, RngCore, SeedableRng};
+use rand::{Rng, SeedableRng};
 
-#[derive(Debug)]
-struct Label(&'static str);
-
-pub struct Target {
-    shooted: bool,
-    delete_timer: Option<Timer>,
+enum TargetSpawnState {
+    Primary,
+    Secondary,
 }
-
-impl Target {
-    fn new() -> Self {
-        Self {
-            shooted: false,
-            delete_timer: None,
-        }
-    }
-
-    pub fn is_shooted(&self) -> bool {
-        self.shooted
-    }
-
-    pub fn shooted(&mut self) {
-        self.shooted = true;
-        self.delete_timer = Some(Timer::new(0.8));
-    }
-
-    pub fn get_material(&self) -> MaterialType {
-        if self.shooted {
-            MaterialType::Yellow
-        } else {
-            MaterialType::Red
-        }
-    }
-
-    pub fn is_need_to_be_deleted(&mut self, delta_time: f32) -> bool {
-        match self.delete_timer {
-            Some(ref mut timer) => {
-                timer.update(delta_time);
-                timer.is_finished()
-            }
-            None => false,
-        }
-    }
-}
-
-pub struct Position(nalgebra::Vector3<f32>);
 
 widget_ids! {
     pub struct ClassicGameSceneIds {
@@ -129,54 +94,31 @@ pub struct ClassicGameScene {
     game_running: bool,
     rng: SmallRng,
     shoot_animation: InOutAnimation,
+    target_spawn_state: TargetSpawnState,
+    secondary_delete_duration: Timer,
+    entity_to_remove: Vec<Entity>,
 }
 
 impl ClassicGameScene {
     pub fn new(_renderer: &mut Renderer, conrod_handle: &mut ConrodHandle) -> Self {
         let mut world = World::new();
-
         let mut physics = GamePhysics::new();
 
         // Ground
-        let ground_rigid_body_handle = physics
-            .rigid_body_set
-            .insert(RigidBodyBuilder::new(RigidBodyType::Static).build());
-        physics.collider_set.insert_with_parent(
-            ColliderBuilder::new(SharedShape::cuboid(999.999, 0.01, 999.999)).build(),
-            ground_rigid_body_handle,
-            &mut physics.rigid_body_set,
-        );
-
-        // Player
-        let player_rigid_body_handle = physics.rigid_body_set.insert(
-            RigidBodyBuilder::new(RigidBodyType::Dynamic)
-                .translation(nalgebra::Vector3::new(0.0, 3.0, 0.0))
+        physics.collider_set.insert(
+            ColliderBuilder::new(SharedShape::cuboid(999.999, 0.1, 999.999))
+                .translation(Vector3::new(0.0, 0.05, 0.0))
                 .build(),
         );
-        physics.collider_set.insert_with_parent(
-            ColliderBuilder::new(SharedShape::cuboid(0.5, 0.5, 0.5)).build(),
-            player_rigid_body_handle,
-            &mut physics.rigid_body_set,
-        );
-        world.spawn((player_rigid_body_handle,));
 
-        {
-            let entity = world.reserve_entity();
-            let pos = nalgebra::Vector3::new(0.0, 5.0, -10.0);
-            world.spawn_at(
-                entity,
-                (
-                    Position(pos),
-                    physics.collider_set.insert(
-                        ColliderBuilder::new(SharedShape::ball(0.5))
-                            .user_data(entity.to_bits() as u128)
-                            .translation(pos)
-                            .build(),
-                    ),
-                    Target::new(),
-                ),
-            );
-        }
+        let player_rigid_body_handle = setup_player_collider(&mut physics);
+
+        spawn_target(
+            &mut world,
+            &mut physics,
+            Vector3::new(0.0, 3.0, -10.0),
+            Target::new(),
+        );
 
         Self {
             world,
@@ -189,8 +131,11 @@ impl ClassicGameScene {
             game_start_timer: Timer::new_finished(),
             shoot_timer: Timer::new_finished(),
             game_running: false,
+            target_spawn_state: TargetSpawnState::Primary,
             rng: SmallRng::from_entropy(),
             shoot_animation: InOutAnimation::new(3.0, 5.0),
+            secondary_delete_duration: Timer::new(1.0),
+            entity_to_remove: Vec::new(),
         }
     }
 }
@@ -203,100 +148,100 @@ impl Scene for ClassicGameScene {
         renderer: &mut Renderer,
         _conrod_handle: &mut ConrodHandle,
         audio_context: &mut AudioContext,
-        database: &mut Database,
+        _database: &mut Database,
     ) {
         renderer.is_render_gui = true;
         renderer.is_render_game = true;
 
-        {
-            let entity = self.world.reserve_entity();
-            let (objects, ref mut bound) = renderer.render_objects.next_static();
-            objects.position = nalgebra::Vector3::new(0.0, 0.0, -20.0);
-            objects.shape_type_material_ids.0 = ShapeType::Box;
-            objects.shape_type_material_ids.1 = MaterialType::Checker;
-            objects.shape_data1 = nalgebra::Vector4::new(20.0, 12.0, 1.0, 0.0);
-            *bound = ObjectBound::Sphere(20.0);
-            self.physics.collider_set.insert(
-                ColliderBuilder::new(SharedShape::cuboid(
-                    objects.shape_data1.x,
-                    objects.shape_data1.y,
-                    objects.shape_data1.z,
-                ))
-                .translation(objects.position)
-                .user_data(entity.to_bits() as u128)
-                .build(),
-            );
-            self.world.spawn_at(entity, (Label("Wall"),));
-        }
+        // {
+        //     let entity = self.world.reserve_entity();
+        let (objects, ref mut bound) = renderer.render_objects.next_static();
+        objects.position = nalgebra::Vector3::new(0.0, 0.0, -20.0);
+        objects.shape_type_material_ids.0 = ShapeType::Box;
+        objects.shape_type_material_ids.1 = MaterialType::Checker;
+        objects.shape_data1 = nalgebra::Vector4::new(20.0, 12.0, 1.0, 0.0);
+        *bound = ObjectBound::Sphere(20.0);
+        //     self.physics.collider_set.insert(
+        //         ColliderBuilder::new(SharedShape::cuboid(
+        //             objects.shape_data1.x,
+        //             objects.shape_data1.y,
+        //             objects.shape_data1.z,
+        //         ))
+        //         .translation(objects.position)
+        //         .user_data(entity.to_bits() as u128)
+        //         .build(),
+        //     );
+        //     self.world.spawn_at(entity, (Wall,));
+        // }
 
-        {
-            let entity = self.world.reserve_entity();
-            let (objects, ref mut bound) = renderer.render_objects.next_static();
-            objects.position = nalgebra::Vector3::new(0.0, 0.0, 10.0);
-            objects.shape_type_material_ids.0 = ShapeType::Box;
-            objects.shape_type_material_ids.1 = MaterialType::Checker;
-            objects.shape_data1 = nalgebra::Vector4::new(20.0, 5.0, 1.0, 0.0);
-            *bound = ObjectBound::Sphere(20.0);
-            self.physics.collider_set.insert(
-                ColliderBuilder::new(SharedShape::cuboid(
-                    objects.shape_data1.x,
-                    objects.shape_data1.y,
-                    objects.shape_data1.z,
-                ))
-                .translation(objects.position)
-                .user_data(entity.to_bits() as u128)
-                .build(),
-            );
-            self.world.spawn_at(entity, (Label("Wall"),));
-        }
-
-        {
-            let entity = self.world.reserve_entity();
-            let (objects, ref mut bound) = renderer.render_objects.next_static();
-            objects.position = nalgebra::Vector3::new(-20.0, 0.0, -5.0);
-            objects.shape_type_material_ids.0 = ShapeType::Box;
-            objects.shape_type_material_ids.1 = MaterialType::Checker;
-            objects.shape_data1 = nalgebra::Vector4::new(1.0, 5.0, 15.0, 0.0);
-            *bound = ObjectBound::Sphere(15.0);
-            self.physics.collider_set.insert(
-                ColliderBuilder::new(SharedShape::cuboid(
-                    objects.shape_data1.x,
-                    objects.shape_data1.y,
-                    objects.shape_data1.z,
-                ))
-                .translation(objects.position)
-                .user_data(entity.to_bits() as u128)
-                .build(),
-            );
-            self.world.spawn_at(entity, (Label("Wall"),));
-        }
-
-        {
-            let entity = self.world.reserve_entity();
-            let (objects, ref mut bound) = renderer.render_objects.next_static();
-            objects.position = nalgebra::Vector3::new(20.0, 0.0, -5.0);
-            objects.shape_type_material_ids.0 = ShapeType::Box;
-            objects.shape_type_material_ids.1 = MaterialType::Checker;
-            objects.shape_data1 = nalgebra::Vector4::new(1.0, 5.0, 15.0, 0.0);
-            *bound = ObjectBound::Sphere(15.0);
-            self.physics.collider_set.insert(
-                ColliderBuilder::new(SharedShape::cuboid(
-                    objects.shape_data1.x,
-                    objects.shape_data1.y,
-                    objects.shape_data1.z,
-                ))
-                .translation(objects.position)
-                .user_data(entity.to_bits() as u128)
-                .build(),
-            );
-            self.world.spawn_at(entity, (Label("Wall"),));
-        }
+        // {
+        //     let entity = self.world.reserve_entity();
+        //     let (objects, ref mut bound) = renderer.render_objects.next_static();
+        //     objects.position = nalgebra::Vector3::new(0.0, 0.0, 10.0);
+        //     objects.shape_type_material_ids.0 = ShapeType::Box;
+        //     objects.shape_type_material_ids.1 = MaterialType::Checker;
+        //     objects.shape_data1 = nalgebra::Vector4::new(20.0, 5.0, 1.0, 0.0);
+        //     *bound = ObjectBound::Sphere(20.0);
+        //     self.physics.collider_set.insert(
+        //         ColliderBuilder::new(SharedShape::cuboid(
+        //             objects.shape_data1.x,
+        //             objects.shape_data1.y,
+        //             objects.shape_data1.z,
+        //         ))
+        //         .translation(objects.position)
+        //         .user_data(entity.to_bits() as u128)
+        //         .build(),
+        //     );
+        //     self.world.spawn_at(entity, (Label("Wall"),));
+        // }
+        //
+        // {
+        //     let entity = self.world.reserve_entity();
+        //     let (objects, ref mut bound) = renderer.render_objects.next_static();
+        //     objects.position = nalgebra::Vector3::new(-20.0, 0.0, -5.0);
+        //     objects.shape_type_material_ids.0 = ShapeType::Box;
+        //     objects.shape_type_material_ids.1 = MaterialType::Checker;
+        //     objects.shape_data1 = nalgebra::Vector4::new(1.0, 5.0, 15.0, 0.0);
+        //     *bound = ObjectBound::Sphere(15.0);
+        //     self.physics.collider_set.insert(
+        //         ColliderBuilder::new(SharedShape::cuboid(
+        //             objects.shape_data1.x,
+        //             objects.shape_data1.y,
+        //             objects.shape_data1.z,
+        //         ))
+        //         .translation(objects.position)
+        //         .user_data(entity.to_bits() as u128)
+        //         .build(),
+        //     );
+        //     self.world.spawn_at(entity, (Label("Wall"),));
+        // }
+        //
+        // {
+        //     let entity = self.world.reserve_entity();
+        //     let (objects, ref mut bound) = renderer.render_objects.next_static();
+        //     objects.position = nalgebra::Vector3::new(20.0, 0.0, -5.0);
+        //     objects.shape_type_material_ids.0 = ShapeType::Box;
+        //     objects.shape_type_material_ids.1 = MaterialType::Checker;
+        //     objects.shape_data1 = nalgebra::Vector4::new(1.0, 5.0, 15.0, 0.0);
+        //     *bound = ObjectBound::Sphere(15.0);
+        //     self.physics.collider_set.insert(
+        //         ColliderBuilder::new(SharedShape::cuboid(
+        //             objects.shape_data1.x,
+        //             objects.shape_data1.y,
+        //             objects.shape_data1.z,
+        //         ))
+        //         .translation(objects.position)
+        //         .user_data(entity.to_bits() as u128)
+        //         .build(),
+        //     );
+        //     self.world.spawn_at(entity, (Label("Wall"),));
+        // }
 
         {
             let player_rigid_body = self
                 .physics
                 .rigid_body_set
-                .get_mut(self.player_rigid_body_handle)
+                .get(self.player_rigid_body_handle)
                 .unwrap();
             renderer.camera.position = *player_rigid_body.translation();
         }
@@ -311,14 +256,14 @@ impl Scene for ClassicGameScene {
 
     fn update(
         &mut self,
-        window: &mut Window,
+        _window: &mut Window,
         renderer: &mut Renderer,
         input_manager: &InputManager,
         delta_time: f32,
         conrod_handle: &mut ConrodHandle,
         audio_context: &mut AudioContext,
         _control_flow: &mut ControlFlow,
-        database: &mut Database,
+        _database: &mut Database,
     ) -> SceneOp {
         renderer.camera.move_direction(input_manager.mouse_movement);
 
@@ -327,7 +272,7 @@ impl Scene for ClassicGameScene {
         let mut ui_cell = conrod_handle.get_ui_mut().set_widgets();
         {
             conrod_core::widget::Canvas::new()
-                .color(conrod_core::Color::Rgba(0.0, 0.0, 0.0, 0.0))
+                .color(conrod_core::color::TRANSPARENT)
                 .set(self.ids.canvas, &mut ui_cell);
 
             conrod_core::widget::Canvas::new()
@@ -341,6 +286,7 @@ impl Scene for ClassicGameScene {
                 (sec / 60.0) as i32,
                 (sec % 60.0) as i32
             ))
+            .color(conrod_core::color::BLACK)
             .rgba(1.0, 1.0, 1.0, 1.0)
             .middle_of(self.ids.canvas_duration)
             .set(self.ids.duration_label, &mut ui_cell);
@@ -366,22 +312,48 @@ impl Scene for ClassicGameScene {
             self.shoot_timer.update(delta_time);
             self.delta_shoot_time.update(delta_time);
 
-            let mut entity_to_remove = Vec::new();
+            let mut missed = || {
+                self.score.score -= 100;
+                self.score.miss += 1;
+            };
+
+            let mut missed_secondary = false;
+
             for (id, (target, collider_handle)) in
                 self.world.query_mut::<(&mut Target, &ColliderHandle)>()
             {
                 if target.is_need_to_be_deleted(delta_time) {
-                    entity_to_remove.push(id);
+                    self.entity_to_remove.push(id);
                     self.physics.collider_set.remove(
                         *collider_handle,
                         &mut self.physics.island_manager,
                         &mut self.physics.rigid_body_set,
                         false,
                     );
+
+                    if !target.is_shooted() {
+                        missed_secondary = true;
+                    }
                 }
             }
-            for entity in entity_to_remove {
-                self.world.despawn(entity).unwrap();
+
+            for entity in self.entity_to_remove.iter() {
+                self.world.despawn(*entity).unwrap();
+            }
+            self.entity_to_remove.clear();
+
+            if missed_secondary {
+                self.target_spawn_state = match self.target_spawn_state {
+                    TargetSpawnState::Secondary => TargetSpawnState::Primary,
+                    _ => unreachable!(),
+                };
+                missed();
+                spawn_target(
+                    &mut self.world,
+                    &mut self.physics,
+                    Vector3::new(0.0, 3.0, self.rng.sample(Uniform::new(-19.0, -13.0))),
+                    Target::new(),
+                );
             }
 
             self.shoot_animation.update(delta_time);
@@ -404,47 +376,30 @@ impl Scene for ClassicGameScene {
                 &(),
                 &(),
             );
-
-            let player_rigid_body = self
-                .physics
-                .rigid_body_set
-                .get_mut(self.player_rigid_body_handle)
-                .unwrap();
-            renderer.camera.position = *player_rigid_body.translation();
-
-            // if input_manager.is_keyboard_press(&VirtualKeyCode::A) {
-            //     renderer.camera.position -=
-            //         3.0 * delta_time * *renderer.camera.get_direction_right();
-            // } else if input_manager.is_keyboard_press(&VirtualKeyCode::D) {
-            //     renderer.camera.position +=
-            //         3.0 * delta_time * *renderer.camera.get_direction_right();
-            // }
-            //
-            // if input_manager.is_keyboard_press(&VirtualKeyCode::W) {
-            //     renderer.camera.position +=
-            //         3.0 * delta_time * *renderer.camera.get_direction_without_pitch();
-            // } else if input_manager.is_keyboard_press(&VirtualKeyCode::S) {
-            //     renderer.camera.position -=
-            //         3.0 * delta_time * *renderer.camera.get_direction_without_pitch();
-            // }
-
-            player_rigid_body.set_translation(renderer.camera.position, false);
-
             self.physics.query_pipeline.update(
                 &self.physics.island_manager,
                 &self.physics.rigid_body_set,
                 &self.physics.collider_set,
             );
 
+            let _player_position = update_player_position(
+                delta_time,
+                input_manager,
+                &mut renderer.camera,
+                &mut self.physics,
+                self.player_rigid_body_handle,
+            );
+
             if input_manager.is_mouse_press(&MouseButton::Left) && self.shoot_timer.is_finished() {
                 self.shoot_animation.trigger();
                 self.shoot_timer.reset(0.4);
+
                 let sink = rodio::Sink::try_new(&audio_context.output_stream_handle).unwrap();
                 sink.append(
                     rodio::Decoder::new(BufReader::new(Cursor::new(AUDIO_FILE_SHOOT.to_vec())))
                         .unwrap(),
                 );
-                audio_context.global_sinks_array.push(Sink::Regular(sink));
+                audio_context.push(Sink::Regular(sink));
 
                 let ray = Ray::new(
                     nalgebra::Point::from(
@@ -464,7 +419,9 @@ impl Scene for ClassicGameScene {
                 ) {
                     let collider = self.physics.collider_set.get(handle).unwrap();
                     let entity = Entity::from_bits(collider.user_data as u64);
-                    if let Ok(target_pos) = self.world.get::<Position>(entity) {
+
+                    let mut need_to_spawn = false;
+                    if let Ok(mut target) = self.world.get_mut::<Target>(entity) {
                         let sink =
                             rodio::Sink::try_new(&audio_context.output_stream_handle).unwrap();
                         sink.append(
@@ -473,51 +430,58 @@ impl Scene for ClassicGameScene {
                             )))
                             .unwrap(),
                         );
-                        audio_context.global_sinks_array.push(Sink::Regular(sink));
-                    }
-                    let mut need_to_spawn = false;
-                    if let Ok(mut target) = self.world.get_mut::<Target>(entity) {
+                        audio_context.push(Sink::Regular(sink));
+
                         if !target.is_shooted() {
-                            let time_now = Instant::now();
                             let shoot_time = self.delta_shoot_time.get_duration();
                             self.delta_shoot_time.reset();
+
                             self.score.total_shoot_time += shoot_time;
+
                             need_to_spawn = true;
                             target.shooted();
+
+                            self.target_spawn_state = match self.target_spawn_state {
+                                TargetSpawnState::Primary => TargetSpawnState::Secondary,
+                                TargetSpawnState::Secondary => TargetSpawnState::Primary,
+                            };
+
                             self.score.score += ((300.0 * (3.0 - shoot_time)) as i32).max(0);
                             self.score.hit += 1;
                         } else {
-                            self.score.score -= 100;
-                            self.score.miss += 1;
+                            missed();
                         }
                     } else {
-                        self.score.score -= 100;
-                        self.score.miss += 1;
+                        missed();
                     }
+
                     if need_to_spawn {
-                        let pos = nalgebra::Vector3::new(
-                            self.rng.sample(Uniform::new(-5.0, 5.0)),
-                            self.rng.sample(Uniform::new(0.5, 5.0)),
-                            -10.0,
-                        );
-                        let new_entity = self.world.reserve_entity();
-                        self.world.spawn_at(
-                            new_entity,
-                            (
-                                Position(pos),
-                                self.physics.collider_set.insert(
-                                    ColliderBuilder::new(SharedShape::ball(0.5))
-                                        .user_data(new_entity.to_bits() as u128)
-                                        .translation(pos)
-                                        .build(),
-                                ),
+                        match self.target_spawn_state {
+                            TargetSpawnState::Primary => spawn_target(
+                                &mut self.world,
+                                &mut self.physics,
+                                Vector3::new(0.0, 3.0, self.rng.sample(Uniform::new(-19.0, -13.0))),
                                 Target::new(),
                             ),
-                        );
+                            TargetSpawnState::Secondary => {
+                                let pos = nalgebra::Vector3::new(
+                                    self.rng.sample(Uniform::new(-5.0, 5.0)),
+                                    self.rng.sample(Uniform::new(0.5, 5.0)),
+                                    self.rng.sample(Uniform::new(-19.0, -13.0)),
+                                );
+                                spawn_target(
+                                    &mut self.world,
+                                    &mut self.physics,
+                                    pos,
+                                    Target::new_with_delete_duration(
+                                        self.secondary_delete_duration.clone(),
+                                    ),
+                                );
+                            }
+                        }
                     }
                 } else {
-                    self.score.score -= 100;
-                    self.score.miss += 1;
+                    missed();
                 }
             }
         }
@@ -545,32 +509,28 @@ impl Scene for ClassicGameScene {
     fn prerender(
         &mut self,
         renderer: &mut Renderer,
-        input_manager: &InputManager,
-        delta_time: f32,
-        conrod_handle: &mut ConrodHandle,
-        audio_context: &mut AudioContext,
+        _input_manager: &InputManager,
+        _delta_time: f32,
+        _conrod_handle: &mut ConrodHandle,
+        _audio_context: &mut AudioContext,
     ) {
-        // for (_id, (position, collider_handle, target)) in
-        //     self.world
-        //         .query_mut::<(&Position, &ColliderHandle, &Target)>()
-        // {
-        //     let collider = self.physics.collider_set.get_mut(*collider_handle).unwrap();
-        //     collider.set_translation(position.0);
-        //     let (objects, ref mut bound) = renderer.render_objects.next();
-        //     objects.position = position.0;
-        //     objects.shape_type_material_ids = (ShapeType::Sphere, target.get_material());
-        //     // let cam_to_obj = nalgebra::Unit::new_normalize(position.0 - renderer.camera.position);
-        //     // let inner_cam_to_obj = cam_to_obj.into_inner() * -0.1;
-        //
-        //     // objects.shape_data1.x = inner_cam_to_obj.x;
-        //     // objects.shape_data1.y = inner_cam_to_obj.y;
-        //     // objects.shape_data1.z = inner_cam_to_obj.z;
-        //     objects.shape_data1.x = collider.shape().as_ball().unwrap().radius;
-        //
-        //     objects.shape_data2 = objects.shape_data1 * -1.0;
-        //
-        //     *bound = ObjectBound::Sphere(0.5);
-        // }
+        for (_id, (collider_handle, target)) in self.world.query_mut::<(&ColliderHandle, &Target)>()
+        {
+            let collider = self.physics.collider_set.get_mut(*collider_handle).unwrap();
+            let (objects, ref mut bound) = renderer.render_objects.next();
+            objects.position = *collider.translation();
+            objects.shape_type_material_ids.0 = ShapeType::Sphere;
+            objects.shape_type_material_ids.1 = target.get_material();
+            // let cam_to_obj = nalgebra::Unit::new_normalize(position.0 - renderer.camera.position);
+            // let inner_cam_to_obj = cam_to_obj.into_inner() * -0.1;
+
+            // objects.shape_data1.x = inner_cam_to_obj.x;
+            // objects.shape_data1.y = inner_cam_to_obj.y;
+            // objects.shape_data1.z = inner_cam_to_obj.z;
+            objects.shape_data1.x = collider.shape().as_ball().unwrap().radius;
+
+            *bound = ObjectBound::Sphere(0.5);
+        }
     }
 
     fn deinit(
@@ -579,7 +539,7 @@ impl Scene for ClassicGameScene {
         renderer: &mut Renderer,
         _conrod_handle: &mut ConrodHandle,
         _audio_context: &mut AudioContext,
-        database: &mut Database,
+        _database: &mut Database,
     ) {
         renderer.rendering_info.fov_shootanim.y = 0.0;
         renderer.render_objects.clear();

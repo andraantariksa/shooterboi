@@ -1,12 +1,12 @@
 use conrod_core::widget::envelope_editor::EnvelopePoint;
-use conrod_core::widget::list_select::Event;
-use conrod_core::widget::{Button, Canvas, List, Text};
-use conrod_core::{Borderable, Colorable, Labelable, Positionable, Sizeable, Widget};
+
+use conrod_core::widget::{Button, Canvas, Text};
+use conrod_core::{Colorable, Labelable, Positionable, Sizeable, Widget};
 use std::collections::HashMap;
-use std::io::{BufReader, Cursor};
+
 use winit::event_loop::ControlFlow;
 
-use crate::audio::{AudioContext, Sink, AUDIO_FILE_AWESOMENESS};
+use crate::audio::{AudioContext};
 use crate::database::Database;
 use crate::gui::ConrodHandle;
 use crate::input_manager::InputManager;
@@ -15,13 +15,13 @@ use crate::scene::classic_game_scene::ClassicGameScene;
 use crate::scene::classic_game_scores_scene::ClassicGameScoresScene;
 use crate::scene::dodge_and_destroy_game_scene::DodgeAndDestroyGameScene;
 use crate::scene::elimination_game_scene::EliminationGameScene;
-use crate::scene::exit_confirm_scene::QuitConfirmScene;
-use crate::scene::guide_scene::GuideScene;
-use crate::scene::settings_scene::SettingsScene;
+
+
+
 use crate::scene::{MaybeMessage, Scene, SceneOp, Value, BUTTON_HEIGHT, BUTTON_WIDTH, MARGIN};
 use crate::window::Window;
 use conrod_core::widget_ids;
-use rodio::Source;
+
 use winit::event::VirtualKeyCode;
 
 widget_ids! {
@@ -76,12 +76,12 @@ impl GameSelectionScene {
 impl Scene for GameSelectionScene {
     fn init(
         &mut self,
-        message: MaybeMessage,
+        _message: MaybeMessage,
         _window: &mut Window,
         renderer: &mut Renderer,
         _conrod_handle: &mut ConrodHandle,
-        audio_context: &mut AudioContext,
-        database: &mut Database,
+        _audio_context: &mut AudioContext,
+        _database: &mut Database,
     ) {
         renderer.is_render_gui = true;
         renderer.is_render_game = false;
@@ -89,24 +89,24 @@ impl Scene for GameSelectionScene {
 
     fn update(
         &mut self,
-        window: &mut Window,
+        _window: &mut Window,
         renderer: &mut Renderer,
         input_manager: &InputManager,
         _delta_time: f32,
         conrod_handle: &mut ConrodHandle,
         _audio_context: &mut AudioContext,
         _control_flow: &mut ControlFlow,
-        database: &mut Database,
+        _database: &mut Database,
     ) -> SceneOp {
         let mut scene_op = SceneOp::None;
 
-        let mut back_button;
-        let mut play_button;
-        let mut score_button;
+        let back_button;
+        let play_button;
+        let score_button;
 
         let image_id = *conrod_handle.get_image_id_map().get("title").unwrap();
 
-        let mut game_modes = [
+        let game_modes = [
             GameMode {
                 image: image_id,
                 title: "Classic",
@@ -166,7 +166,7 @@ impl Scene for GameSelectionScene {
                     .scrollbar_next_to()
                     .middle_of(self.ids.game_mode_selection_canvas)
                     .set(self.ids.game_mode_selection_listselect, &mut ui_cell);
-            game_list_scroll.map(|s| s.set(&mut ui_cell));
+            if let Some(s) = game_list_scroll { s.set(&mut ui_cell) }
             while let Some(event) =
                 game_list_events.next(&ui_cell, |i| i == self.selected_game_mode_idx)
             {
@@ -260,7 +260,7 @@ impl Scene for GameSelectionScene {
         _renderer: &mut Renderer,
         _conrod_handle: &mut ConrodHandle,
         _audio_context: &mut AudioContext,
-        database: &mut Database,
+        _database: &mut Database,
     ) {
     }
 }

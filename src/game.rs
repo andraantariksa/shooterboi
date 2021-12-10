@@ -3,15 +3,15 @@ use crate::database::Database;
 use crate::gui::ConrodHandle;
 use crate::input_manager::InputManager;
 use crate::renderer::Renderer;
-use crate::scene::classic_game_scene::ClassicGameScene;
-use crate::scene::classic_score_scene::ClassicScoreScene;
-use crate::scene::dodge_and_destroy_game_scene::DodgeAndDestroyGameScene;
-use crate::scene::{main_menu_scene::MainMenuScene, Scene, SceneOp, Value};
+
+
+
+use crate::scene::{main_menu_scene::MainMenuScene, Scene, SceneOp};
 use crate::window::Window;
-use instant::{Duration, Instant};
-use std::collections::{HashMap, VecDeque};
-use std::ops::Sub;
-use winit::dpi::{PhysicalPosition, PhysicalSize};
+use instant::{Instant};
+use std::collections::{VecDeque};
+
+use winit::dpi::{PhysicalSize};
 use winit::event::{Event, VirtualKeyCode, WindowEvent};
 use winit::event_loop::ControlFlow;
 use winit::window::Window as WinitWindow;
@@ -51,9 +51,8 @@ impl Game {
         database.init_settings(&mut audio_context, &mut renderer);
 
         let mut scene_stack = VecDeque::<Box<dyn Scene>>::new();
-        //let mut first_scene = MainMenuScene::new(&mut renderer, &mut conrod_handle); // ClassicScoreScene::new(&mut renderer, &mut conrod_handle);
-        let mut first_scene = DodgeAndDestroyGameScene::new(&mut renderer, &mut conrod_handle);
-
+        let mut first_scene = MainMenuScene::new(&mut renderer, &mut conrod_handle); // ClassicScoreScene::new(&mut renderer, &mut conrod_handle);
+                                                                                     // let mut first_scene = DodgeAndDestroyGameScene::new(&mut renderer, &mut conrod_handle);
         first_scene.init(
             None,
             &mut window,
@@ -219,7 +218,7 @@ impl Game {
                     // The system is out of memory, we should probably quit
                     Err(wgpu::SurfaceError::OutOfMemory) => panic!("Out of memory"),
                     // All other errors (Outdated, Timeout) should be resolved by the next frame
-                    Err(e) => {}
+                    Err(_e) => {}
                 };
 
                 self.input_manager.clear();

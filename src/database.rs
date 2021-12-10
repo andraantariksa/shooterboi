@@ -1,14 +1,14 @@
 use crate::audio::AudioContext;
 use crate::renderer::Renderer;
 use crate::scene::classic_score_scene::ClassicGameScoreDisplay;
-use chrono::{NaiveDate, NaiveDateTime, Utc};
-use gluesql::ast::DataType;
+use chrono::{NaiveDateTime};
+
 use gluesql::data::Value;
 #[cfg(target_arch = "wasm32")]
 use gluesql::prelude::MemoryStorage as Storage;
 #[cfg(not(target_arch = "wasm32"))]
 use gluesql::prelude::SledStorage as Storage;
-use gluesql::prelude::{Glue, MemoryStorage, Payload};
+use gluesql::prelude::{Glue, Payload};
 #[cfg(not(target_arch = "wasm32"))]
 use gluesql::sled::IVec as Debug;
 #[cfg(target_arch = "wasm32")]

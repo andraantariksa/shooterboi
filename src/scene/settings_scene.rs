@@ -7,11 +7,11 @@ use crate::audio::AudioContext;
 use crate::database::Database;
 use crate::gui::ConrodHandle;
 use crate::input_manager::InputManager;
-use crate::renderer::vertex::CoordColorVertex;
+
 use crate::renderer::Renderer;
-use crate::scene::main_menu_scene::play_bgm;
+
 use crate::scene::{MaybeMessage, Scene, SceneOp, Value, MARGIN};
-use crate::util::{any_sized_as_u8_slice, any_slice_as_u8_slice};
+use crate::util::{any_sized_as_u8_slice};
 use crate::window::Window;
 use conrod_core::widget_ids;
 
@@ -106,7 +106,7 @@ pub struct SettingsScene {
 }
 
 impl SettingsScene {
-    pub fn new(renderer: &mut Renderer, conrod_handle: &mut ConrodHandle) -> Self {
+    pub fn new(_renderer: &mut Renderer, conrod_handle: &mut ConrodHandle) -> Self {
         Self {
             ids: SettingsSceneIds::new(conrod_handle.get_ui_mut().widget_id_generator()),
         }
@@ -123,12 +123,12 @@ fn settings_item_canvas() -> conrod_core::widget::Canvas<'static> {
 impl Scene for SettingsScene {
     fn init(
         &mut self,
-        message: MaybeMessage,
+        _message: MaybeMessage,
         _window: &mut Window,
         renderer: &mut Renderer,
         _conrod_handle: &mut ConrodHandle,
-        audio_context: &mut AudioContext,
-        database: &mut Database,
+        _audio_context: &mut AudioContext,
+        _database: &mut Database,
     ) {
         renderer.is_render_gui = true;
         renderer.is_render_game = false;
@@ -144,20 +144,19 @@ impl Scene for SettingsScene {
 
     fn update(
         &mut self,
-        window: &mut Window,
+        _window: &mut Window,
         renderer: &mut Renderer,
         _input_manager: &InputManager,
         _delta_time: f32,
         conrod_handle: &mut ConrodHandle,
         audio_context: &mut AudioContext,
         _control_flow: &mut ControlFlow,
-        database: &mut Database,
+        _database: &mut Database,
     ) -> SceneOp {
-        let crosshair_texture_id = conrod_handle
+        let crosshair_texture_id = *conrod_handle
             .get_image_id_map()
             .get("crosshair")
-            .unwrap()
-            .clone();
+            .unwrap();
         let crosshair_image = conrod_handle
             .get_image_map()
             .get(&crosshair_texture_id)
@@ -585,7 +584,7 @@ impl Scene for SettingsScene {
         renderer.crosshair.update_vertices(
             &renderer.queue,
             &renderer.game_renderer.crosshair_vertex_buffer,
-            0 as wgpu::BufferAddress,
+            0_u64,
         );
 
         scene_op

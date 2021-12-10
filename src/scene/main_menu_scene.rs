@@ -8,14 +8,14 @@ use crate::database::Database;
 use crate::gui::ConrodHandle;
 use crate::input_manager::InputManager;
 use crate::renderer::Renderer;
-use crate::scene::classic_game_scene::ClassicGameScene;
+
 use crate::scene::classic_score_scene::ClassicGameScoreDisplay;
 use crate::scene::exit_confirm_scene::QuitConfirmScene;
 use crate::scene::game_selection_scene::GameSelectionScene;
 use crate::scene::guide_scene::GuideScene;
 use crate::scene::settings_scene::SettingsScene;
 use crate::scene::{
-    MaybeMessage, Message, Scene, SceneOp, Value, BUTTON_HEIGHT, BUTTON_WIDTH, MARGIN,
+    MaybeMessage, Scene, SceneOp, Value, BUTTON_HEIGHT, BUTTON_WIDTH, MARGIN,
 };
 use crate::window::Window;
 use conrod_core::widget_ids;
@@ -56,7 +56,7 @@ pub fn play_bgm(message: &MaybeMessage, audio_context: &mut AudioContext) {
         if let Some(ref msg) = message {
             let value = msg.get("start_bgm")?;
             Some(match value {
-                Value::Bool(x) => x.clone(),
+                Value::Bool(x) => *x,
                 _ => unreachable!(),
             })
         } else {
@@ -106,14 +106,14 @@ impl Scene for MainMenuScene {
 
     fn update(
         &mut self,
-        window: &mut Window,
+        _window: &mut Window,
         renderer: &mut Renderer,
         input_manager: &InputManager,
         _delta_time: f32,
         conrod_handle: &mut ConrodHandle,
         _audio_context: &mut AudioContext,
         _control_flow: &mut ControlFlow,
-        database: &mut Database,
+        _database: &mut Database,
     ) -> SceneOp {
         let mut scene_op = SceneOp::None;
 
@@ -213,7 +213,7 @@ impl Scene for MainMenuScene {
         _renderer: &mut Renderer,
         _conrod_handle: &mut ConrodHandle,
         _audio_context: &mut AudioContext,
-        database: &mut Database,
+        _database: &mut Database,
     ) {
     }
 }

@@ -1,4 +1,4 @@
-use crate::renderer::vertex::{CoordColorVertex, CoordVertex};
+use crate::renderer::vertex::{CoordColorVertex};
 use crate::util::any_slice_as_u8_slice;
 use nalgebra::{Rotation2, Vector2, Vector3, Vector4};
 

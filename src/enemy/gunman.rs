@@ -1,12 +1,10 @@
 use crate::animation::InOutAnimation;
 use crate::enemy::{HasMaterial, HITTED_MATERIAL_DURATION};
-use crate::physics::GamePhysics;
+
 use crate::renderer::render_objects::MaterialType;
-use hecs::World;
-use nalgebra::{Point3, Unit, Vector3};
-use rapier3d::prelude::{
-    ColliderBuilder, ColliderHandle, RigidBodyBuilder, RigidBodyHandle, RigidBodyType, SharedShape,
-};
+
+use nalgebra::{Unit, Vector3};
+
 
 pub enum EnemyState {
     Shoot(InOutAnimation),
@@ -53,23 +51,23 @@ impl Gunman {
             _ => {}
         };
 
-        let move_speed = 5.0; // Change this, if you feel the enemy rotation is too slow.
-        let current_dir = Unit::new_normalize(player_pos - obj_pos);
+        let rotation_speed = 5.0; // Change this, if you feel the enemy rotation is too slow.
+        let current_dir = Unit::new_normalize(*player_pos - *obj_pos);
 
         // This can be normalized. However, since the player
         // can't move fast, the enemy rotation velocity wouldn't
         // change much, so the normalized version of this vector is optional.
-        let delta_dir = *current_dir - self.dir;
+        let delta_dir = Unit::new_normalize(*current_dir - self.dir);
 
         let mut is_moving = false;
 
         if delta_dir.x.abs() > 0.01 {
-            self.dir.x += delta_dir.x * delta_time * move_speed;
+            self.dir.x += delta_dir.x * delta_time * rotation_speed;
             is_moving |= true;
         }
 
         if delta_dir.z.abs() > 0.01 {
-            self.dir.z += delta_dir.z * delta_time * move_speed;
+            self.dir.z += delta_dir.z * delta_time * rotation_speed;
             is_moving |= true;
         }
 
@@ -79,7 +77,7 @@ impl Gunman {
     }
 
     pub fn get_direction(&self) -> Vector3<f32> {
-        return self.dir;
+        self.dir
     }
 
     pub fn get_rotation(&self) -> f32 {

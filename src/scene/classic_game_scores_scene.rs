@@ -1,26 +1,26 @@
 use conrod_core::widget::envelope_editor::EnvelopePoint;
-use conrod_core::widget::list_select::Event;
+
 use conrod_core::widget::{Button, Canvas, List, Text};
-use conrod_core::{Borderable, Colorable, Labelable, Positionable, Sizeable, Widget};
+use conrod_core::{Labelable, Positionable, Sizeable, Widget};
 use std::collections::HashMap;
-use std::io::{BufReader, Cursor};
+
 use winit::event_loop::ControlFlow;
 
-use crate::audio::{AudioContext, Sink, AUDIO_FILE_AWESOMENESS};
+use crate::audio::{AudioContext};
 use crate::database::Database;
 use crate::gui::ConrodHandle;
 use crate::input_manager::InputManager;
 use crate::renderer::Renderer;
-use crate::scene::classic_game_scene::ClassicGameScene;
+
 use crate::scene::classic_score_scene::ClassicGameScoreDisplay;
-use crate::scene::elimination_game_scene::EliminationGameScene;
-use crate::scene::exit_confirm_scene::QuitConfirmScene;
-use crate::scene::guide_scene::GuideScene;
-use crate::scene::settings_scene::SettingsScene;
+
+
+
+
 use crate::scene::{MaybeMessage, Scene, SceneOp, Value, BUTTON_HEIGHT, BUTTON_WIDTH, MARGIN};
 use crate::window::Window;
 use conrod_core::widget_ids;
-use rodio::Source;
+
 use winit::event::VirtualKeyCode;
 
 widget_ids! {
@@ -63,11 +63,11 @@ impl ClassicGameScoresScene {
 impl Scene for ClassicGameScoresScene {
     fn init(
         &mut self,
-        message: MaybeMessage,
+        _message: MaybeMessage,
         _window: &mut Window,
         renderer: &mut Renderer,
         _conrod_handle: &mut ConrodHandle,
-        audio_context: &mut AudioContext,
+        _audio_context: &mut AudioContext,
         database: &mut Database,
     ) {
         renderer.is_render_gui = true;
@@ -78,18 +78,18 @@ impl Scene for ClassicGameScoresScene {
 
     fn update(
         &mut self,
-        window: &mut Window,
-        renderer: &mut Renderer,
+        _window: &mut Window,
+        _renderer: &mut Renderer,
         input_manager: &InputManager,
         _delta_time: f32,
         conrod_handle: &mut ConrodHandle,
         _audio_context: &mut AudioContext,
         _control_flow: &mut ControlFlow,
-        database: &mut Database,
+        _database: &mut Database,
     ) -> SceneOp {
         let mut scene_op = SceneOp::None;
 
-        let mut back_button;
+        let back_button;
         {
             let mut ui_cell = conrod_handle.get_ui_mut().set_widgets();
 
@@ -120,7 +120,7 @@ impl Scene for ClassicGameScoresScene {
                 .scrollbar_next_to()
                 .middle_of(self.ids.body_canvas)
                 .set(self.ids.score_list, &mut ui_cell);
-            score_list_scrollbar.map(|s| s.set(&mut ui_cell));
+            if let Some(s) = score_list_scrollbar { s.set(&mut ui_cell) }
             while let Some(item) = score_list_event.next(&ui_cell) {
                 let s = format!("{}", self.scores[item.i]);
                 let text = Text::new(&s);
@@ -151,7 +151,7 @@ impl Scene for ClassicGameScoresScene {
         _renderer: &mut Renderer,
         _conrod_handle: &mut ConrodHandle,
         _audio_context: &mut AudioContext,
-        database: &mut Database,
+        _database: &mut Database,
     ) {
     }
 }

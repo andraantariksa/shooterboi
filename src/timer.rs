@@ -1,5 +1,4 @@
-use instant::{Duration, Instant};
-
+#[derive(Clone)]
 pub struct Timer {
     duration: f32,
 }
@@ -30,6 +29,7 @@ impl Timer {
     }
 }
 
+#[derive(Clone)]
 pub struct Stopwatch {
     duration: f32,
 }

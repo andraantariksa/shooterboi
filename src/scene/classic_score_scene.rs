@@ -1,9 +1,9 @@
 use chrono::NaiveDateTime;
 use conrod_core::widget::envelope_editor::EnvelopePoint;
 use conrod_core::widget::Text;
-use conrod_core::{Colorable, Labelable, Positionable, Sizeable, Widget};
+use conrod_core::{Labelable, Positionable, Sizeable, Widget};
 use std::fmt::{Display, Formatter};
-use std::time::UNIX_EPOCH;
+
 use winit::event_loop::ControlFlow;
 
 use crate::audio::AudioContext;
@@ -11,15 +11,15 @@ use crate::database::Database;
 use crate::gui::ConrodHandle;
 use crate::input_manager::InputManager;
 use crate::renderer::Renderer;
-use crate::scene::main_menu_scene::play_bgm;
+
 use crate::scene::{
-    MaybeMessage, Message, Scene, SceneOp, Value, BUTTON_HEIGHT, BUTTON_WIDTH, GAP_BETWEEN_ITEM,
+    MaybeMessage, Scene, SceneOp, BUTTON_HEIGHT, BUTTON_WIDTH, GAP_BETWEEN_ITEM,
     MARGIN,
 };
 use crate::window::Window;
 use conrod_core::widget_ids;
 use gluesql::chrono::Utc;
-use instant::{Instant, SystemTime};
+
 use winit::event::VirtualKeyCode;
 
 widget_ids! {
@@ -101,7 +101,7 @@ pub struct ClassicScoreScene {
 
 impl ClassicScoreScene {
     pub fn new(_renderer: &mut Renderer, conrod_handle: &mut ConrodHandle) -> Self {
-        let mut ids = ClassicScoreSceneIds::new(conrod_handle.get_ui_mut().widget_id_generator());
+        let ids = ClassicScoreSceneIds::new(conrod_handle.get_ui_mut().widget_id_generator());
         Self {
             ids,
             score: ClassicGameScoreDisplay::new(),
@@ -116,7 +116,7 @@ impl Scene for ClassicScoreScene {
         _window: &mut Window,
         renderer: &mut Renderer,
         _conrod_handle: &mut ConrodHandle,
-        audio_context: &mut AudioContext,
+        _audio_context: &mut AudioContext,
         database: &mut Database,
     ) {
         renderer.is_render_gui = true;
@@ -145,14 +145,14 @@ impl Scene for ClassicScoreScene {
 
     fn update(
         &mut self,
-        window: &mut Window,
+        _window: &mut Window,
         _renderer: &mut Renderer,
         input_manager: &InputManager,
         _delta_time: f32,
         conrod_handle: &mut ConrodHandle,
         _audio_context: &mut AudioContext,
-        control_flow: &mut ControlFlow,
-        database: &mut Database,
+        _control_flow: &mut ControlFlow,
+        _database: &mut Database,
     ) -> SceneOp {
         let mut scene_op = SceneOp::None;
 
@@ -274,7 +274,7 @@ impl Scene for ClassicScoreScene {
         _renderer: &mut Renderer,
         _conrod_handle: &mut ConrodHandle,
         _audio_context: &mut AudioContext,
-        database: &mut Database,
+        _database: &mut Database,
     ) {
     }
 }

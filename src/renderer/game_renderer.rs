@@ -1,5 +1,5 @@
 use wgpu::util::DeviceExt;
-use wgpu::{Device, SurfaceConfiguration};
+
 
 use crate::camera::Camera;
 use crate::gui::ConrodHandle;
@@ -94,16 +94,15 @@ impl GameSceneRenderer {
         let image = image::load_from_memory(include_bytes!("../../assets/images/checker.png"))
             .unwrap()
             .to_rgba8();
-        let texture_size = wgpu::Extent3d {
-            width: image.width(),
-            height: image.height(),
-            depth_or_array_layers: 1,
-        };
         let ground_texture = device.create_texture_with_data(
             queue,
             &wgpu::TextureDescriptor {
                 label: Some("Ground texture"),
-                size: texture_size,
+                size: wgpu::Extent3d {
+                    width: image.width(),
+                    height: image.height(),
+                    depth_or_array_layers: 1,
+                },
                 mip_level_count: 1,
                 sample_count: 1,
                 dimension: wgpu::TextureDimension::D2,
@@ -122,6 +121,98 @@ impl GameSceneRenderer {
             base_array_layer: 0,
             array_layer_count: None,
         });
+
+        let noise_vol_gray_texture = device.create_texture_with_data(
+            queue,
+            &wgpu::TextureDescriptor {
+                label: Some("Noise gray 3D texture"),
+                size: wgpu::Extent3d {
+                    width: 32,
+                    height: 32,
+                    depth_or_array_layers: 32,
+                },
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D3,
+                format: wgpu::TextureFormat::R8Uint,
+                usage: wgpu::TextureUsages::TEXTURE_BINDING,
+            },
+            include_bytes!("../../assets/volume/grayvolume.bin"),
+        );
+        let noise_vol_gray_texture_view =
+            noise_vol_gray_texture.create_view(&wgpu::TextureViewDescriptor {
+                label: Some("Noise gray 3D texture view"),
+                format: Some(wgpu::TextureFormat::R8Uint),
+                dimension: Some(wgpu::TextureViewDimension::D3),
+                aspect: wgpu::TextureAspect::All,
+                base_mip_level: 0,
+                mip_level_count: None,
+                base_array_layer: 0,
+                array_layer_count: None,
+            });
+
+        let image = image::load_from_memory(include_bytes!("../../assets/images/crate.jpg"))
+            .unwrap()
+            .to_rgba8();
+        let crate_texture = device.create_texture_with_data(
+            queue,
+            &wgpu::TextureDescriptor {
+                label: Some("Crate texture"),
+                size: wgpu::Extent3d {
+                    width: image.width(),
+                    height: image.height(),
+                    depth_or_array_layers: 1,
+                },
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format: wgpu::TextureFormat::Rgba8Unorm,
+                usage: wgpu::TextureUsages::TEXTURE_BINDING,
+            },
+            &image.into_raw()[..],
+        );
+        let crate_texture_view = crate_texture.create_view(&wgpu::TextureViewDescriptor {
+            label: Some("Crate texture view"),
+            format: Some(wgpu::TextureFormat::Rgba8Unorm),
+            dimension: Some(wgpu::TextureViewDimension::D2),
+            aspect: wgpu::TextureAspect::All,
+            base_mip_level: 0,
+            mip_level_count: None,
+            base_array_layer: 0,
+            array_layer_count: None,
+        });
+
+        let image = image::load_from_memory(include_bytes!("../../assets/images/pebbles.png"))
+            .unwrap()
+            .to_rgba8();
+        let _pebbles_texture = device.create_texture_with_data(
+            queue,
+            &wgpu::TextureDescriptor {
+                label: Some("Pebbles texture"),
+                size: wgpu::Extent3d {
+                    width: image.width(),
+                    height: image.height(),
+                    depth_or_array_layers: 1,
+                },
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format: wgpu::TextureFormat::Rgba8Unorm,
+                usage: wgpu::TextureUsages::TEXTURE_BINDING,
+            },
+            &image.into_raw()[..],
+        );
+        let pebbles_texture_view = crate_texture.create_view(&wgpu::TextureViewDescriptor {
+            label: Some("Pebbles texture view"),
+            format: Some(wgpu::TextureFormat::Rgba8Unorm),
+            dimension: Some(wgpu::TextureViewDimension::D2),
+            aspect: wgpu::TextureAspect::All,
+            base_mip_level: 0,
+            mip_level_count: None,
+            base_array_layer: 0,
+            array_layer_count: None,
+        });
+
         let texture_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
             label: Some("Texture sampler"),
             address_mode_u: wgpu::AddressMode::Repeat,
@@ -184,6 +275,36 @@ impl GameSceneRenderer {
                         },
                         visibility: wgpu::ShaderStages::FRAGMENT,
                     },
+                    wgpu::BindGroupLayoutEntry {
+                        count: None,
+                        binding: 4,
+                        ty: wgpu::BindingType::Texture {
+                            multisampled: false,
+                            sample_type: wgpu::TextureSampleType::Uint,
+                            view_dimension: wgpu::TextureViewDimension::D3,
+                        },
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        count: None,
+                        binding: 5,
+                        ty: wgpu::BindingType::Texture {
+                            multisampled: false,
+                            sample_type: wgpu::TextureSampleType::Float { filterable: false },
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                        },
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        count: None,
+                        binding: 6,
+                        ty: wgpu::BindingType::Texture {
+                            multisampled: false,
+                            sample_type: wgpu::TextureSampleType::Float { filterable: false },
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                        },
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                    },
                 ],
             });
 
@@ -213,6 +334,18 @@ impl GameSceneRenderer {
                 wgpu::BindGroupEntry {
                     binding: 3,
                     resource: wgpu::BindingResource::TextureView(&ground_texture_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 4,
+                    resource: wgpu::BindingResource::TextureView(&noise_vol_gray_texture_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 5,
+                    resource: wgpu::BindingResource::TextureView(&crate_texture_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 6,
+                    resource: wgpu::BindingResource::TextureView(&pebbles_texture_view),
                 },
             ],
         });

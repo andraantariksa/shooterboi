@@ -166,7 +166,7 @@ fn create_image_texture(
         height,
         depth_or_array_layers: 1,
     };
-    let texture = device.create_texture(&wgpu::TextureDescriptor {
+    let texture_checker = device.create_texture(&wgpu::TextureDescriptor {
         label: Some("Creating texture"),
         size: texture_extent,
         mip_level_count: 1,
@@ -187,7 +187,7 @@ fn create_image_texture(
         rows_per_image: std::num::NonZeroU32::new(height),
     };
     let texture_copy_view = wgpu::ImageCopyTexture {
-        texture: &texture,
+        texture: &texture_checker,
         mip_level: 0,
         origin: wgpu::Origin3d::ZERO,
         aspect: wgpu::TextureAspect::All,
@@ -199,5 +199,5 @@ fn create_image_texture(
     };
     queue.write_texture(texture_copy_view, data, data_layout, extent);
 
-    texture
+    texture_checker
 }
