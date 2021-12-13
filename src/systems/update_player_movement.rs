@@ -18,21 +18,17 @@ pub fn update_player_position(
         .rigid_body_set
         .get_mut(player_rigid_body_handle)
         .unwrap();
-
     camera.position = *player_rigid_body.translation();
-
     if input_manager.is_keyboard_press(&VirtualKeyCode::A) {
         camera.position -= SPEED * delta_time * *camera.get_direction_right();
     } else if input_manager.is_keyboard_press(&VirtualKeyCode::D) {
         camera.position += SPEED * delta_time * *camera.get_direction_right();
     }
-
     if input_manager.is_keyboard_press(&VirtualKeyCode::W) {
         camera.position += SPEED * delta_time * *camera.get_direction_without_pitch();
     } else if input_manager.is_keyboard_press(&VirtualKeyCode::S) {
         camera.position -= SPEED * delta_time * *camera.get_direction_without_pitch();
     }
-
     player_rigid_body.set_translation(camera.position, true);
     camera.position
 }

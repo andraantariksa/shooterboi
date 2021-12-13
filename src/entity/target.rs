@@ -35,7 +35,7 @@ impl Target {
         if self.shooted {
             MaterialType::Yellow
         } else {
-            MaterialType::Red
+            MaterialType::Target
         }
     }
 

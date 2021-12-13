@@ -147,30 +147,30 @@ impl DodgeAndDestroyGameScene {
             world.spawn_at(entity, (Gunman::new(), rigid_body_handle, Label::Gunman));
         }
 
-        {
-            let entity = world.reserve_entity();
-            let rigid_body_handle = physics.rigid_body_set.insert(
-                RigidBodyBuilder::new(RigidBodyType::Dynamic)
-                    .translation(Vector3::<f32>::new(-2.0, 2.0, -2.0))
-                    .lock_rotations()
-                    .build(),
-            );
-            physics.collider_set.insert_with_parent(
-                ColliderBuilder::new(SharedShape::capsule(
-                    Point3::<f32>::new(0.0, 1.0, 0.0),
-                    Point3::<f32>::new(0.0, -0.5, 0.0),
-                    0.5,
-                ))
-                .user_data(entity.to_bits() as u128)
-                .build(),
-                rigid_body_handle,
-                &mut physics.rigid_body_set,
-            );
-            world.spawn_at(
-                entity,
-                (Swordman::new(), rigid_body_handle, Label::Swordman),
-            );
-        }
+        // {
+        //     let entity = world.reserve_entity();
+        //     let rigid_body_handle = physics.rigid_body_set.insert(
+        //         RigidBodyBuilder::new(RigidBodyType::Dynamic)
+        //             .translation(Vector3::<f32>::new(-2.0, 2.0, -2.0))
+        //             .lock_rotations()
+        //             .build(),
+        //     );
+        //     physics.collider_set.insert_with_parent(
+        //         ColliderBuilder::new(SharedShape::capsule(
+        //             Point3::<f32>::new(0.0, 1.0, 0.0),
+        //             Point3::<f32>::new(0.0, -0.5, 0.0),
+        //             0.5,
+        //         ))
+        //         .user_data(entity.to_bits() as u128)
+        //         .build(),
+        //         rigid_body_handle,
+        //         &mut physics.rigid_body_set,
+        //     );
+        //     world.spawn_at(
+        //         entity,
+        //         (Swordman::new(), rigid_body_handle, Label::Swordman),
+        //     );
+        // }
 
         Self {
             world,
@@ -294,24 +294,6 @@ impl Scene for DodgeAndDestroyGameScene {
                 .get_mut(self.player_rigid_body_handle)
                 .unwrap();
             renderer.camera.position = *player_rigid_body.translation();
-        }
-
-        {
-            let entity = self.world.reserve_entity();
-            let rb_handle = self.physics.rigid_body_set.insert(
-                RigidBodyBuilder::new(RigidBodyType::Dynamic)
-                    .user_data(entity.to_bits() as u128)
-                    .build(),
-            );
-            self.physics.collider_set.insert_with_parent(
-                ColliderBuilder::new(SharedShape::cuboid(1.0, 1.0, 1.0))
-                    .user_data(entity.to_bits() as u128)
-                    .build(),
-                rb_handle,
-                &mut self.physics.rigid_body_set,
-            );
-            self.world
-                .spawn_at(entity, (Label::Crate, Crate, rb_handle));
         }
 
         window.set_is_cursor_grabbed(true);
@@ -606,6 +588,7 @@ impl Scene for DodgeAndDestroyGameScene {
 
             let (objects, ref mut bound) = renderer.render_objects.next();
             objects.position = *rb.translation();
+            // println!("pos {}", rb.translation());
             objects.shape_type_material_ids.0 = ShapeType::Box;
             objects.shape_type_material_ids.1 = MaterialType::Crate;
             objects.rotation = rb.rotation().to_homogeneous();

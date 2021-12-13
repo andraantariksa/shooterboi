@@ -1,6 +1,7 @@
 use glob::{glob, GlobError, PatternError};
-use shaderc::CompileOptions;
 use shaderc::OptimizationLevel;
+use shaderc::{CompileOptions, ResolvedInclude};
+use std::env;
 use std::fs::{read_to_string, write};
 use std::path::PathBuf;
 
@@ -38,7 +39,6 @@ impl ShaderData {
 }
 
 fn main() -> BuildScriptResult<()> {
-    println!("cargo:warning=Running build.rs");
     let mut shader_paths = [
         glob("./src/shaders/*.vert")?,
         glob("./src/shaders/*.frag")?,
@@ -52,9 +52,22 @@ fn main() -> BuildScriptResult<()> {
         .collect::<Vec<BuildScriptResult<_>>>()
         .into_iter()
         .collect::<BuildScriptResult<Vec<_>>>()?;
-    let mut compiler = shaderc::Compiler::new().expect("Unable to create shader compiler");
-    #[warn(unused_mut)]
+    let mut compiler = shaderc::Compiler::new().unwrap();
     let mut compile_options = CompileOptions::new().unwrap();
+    compile_options.set_include_callback(
+        |requested_source, _include_type, _requesting_source, include_depth| {
+            if include_depth > 5 {
+                panic!("Recursive include");
+            }
+            let mut dir = env::current_dir().unwrap();
+            dir.push("src/shaders");
+            dir.push(requested_source);
+            Ok(ResolvedInclude {
+                content: read_to_string(&dir).unwrap(),
+                resolved_name: dir.to_str().unwrap().to_string(),
+            })
+        },
+    );
     let target = std::env::var("TARGET").unwrap();
     let profile = std::env::var("PROFILE").unwrap();
 
@@ -68,11 +81,11 @@ fn main() -> BuildScriptResult<()> {
     }
 
     for shader in shaders {
-        // println!(
-        //     "cargo:rerun-if-changed={}",
-        //     shader.src_path.as_os_str().to_str().unwrap()
-        // );
-        println!("cargo:warning=Compiling {:?}", shader.src_path.to_str());
+        println!(
+            "cargo:rerun-if-changed={}",
+            shader.src_path.as_os_str().to_str().unwrap()
+        );
+        //println!("cargo:warning=Compiling {:?}", shader.src_path.to_str());
         let compiled = compiler.compile_into_spirv(
             &shader.src,
             shader.kind,
@@ -80,7 +93,9 @@ fn main() -> BuildScriptResult<()> {
             "main",
             Some(&compile_options),
         )?;
+        println!("{}", compiled.get_warning_messages());
         write(shader.spv_path, compiled.as_binary_u8())?;
+        println!("DONE");
     }
 
     Ok(())

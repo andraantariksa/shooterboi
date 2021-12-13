@@ -1,17 +1,8 @@
 #version 450
 
-#define SENTINEL_IDX 9999
+#extension GL_GOOGLE_include_directive : enable
 
-#define EPS 0.0001
-#define MAX_DISTANCE 100.0
-#define MAX_QUEUE 100
-
-#define SHAPE_TYPE_NONE 0
-#define SHAPE_TYPE_BOX 1
-#define SHAPE_TYPE_SPHERE 2
-#define SHAPE_TYPE_CYLINDER 3
-#define SHAPE_TYPE_SWORDMAN 4
-#define SHAPE_TYPE_GUNMAN 5
+#include "common.glsl"
 
 #define MATERIAL_GREEN 0
 #define MATERIAL_YELLOW 1
@@ -22,99 +13,11 @@
 #define MATERIAL_ORANGE 6
 #define MATERIAL_CRATE 7
 #define MATERIAL_PEBBLES 8
-
-#define DEBUG_POSITION 0
-
-struct RenderQueue
-{
-    vec3 position;
-    vec3 scale;
-    mat4 rotation;
-    vec4 shape_data1;
-    vec4 shape_data2;
-    uvec4 shape_type_materials_id;
-};
-
-layout(std140, binding = 0) uniform rendering_info {
-    vec3 reso_time;
-    vec3 cam_pos;
-    vec3 cam_dir;
-    vec2 fov_shootanim;
-    uvec3 queuecount_raymarchmaxstep_aostep;
-};
-
-#ifdef IS_WEB
-layout(std140, binding = 1) uniform render_queue {
-#else
-layout(std430, binding = 1) readonly buffer render_queue {
-#endif
-    RenderQueue queue[70];
-};
-
-layout(binding = 2) uniform sampler common_sampler;
-layout(binding = 3) uniform texture2D checker_texture;
-layout(binding = 4) uniform texture3D noise_vol_gray_texture;
-layout(binding = 5) uniform texture2D crate_texture;
-layout(binding = 6) uniform texture2D pebbles_texture;
-
-layout(location = 0) out vec4 outColor;
-
-struct RayHit
-{
-    vec3 pos;
-    float dist;
-};
-
-struct Distance
-{
-    float distance;
-    uint materialId;
-    uint idx;
-};
-
-Distance sd_union(Distance d1, Distance d2)
-{
-    return d1.distance < d2.distance ? d1 : d2;
-}
-
-Distance sd_intersect(Distance d1, Distance d2)
-{
-    return d1.distance > d2.distance ? d1 : d2;
-}
-
-mat3 rot_z(float rad)
-{
-    float s = sin(rad);
-    float c = cos(rad);
-    return mat3(
-    c, -s, 0,
-    s, c, 0,
-    0, 0, 1);
-}
-
-mat3 rot_y(float rad) {
-    float c = cos(rad);
-    float s = sin(rad);
-    return mat3(
-    c, 0.0, -s,
-    0.0, 1.0, 0.0,
-    s, 0.0, c);
-}
-
-mat3 rot_x(float rad) {
-    float c = cos(rad);
-    float s = sin(rad);
-    return mat3(
-    1., 0., 0.,
-    0., c, -s,
-    0., s, c);
-}
-
-float smin(float a, float b, float k)
-{
-    float h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0);
-    return mix(b, a, h) - k * h * (1.0 - h);
-}
+#define MATERIAL_COBBLESTONE_PAVING 9
+#define MATERIAL_CONTAINER 10
+#define MATERIAL_TARGET 11
+#define MATERIAL_GRASS 12
+#define MATERIAL_STONE_WALL 13
 
 float sd_capsule_line(vec3 p, vec3 a, vec3 b, float r)
 {
@@ -317,14 +220,129 @@ float sd_baseground(vec3 p)
 Distance sd_ground(vec3 p)
 {
     float grassheight = 0.1 - textureLod(sampler2D(pebbles_texture, common_sampler), p.xz * 4.0, 0.).x * .1;
-    return Distance(sd_baseground(p) + grassheight, MATERIAL_GREEN, SENTINEL_IDX);
+    return Distance(sd_baseground(p) + grassheight, MATERIAL_GRASS, SENTINEL_IDX);
 }
 
-Distance scene_dist(vec3 pos)
+#define TIME_FACTOR .01
+
+#define SKY_COLOR vec3(.05, .4, 1.)
+#define CLOUD_COLOR vec3(1, 1, 1)
+#define CLOUD_DARK_COLOR vec3(.4, .5, .4)
+#define LAYERS 3 // More layers = less fluffy
+#define CLOUD_INTENSITY 1.4 //amount of clouds
+#define DISTANCE .2 //scale factor of first layer
+#define ROUGHNESS .75 //amount contribution per each successive layer
+
+const float div = 1. / (float(LAYERS) * ROUGHNESS);
+
+float fractal_cloud(vec2 position, vec2 delta)
 {
-    Distance m = Distance(sd_box(pos - vec3(0., -0.5, 0.), vec3(10., .5, 10.)), MATERIAL_CHECKER, SENTINEL_IDX);
-//    m = sd_union(m, Distance(sd_tree(pos - vec3(2., 0., 2.)), MATERIAL_GREEN, SENTINEL_IDX));
-    m = sd_union(m, sd_ground(pos - vec3(0., -0.5, 0.)));
+    float step = DISTANCE;
+    float mul = CLOUD_INTENSITY;
+    float p = 0.;
+    for (uint i = 0; i < LAYERS; i++)
+    {
+        vec2 coord = position * step + delta * sqrt(step);
+        p = p + textureLod(sampler2D(abstract3_texture, common_sampler), coord, 0.).r * mul;
+        step *= 1.75;
+        mul *= ROUGHNESS;
+    }
+    return p * div;
+}
+
+
+#define MASK_LAYERS 2
+float cloud_mask(vec2 position, vec2 delta)
+{
+    float step = .15;
+    float p = .25;
+    float mul = 1.;
+    for (uint i = 0; i < MASK_LAYERS; i++)
+    {
+        vec2 coord = (position) * step + delta;// + sqrt(delta);
+        float k = textureLod(sampler2D(pebbles_texture, common_sampler), coord, 0.).r;
+        //k = cos(k * TAU);
+        p += k * mul;
+        mul = mul * -.5;
+        step = step * 2.;
+    }
+    return p;
+}
+
+vec3 clouds(vec3 pos) {
+    vec2 uv = pos.xz / 3000.;
+    float time = reso_time.z * TIME_FACTOR;
+
+    float cloudIntensity = sin(time * .5 + uv.x * 1.5);
+    cloudIntensity = 1.25 + cloudIntensity * .75;
+
+    float p = fractal_cloud(uv, vec2(time * .3, time * -.15));
+    p *= (.5 + cloud_mask(uv, vec2(time * .15, time * .05)) * cloudIntensity);
+    p = smoothstep(0., 2., p) * 2.;
+
+    float dark = max(p - 1., 0.);
+    dark =log(1. + dark);
+    float light = min(p, 1.);
+    return mix(
+        mix(SKY_COLOR, CLOUD_COLOR, smoothstep(0.,1.,light)),
+        CLOUD_DARK_COLOR, smoothstep(0.,1.,dark));
+}
+
+float hash1( vec2 p )
+{
+    p  = 50.0*fract( p*0.3183099 );
+    return fract( p.x*p.y*(p.x+p.y) );
+}
+
+float noise( in vec2 x )
+{
+    vec2 p = floor(x);
+    vec2 w = fract(x);
+    #if 1
+    vec2 u = w*w*w*(w*(w*6.0-15.0)+10.0);
+    #else
+    vec2 u = w*w*(3.0-2.0*w);
+    #endif
+
+    float a = hash1(p+vec2(0,0));
+    float b = hash1(p+vec2(1,0));
+    float c = hash1(p+vec2(0,1));
+    float d = hash1(p+vec2(1,1));
+
+    return -1.0+2.0*(a + (b-a)*u.x + (c-a)*u.y + (a - b - c + d)*u.x*u.y);
+}
+
+const mat2 m2 = mat2(  0.80,  0.60,
+-0.60,  0.80 );
+
+float fbm_9( in vec2 x )
+{
+    float f = 1.9;
+    float s = 0.55;
+    float a = 0.0;
+    float b = 0.5;
+    for(uint i = 0; i < 9; i++)
+    {
+        float n = noise(x);
+        a += b*n;
+        b *= s;
+        x = f*m2*x;
+    }
+
+    return a;
+}
+
+float sd_terrain(vec2 p) {
+    const float sca = 0.08;
+    p *= sca;
+    float h = fbm_9(p + vec2(1.0,-2.0) );
+    return h * 1.8;
+}
+
+Distance scene_dist(vec3 pos) {
+    Distance m = Distance(pos.y - sd_terrain(pos.xz), MATERIAL_GRASS, SENTINEL_IDX);
+    //m = sd_union(m, Distance(sd_box(pos - vec3(0., -0.5, 0.), vec3(10., .5, 10.)), MATERIAL_COBBLESTONE_PAVING, SENTINEL_IDX));
+    //m = sd_union(m, sd_ground(pos - vec3(0., -0.5, 0.)));
 
     for (uint i = 0u; i < queuecount_raymarchmaxstep_aostep.x; i++) {
         vec3 pos_transformed = (vec4(pos - queue[i].position, 1.) * queue[i].rotation).xyz;
@@ -385,156 +403,53 @@ Distance scene_dist(vec3 pos)
                 }
                 break;
             default:
-                break;
+                return m;
         }
     }
 
     return m;
 }
 
-vec3 get_normal(vec3 pos)
-{
-    float d = scene_dist(pos).distance;
-    vec2 eps = vec2(EPS, 0.);
+const float SKY_HEIGHT = 500.;
+const vec3 SKYCOLOR = vec3(113, 188, 225) / 255.0;
 
-    vec3 normal = vec3(
-        scene_dist(pos + eps.xyy).distance - d,
-        scene_dist(pos + eps.yxy).distance - d,
-        scene_dist(pos + eps.yyx).distance - d);
-
-    return normalize(normal);
+vec3 texture_map_triplanar(texture2D texture, vec3 pos, vec3 normal) {
+    vec3 texture_xz = textureLod(sampler2D(texture, common_sampler), pos.xz * .5 + .5, 0.).rgb;
+    vec3 texture_xy = textureLod(sampler2D(texture, common_sampler), pos.xy * .5 + vec2(.5, 0.), 0.).rgb;
+    vec3 texture_yz = textureLod(sampler2D(texture, common_sampler), pos.yz * .5 + vec2(0., .5), 0.).rgb;
+    return texture_yz * abs(normal.x) + texture_xy * abs(normal.z) + texture_xz * abs(normal.y);
 }
 
-Distance ray_march(vec3 ray_origin, vec3 ray_dir)
-{
-    float d = 0.0;
-    uint mat_id = 0;
-    uint idx = 0;
-    vec3 current_pos = vec3(0);
-
-    for (uint i = 0u; i < queuecount_raymarchmaxstep_aostep.y; i++) {
-        current_pos = ray_origin + d * ray_dir;
-        Distance closest_distance = scene_dist(current_pos);
-
-        if (abs(closest_distance.distance) < 0.0001 || d >= 100.0) {
-            break;
-        }
-
-        d += closest_distance.distance;
-        mat_id = closest_distance.materialId;
-        idx = closest_distance.idx;
-    }
-
-    return Distance(d, mat_id, idx);
+vec3 texture_map_triplanar(texture2D texture, vec3 pos, vec3 normal, vec4 xz_tex, vec4 xz_world, vec4 xy_tex, vec4 xy_world, vec4 yz_tex, vec4 yz_world) {
+    vec3 texture_xz = textureLod(sampler2D(texture, common_sampler), mix(xz_tex.xy, xz_tex.zw, (pos.xz - xz_world.xy) / (xz_world.zw - xz_world.xy)), 0.).rgb;
+    vec3 texture_xy = textureLod(sampler2D(texture, common_sampler), mix(xy_tex.xy, xy_tex.zw, (pos.xy - xy_world.xy) / (xy_world.zw - xy_world.xy)), 0.).rgb;
+    vec3 texture_yz = textureLod(sampler2D(texture, common_sampler), mix(yz_tex.xy, yz_tex.zw, (pos.yz - yz_world.xy) / (yz_world.zw - yz_world.xy)), 0.).rgb;
+    return texture_yz * abs(normal.x) + texture_xy * abs(normal.z) + texture_xz * abs(normal.y);
 }
-
-float soft_shadow(in vec3 ro, in vec3 rd, float mint, float maxt, float k)
-{
-    float res = 1.0;
-    float ph = 1e10;
-    for (float t = mint; t < maxt; )
-    {
-        Distance h = scene_dist(ro + rd * t);
-        if (h.distance < 0.001)
-        return 0.0;
-        float y = h.distance * h.distance / (2.0 * ph);
-        float d = sqrt(h.distance * h.distance - y * y);
-        res = min(res, k * d / max(0.0, t - y));
-        ph = h.distance;
-        t += h.distance;
-    }
-    return res;
-}
-
-float ambient_ocl(in vec3 pos, in vec3 nor)
-{
-    float occ = 0.0;
-    float sca = 1.0;
-    for (uint i = 0; i < queuecount_raymarchmaxstep_aostep.z; i++)
-    {
-        float h = 0.001 + 0.15 * float(i) / 4.0;
-        Distance d = scene_dist(pos + h * nor);
-        occ += (h - d.distance) * sca;
-        sca *= 0.95;
-    }
-    return clamp(1.0 - 1.5 * occ, 0.0, 1.0);
-}
-
-float light(vec3 n, vec3 lp, vec3 l)
-{
-    return clamp(dot(n, normalize(l - lp)), 0, 1);
-}
-
-vec3 lookat(vec2 uv, vec3 pos, vec3 dir, vec3 w_up)
-{
-    vec3 right = normalize(cross(w_up, dir));
-    vec3 up = normalize(cross(right, dir));
-    return normalize(uv.x * right + uv.y * up + dir * 2.0);
-}
-
-vec3 ray_view_dir(vec2 size, vec2 coord) {
-    vec2 xy = coord - size / 2.0;
-    float z = size.y / tan(fov_shootanim.x / 2.0);
-    return normalize(vec3(xy, z));
-}
-
-mat4 view_matrix(vec3 pos, vec3 dir, vec3 world_up) {
-    vec3 right = normalize(cross(dir, world_up));
-    vec3 up = normalize(cross(dir, right));
-    return mat4(
-        vec4(right, 0.0),
-        vec4(up, 0.0),
-        vec4(dir, 0.0),
-        vec4(0.0, 0.0, 0.0, 1));
-}
-
-vec3 blinn_phong(
-    vec3 k_d,
-    vec3 k_s,
-    float alpha,
-    vec3 p,
-    vec3 eye,
-    vec3 light_pos,
-    vec3 light_intensity,
-    vec3 n)
-{
-    vec3 l = normalize(light_pos - p);
-    vec3 v = normalize(eye - p);
-    vec3 h = normalize(l + v);
-    float diff = max(dot(l, n), 0.0);
-    float spec = max(dot(h, n), 0.0);
-    if (diff < 0.0) {
-        // Light not visible from this point on the surface
-        return vec3(0.0, 0.0, 0.0);
-    }
-    if (spec < 0.0) {
-        // Light reflection in opposite direction as viewer, apply only diffuse
-        // component
-        return light_intensity * (k_d * diff);
-    }
-    return light_intensity * (k_d * diff + k_s * pow(spec, alpha));
-}
-
-const vec3 skycolor = vec3(113, 188, 225) / 255.0;
-const vec3 world_up = vec3(0.0, 1.0, 0.0);
 
 void main()
 {
     vec3 ray_view_dir = ray_view_dir(reso_time.xy, gl_FragCoord.xy);
-    mat4 view_to_world = view_matrix(cam_pos, cam_dir, world_up);
+    mat4 view_to_world = view_matrix(cam_pos, cam_dir);
     vec3 ray_world_dir = (view_to_world * vec4(ray_view_dir, 0.0)).xyz;
 
     Distance d = ray_march(cam_pos, ray_world_dir);
 
+    if (d.distance > MAX_DISTANCE - EPS) {
+        if (dot(ray_world_dir, WORLD_UP) > 0.) {
+            float h_f = SKY_HEIGHT / ray_world_dir.y;
+            vec3 ray_hit_sky_pos = cam_pos + h_f * ray_world_dir;
+            outColor = vec4(clouds(ray_hit_sky_pos), 1.);
+            return;
+        } else {
+            discard;
+        }
+    }
+
     vec3 ray_hit_pos = cam_pos + d.distance * ray_world_dir;
     vec3 normal = get_normal(ray_hit_pos);
 
-    if (d.distance > MAX_DISTANCE - EPS) {
-        outColor = vec4(skycolor, 1.0);
-        return;
-    }
-
-    vec3 col = vec3(46., 209., 162.) / 255.;
+    vec3 col = vec3(0.);
     switch (d.materialId) {
         case MATERIAL_RED:
             col = vec3(1., 0., 0.);
@@ -565,17 +480,75 @@ void main()
         case MATERIAL_CRATE:
         {
             //vec3 pos_before_transformed = (vec4(ray_hit_pos + queue[d.idx].position, 1.) * inverse(queue[d.idx].rotation)).xyz;
-            vec3 texture_xz = textureLod(sampler2D(crate_texture, common_sampler), ray_hit_pos.xz * .5 + .5, 0.).rgb;
-            vec3 texture_xy = textureLod(sampler2D(crate_texture, common_sampler), ray_hit_pos.xy * .5 + vec2(.5, 0.), 0.).rgb;
-            vec3 texture_yz = textureLod(sampler2D(crate_texture, common_sampler), ray_hit_pos.yz * .5 + vec2(0., .5), 0.).rgb;
-            col = texture_yz * abs(normal.x) + texture_xy * abs(normal.z) + texture_xz * abs(normal.y);
+            //col = texture_map_triplanar(crate_texture, ray_hit_pos, normal);
+
+            // Assuming SHAPE_TYPE_BOX
+            // Top back right
+            const vec3 tbr = queue[d.idx].position + queue[d.idx].shape_data1.xyz;
+            // Bottom front left
+            const vec3 bfl = queue[d.idx].position - queue[d.idx].shape_data1.xyz;
+            col = texture_map_triplanar(
+                crate_texture,
+                ray_hit_pos,
+                normal,
+                vec4(0., 0., 1., 1.),
+                vec4(bfl.x, bfl.z, tbr.x, tbr.z),
+                vec4(0., 0., 1., 1.),
+                vec4(bfl.x, bfl.y, tbr.x, tbr.y),
+                vec4(0., 0., 1., 1.),
+                vec4(bfl.y, bfl.z, tbr.y, tbr.z));
+            break;
+        }
+        case MATERIAL_GRASS:
+        {
+            //vec3 pos_before_transformed = (vec4(ray_hit_pos + queue[d.idx].position, 1.) * inverse(queue[d.idx].rotation)).xyz;
+            col = texture_map_triplanar(grass_texture, ray_hit_pos, normal);
+            break;
+        }
+        case MATERIAL_COBBLESTONE_PAVING:
+        {
+            col = texture_map_triplanar(cobblestone_paving_texture, ray_hit_pos, normal);
+            break;
+        }
+        case MATERIAL_STONE_WALL:
+        {
+            col = texture_map_triplanar(stone_wall_texture, ray_hit_pos, normal);
+            break;
+        }
+        case MATERIAL_CONTAINER:
+        {
+            // xz yz xy
+            // w 322
+            // h 419.5
+
+            // Assuming SHAPE_TYPE_BOX
+            // Top back right
+            const vec3 tbr = queue[d.idx].position + queue[d.idx].shape_data1.xyz;
+            // Bottom front left
+            const vec3 bfl = queue[d.idx].position - queue[d.idx].shape_data1.xyz;
+            col = texture_map_triplanar(
+                container_texture,
+                ray_hit_pos,
+                normal,
+                vec4(0., 0., 1., .5),
+                vec4(bfl.x, bfl.z, tbr.x, tbr.z),
+                vec4(0., .5, 322. / 840., 1.),
+                vec4(bfl.x, bfl.y, tbr.x, tbr.y),
+                vec4(0., 0., 1., .5),
+                vec4(bfl.y, bfl.z, tbr.y, tbr.z));
+            break;
+        }
+        case MATERIAL_TARGET:
+        {
+            float dd = dot(normal, normalize(queue[d.idx].position - cam_pos)) * -1. / 3.;
+            col = textureLod(sampler2D(target_texture, common_sampler), vec2(1. - dd), 0.).rgb;
             break;
         }
         default:
             break;
     }
 
-    const vec3 ambient_light = skycolor * col * 0.5;
+    const vec3 ambient_light = SKYCOLOR * col * 0.5;
     vec3 color = ambient_light;
     color += blinn_phong(
         col,

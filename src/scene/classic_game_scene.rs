@@ -26,14 +26,17 @@ use crate::renderer::Renderer;
 use crate::scene::classic_score_scene::ClassicScoreScene;
 use crate::scene::pause_scene::PauseScene;
 use crate::scene::{MaybeMessage, Message, Scene, SceneOp, Value};
+use crate::systems::container::{enqueue_container, spawn_container};
+use crate::systems::crate_box::{enqueue_crate, spawn_crate};
 use crate::systems::setup_player_collider::setup_player_collider;
 use crate::systems::spawn_target::spawn_target;
 use crate::systems::update_player_movement::update_player_position;
+use crate::systems::wall::{enqueue_wall, spawn_wall};
 use crate::timer::{Stopwatch, Timer};
 use crate::util::lerp;
 use crate::window::Window;
 use conrod_core::widget_ids;
-use nalgebra::Vector3;
+use nalgebra::{Vector3, Vector4};
 use rand::distributions::Uniform;
 use rand::prelude::SmallRng;
 use rand::{Rng, SeedableRng};
@@ -105,11 +108,9 @@ impl ClassicGameScene {
         let mut physics = GamePhysics::new();
 
         // Ground
-        physics.collider_set.insert(
-            ColliderBuilder::new(SharedShape::cuboid(999.999, 0.1, 999.999))
-                .translation(Vector3::new(0.0, 0.05, 0.0))
-                .build(),
-        );
+        physics
+            .collider_set
+            .insert(ColliderBuilder::new(SharedShape::cuboid(20.0, 1.0, 10.0)).build());
 
         let player_rigid_body_handle = setup_player_collider(&mut physics);
 
@@ -118,6 +119,63 @@ impl ClassicGameScene {
             &mut physics,
             Vector3::new(0.0, 3.0, -10.0),
             Target::new(),
+        );
+
+        spawn_container(
+            &mut world,
+            &mut physics,
+            Vector3::new(20.0 - 1.0 - 2.0, 1.0 + 2.0, -1.0),
+            Vector3::new(1.99, 1.99, 4.99),
+        );
+
+        spawn_wall(
+            &mut world,
+            &mut physics,
+            Vector3::new(0.0, 1.4, -9.5),
+            Vector3::new(20.0, 0.398, 0.5),
+        );
+        spawn_wall(
+            &mut world,
+            &mut physics,
+            Vector3::new(0.0, 1.4, 9.5),
+            Vector3::new(20.0, 0.398, 0.5),
+        );
+        spawn_wall(
+            &mut world,
+            &mut physics,
+            Vector3::new(19.5, 1.4, 0.0),
+            Vector3::new(0.5, 0.398, 9.99),
+        );
+        spawn_wall(
+            &mut world,
+            &mut physics,
+            Vector3::new(-19.5, 1.4, 0.0),
+            Vector3::new(0.5, 0.398, 9.99),
+        );
+
+        spawn_crate(
+            &mut world,
+            &mut physics,
+            Vector3::new(-4.0, 4.0, 8.0),
+            Vector3::new(0.99, 0.99, 0.99),
+        );
+        spawn_crate(
+            &mut world,
+            &mut physics,
+            Vector3::new(-6.0, 2.0, 8.0),
+            Vector3::new(0.99, 0.99, 0.99),
+        );
+        spawn_crate(
+            &mut world,
+            &mut physics,
+            Vector3::new(-4.0, 2.0, 8.0),
+            Vector3::new(0.99, 0.99, 0.99),
+        );
+        spawn_crate(
+            &mut world,
+            &mut physics,
+            Vector3::new(-2.0, 2.0, 8.0),
+            Vector3::new(0.99, 0.99, 0.99),
         );
 
         Self {
@@ -153,12 +211,19 @@ impl Scene for ClassicGameScene {
         renderer.is_render_gui = true;
         renderer.is_render_game = true;
 
-        // {
-        //     let entity = self.world.reserve_entity();
+        // Ground
         let (objects, ref mut bound) = renderer.render_objects.next_static();
-        objects.position = nalgebra::Vector3::new(0.0, 0.0, -20.0);
+        objects.position = nalgebra::Vector3::new(0.0, 0.0, 0.0);
         objects.shape_type_material_ids.0 = ShapeType::Box;
-        objects.shape_type_material_ids.1 = MaterialType::Checker;
+        objects.shape_type_material_ids.1 = MaterialType::CobblestonePaving;
+        objects.shape_data1 = nalgebra::Vector4::new(20.0, 1.0, 10.0, 0.0);
+        *bound = ObjectBound::None;
+
+        // Wall
+        let (objects, ref mut bound) = renderer.render_objects.next_static();
+        objects.position = nalgebra::Vector3::new(0.0, 0.0, -40.0);
+        objects.shape_type_material_ids.0 = ShapeType::Box;
+        objects.shape_type_material_ids.1 = MaterialType::StoneWall;
         objects.shape_data1 = nalgebra::Vector4::new(20.0, 12.0, 1.0, 0.0);
         *bound = ObjectBound::Sphere(20.0);
         //     self.physics.collider_set.insert(
@@ -287,7 +352,6 @@ impl Scene for ClassicGameScene {
                 (sec % 60.0) as i32
             ))
             .color(conrod_core::color::BLACK)
-            .rgba(1.0, 1.0, 1.0, 1.0)
             .middle_of(self.ids.canvas_duration)
             .set(self.ids.duration_label, &mut ui_cell);
         }
@@ -531,6 +595,10 @@ impl Scene for ClassicGameScene {
 
             *bound = ObjectBound::Sphere(0.5);
         }
+
+        enqueue_crate(&mut self.world, &mut self.physics, renderer);
+        enqueue_wall(&mut self.world, &mut self.physics, renderer);
+        enqueue_container(&mut self.world, &mut self.physics, renderer);
     }
 
     fn deinit(

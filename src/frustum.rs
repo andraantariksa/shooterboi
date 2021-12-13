@@ -42,6 +42,7 @@ impl Frustum {
     }
 }
 
+#[derive(Clone)]
 pub enum ObjectBound {
     Sphere(f32),
     None,

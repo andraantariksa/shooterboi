@@ -24,6 +24,11 @@ pub enum MaterialType {
     Orange = 6,
     Crate = 7,
     Pebbles = 8,
+    CobblestonePaving = 9,
+    Container = 10,
+    Target = 11,
+    Grass = 12,
+    StoneWall = 13,
 }
 
 #[derive(Debug, Copy, Clone)]

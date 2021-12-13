@@ -1,5 +1,5 @@
+use image::GenericImage;
 use wgpu::util::DeviceExt;
-
 
 use crate::camera::Camera;
 use crate::gui::ConrodHandle;
@@ -96,31 +96,11 @@ impl GameSceneRenderer {
             .to_rgba8();
         let ground_texture = device.create_texture_with_data(
             queue,
-            &wgpu::TextureDescriptor {
-                label: Some("Ground texture"),
-                size: wgpu::Extent3d {
-                    width: image.width(),
-                    height: image.height(),
-                    depth_or_array_layers: 1,
-                },
-                mip_level_count: 1,
-                sample_count: 1,
-                dimension: wgpu::TextureDimension::D2,
-                format: wgpu::TextureFormat::Rgba8Unorm,
-                usage: wgpu::TextureUsages::TEXTURE_BINDING,
-            },
+            &default_texture_descriptor("Ground texture", &image),
             &image.into_raw()[..],
         );
-        let ground_texture_view = ground_texture.create_view(&wgpu::TextureViewDescriptor {
-            label: Some("Ground texture view"),
-            format: Some(wgpu::TextureFormat::Rgba8Unorm),
-            dimension: Some(wgpu::TextureViewDimension::D2),
-            aspect: wgpu::TextureAspect::All,
-            base_mip_level: 0,
-            mip_level_count: None,
-            base_array_layer: 0,
-            array_layer_count: None,
-        });
+        let ground_texture_view =
+            ground_texture.create_view(&default_texture_view_descriptor("Ground texture view"));
 
         let noise_vol_gray_texture = device.create_texture_with_data(
             queue,
@@ -141,7 +121,7 @@ impl GameSceneRenderer {
         );
         let noise_vol_gray_texture_view =
             noise_vol_gray_texture.create_view(&wgpu::TextureViewDescriptor {
-                label: Some("Noise gray 3D texture view"),
+                label: Some("Noise gray 3d texture view"),
                 format: Some(wgpu::TextureFormat::R8Uint),
                 dimension: Some(wgpu::TextureViewDimension::D3),
                 aspect: wgpu::TextureAspect::All,
@@ -156,62 +136,90 @@ impl GameSceneRenderer {
             .to_rgba8();
         let crate_texture = device.create_texture_with_data(
             queue,
-            &wgpu::TextureDescriptor {
-                label: Some("Crate texture"),
-                size: wgpu::Extent3d {
-                    width: image.width(),
-                    height: image.height(),
-                    depth_or_array_layers: 1,
-                },
-                mip_level_count: 1,
-                sample_count: 1,
-                dimension: wgpu::TextureDimension::D2,
-                format: wgpu::TextureFormat::Rgba8Unorm,
-                usage: wgpu::TextureUsages::TEXTURE_BINDING,
-            },
+            &default_texture_descriptor("Crate texture", &image),
             &image.into_raw()[..],
         );
-        let crate_texture_view = crate_texture.create_view(&wgpu::TextureViewDescriptor {
-            label: Some("Crate texture view"),
-            format: Some(wgpu::TextureFormat::Rgba8Unorm),
-            dimension: Some(wgpu::TextureViewDimension::D2),
-            aspect: wgpu::TextureAspect::All,
-            base_mip_level: 0,
-            mip_level_count: None,
-            base_array_layer: 0,
-            array_layer_count: None,
-        });
+        let crate_texture_view =
+            crate_texture.create_view(&default_texture_view_descriptor("Crate texture view"));
 
         let image = image::load_from_memory(include_bytes!("../../assets/images/pebbles.png"))
             .unwrap()
             .to_rgba8();
-        let _pebbles_texture = device.create_texture_with_data(
+        let pebbles_texture = device.create_texture_with_data(
             queue,
-            &wgpu::TextureDescriptor {
-                label: Some("Pebbles texture"),
-                size: wgpu::Extent3d {
-                    width: image.width(),
-                    height: image.height(),
-                    depth_or_array_layers: 1,
-                },
-                mip_level_count: 1,
-                sample_count: 1,
-                dimension: wgpu::TextureDimension::D2,
-                format: wgpu::TextureFormat::Rgba8Unorm,
-                usage: wgpu::TextureUsages::TEXTURE_BINDING,
-            },
+            &default_texture_descriptor("Pebbles texture", &image),
             &image.into_raw()[..],
         );
-        let pebbles_texture_view = crate_texture.create_view(&wgpu::TextureViewDescriptor {
-            label: Some("Pebbles texture view"),
-            format: Some(wgpu::TextureFormat::Rgba8Unorm),
-            dimension: Some(wgpu::TextureViewDimension::D2),
-            aspect: wgpu::TextureAspect::All,
-            base_mip_level: 0,
-            mip_level_count: None,
-            base_array_layer: 0,
-            array_layer_count: None,
-        });
+        let pebbles_texture_view =
+            pebbles_texture.create_view(&default_texture_view_descriptor("Pebbles texture view"));
+
+        let image = image::load_from_memory(include_bytes!("../../assets/images/abstract3.jpg"))
+            .unwrap()
+            .to_rgba8();
+        let abstract3_texture = device.create_texture_with_data(
+            queue,
+            &default_texture_descriptor("Abstract 3 texture", &image),
+            &image.into_raw()[..],
+        );
+        let abstract3_texture_view = abstract3_texture
+            .create_view(&default_texture_view_descriptor("Abstract 3 texture view"));
+
+        let image =
+            image::load_from_memory(include_bytes!("../../assets/images/cobblestone_paving.jpg"))
+                .unwrap()
+                .to_rgba8();
+        let cobblestone_paving_texture = device.create_texture_with_data(
+            queue,
+            &default_texture_descriptor("Cobblestone paving texture", &image),
+            &image.into_raw()[..],
+        );
+        let cobblestone_paving_texture_view = cobblestone_paving_texture.create_view(
+            &default_texture_view_descriptor("Cobblestone paving texture view"),
+        );
+
+        let image = image::load_from_memory(include_bytes!("../../assets/images/container.png"))
+            .unwrap()
+            .to_rgba8();
+        let container_texture = device.create_texture_with_data(
+            queue,
+            &default_texture_descriptor("Container texture", &image),
+            &image.into_raw()[..],
+        );
+        let container_texture_view = container_texture
+            .create_view(&default_texture_view_descriptor("Container texture view"));
+
+        let image = image::load_from_memory(include_bytes!("../../assets/images/target.png"))
+            .unwrap()
+            .to_rgba8();
+        let target_texture = device.create_texture_with_data(
+            queue,
+            &default_texture_descriptor("Target texture", &image),
+            &image.into_raw()[..],
+        );
+        let target_texture_view =
+            target_texture.create_view(&default_texture_view_descriptor("Target texture view"));
+
+        let image = image::load_from_memory(include_bytes!("../../assets/images/grass2.jpg"))
+            .unwrap()
+            .to_rgba8();
+        let grass_texture = device.create_texture_with_data(
+            queue,
+            &default_texture_descriptor("Grass texture", &image),
+            &image.into_raw()[..],
+        );
+        let grass_texture_view =
+            grass_texture.create_view(&default_texture_view_descriptor("Grass texture view"));
+
+        let image = image::load_from_memory(include_bytes!("../../assets/images/stone_wall.jpg"))
+            .unwrap()
+            .to_rgba8();
+        let stone_wall_texture = device.create_texture_with_data(
+            queue,
+            &default_texture_descriptor("Stone wall texture", &image),
+            &image.into_raw()[..],
+        );
+        let stone_wall_texture_view = stone_wall_texture
+            .create_view(&default_texture_view_descriptor("Stone wall texture view"));
 
         let texture_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
             label: Some("Texture sampler"),
@@ -265,16 +273,7 @@ impl GameSceneRenderer {
                         },
                         visibility: wgpu::ShaderStages::FRAGMENT,
                     },
-                    wgpu::BindGroupLayoutEntry {
-                        count: None,
-                        binding: 3,
-                        ty: wgpu::BindingType::Texture {
-                            multisampled: false,
-                            sample_type: wgpu::TextureSampleType::Float { filterable: false },
-                            view_dimension: wgpu::TextureViewDimension::D2,
-                        },
-                        visibility: wgpu::ShaderStages::FRAGMENT,
-                    },
+                    default_texture_bind_group_layout_entry(3),
                     wgpu::BindGroupLayoutEntry {
                         count: None,
                         binding: 4,
@@ -285,26 +284,14 @@ impl GameSceneRenderer {
                         },
                         visibility: wgpu::ShaderStages::FRAGMENT,
                     },
-                    wgpu::BindGroupLayoutEntry {
-                        count: None,
-                        binding: 5,
-                        ty: wgpu::BindingType::Texture {
-                            multisampled: false,
-                            sample_type: wgpu::TextureSampleType::Float { filterable: false },
-                            view_dimension: wgpu::TextureViewDimension::D2,
-                        },
-                        visibility: wgpu::ShaderStages::FRAGMENT,
-                    },
-                    wgpu::BindGroupLayoutEntry {
-                        count: None,
-                        binding: 6,
-                        ty: wgpu::BindingType::Texture {
-                            multisampled: false,
-                            sample_type: wgpu::TextureSampleType::Float { filterable: false },
-                            view_dimension: wgpu::TextureViewDimension::D2,
-                        },
-                        visibility: wgpu::ShaderStages::FRAGMENT,
-                    },
+                    default_texture_bind_group_layout_entry(5),
+                    default_texture_bind_group_layout_entry(6),
+                    default_texture_bind_group_layout_entry(7),
+                    default_texture_bind_group_layout_entry(8),
+                    default_texture_bind_group_layout_entry(9),
+                    default_texture_bind_group_layout_entry(10),
+                    default_texture_bind_group_layout_entry(11),
+                    default_texture_bind_group_layout_entry(12),
                 ],
             });
 
@@ -346,6 +333,30 @@ impl GameSceneRenderer {
                 wgpu::BindGroupEntry {
                     binding: 6,
                     resource: wgpu::BindingResource::TextureView(&pebbles_texture_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 7,
+                    resource: wgpu::BindingResource::TextureView(&abstract3_texture_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 8,
+                    resource: wgpu::BindingResource::TextureView(&cobblestone_paving_texture_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 9,
+                    resource: wgpu::BindingResource::TextureView(&container_texture_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 10,
+                    resource: wgpu::BindingResource::TextureView(&target_texture_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 11,
+                    resource: wgpu::BindingResource::TextureView(&grass_texture_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 12,
+                    resource: wgpu::BindingResource::TextureView(&stone_wall_texture_view),
                 },
             ],
         });
@@ -504,5 +515,50 @@ impl GameSceneRenderer {
         render_pass.set_pipeline(&self.crosshair_render_pipeline);
         render_pass.set_vertex_buffer(0, self.crosshair_vertex_buffer.slice(..));
         render_pass.draw(0..crosshair.vertices_len(), 0..1);
+    }
+}
+
+fn default_texture_view_descriptor(label: &str) -> wgpu::TextureViewDescriptor {
+    wgpu::TextureViewDescriptor {
+        label: Some(label),
+        format: Some(wgpu::TextureFormat::Rgba8Unorm),
+        dimension: Some(wgpu::TextureViewDimension::D2),
+        aspect: wgpu::TextureAspect::All,
+        base_mip_level: 0,
+        mip_level_count: None,
+        base_array_layer: 0,
+        array_layer_count: None,
+    }
+}
+
+fn default_texture_bind_group_layout_entry(binding: u32) -> wgpu::BindGroupLayoutEntry {
+    wgpu::BindGroupLayoutEntry {
+        count: None,
+        binding,
+        ty: wgpu::BindingType::Texture {
+            multisampled: false,
+            sample_type: wgpu::TextureSampleType::Float { filterable: false },
+            view_dimension: wgpu::TextureViewDimension::D2,
+        },
+        visibility: wgpu::ShaderStages::FRAGMENT,
+    }
+}
+
+fn default_texture_descriptor<T: GenericImage>(
+    label: &'static str,
+    image: &T,
+) -> wgpu::TextureDescriptor<'static> {
+    wgpu::TextureDescriptor {
+        label: Some(label),
+        size: wgpu::Extent3d {
+            width: image.width(),
+            height: image.height(),
+            depth_or_array_layers: 1,
+        },
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format: wgpu::TextureFormat::Rgba8Unorm,
+        usage: wgpu::TextureUsages::TEXTURE_BINDING,
     }
 }
