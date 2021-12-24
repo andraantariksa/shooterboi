@@ -1,11 +1,12 @@
 use crate::physics::GamePhysics;
-use nalgebra::Point3;
+use crate::renderer::Renderer;
+use nalgebra::{Point3, Vector3};
 use rapier3d::prelude::*;
 
-pub fn setup_player_collider(physics: &mut GamePhysics) -> RigidBodyHandle {
+pub fn setup_player_collider(physics: &mut GamePhysics, position: Vector3<f32>) -> RigidBodyHandle {
     let player_rigid_body_handle = physics.rigid_body_set.insert(
         RigidBodyBuilder::new(RigidBodyType::Dynamic)
-            .translation(nalgebra::Vector3::new(0.0, 3.0, 0.0))
+            .translation(position)
             .lock_rotations()
             .build(),
     );
@@ -20,4 +21,16 @@ pub fn setup_player_collider(physics: &mut GamePhysics) -> RigidBodyHandle {
         &mut physics.rigid_body_set,
     );
     player_rigid_body_handle
+}
+
+pub fn init_player(
+    physics: &mut GamePhysics,
+    renderer: &mut Renderer,
+    player_rigid_body_handle: RigidBodyHandle,
+) {
+    let player_rigid_body = physics
+        .rigid_body_set
+        .get_mut(player_rigid_body_handle)
+        .unwrap();
+    renderer.camera.position = *player_rigid_body.translation();
 }

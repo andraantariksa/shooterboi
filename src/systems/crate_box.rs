@@ -57,6 +57,6 @@ pub fn enqueue_crate(world: &mut World, physics: &mut GamePhysics, renderer: &mu
         objects.shape_data1.y = shape.half_extents.y;
         objects.shape_data1.z = shape.half_extents.z;
 
-        *bound = object_bound.clone();
+        *bound = objects.get_bounding_sphere_radius();
     }
 }

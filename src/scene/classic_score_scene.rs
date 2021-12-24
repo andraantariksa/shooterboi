@@ -13,12 +13,12 @@ use crate::input_manager::InputManager;
 use crate::renderer::Renderer;
 
 use crate::scene::{
-    MaybeMessage, Scene, SceneOp, BUTTON_HEIGHT, BUTTON_WIDTH, GAP_BETWEEN_ITEM,
-    MARGIN,
+    MaybeMessage, Scene, SceneOp, BUTTON_HEIGHT, BUTTON_WIDTH, GAP_BETWEEN_ITEM, MARGIN,
 };
 use crate::window::Window;
 use conrod_core::widget_ids;
 use gluesql::chrono::Utc;
+use gluesql::data::Value;
 
 use winit::event::VirtualKeyCode;
 
@@ -75,10 +75,22 @@ impl ClassicGameScoreDisplay {
 
     pub fn read_message(&mut self, message: &MaybeMessage) {
         if let Some(msg) = message {
-            self.hit = *msg.get("hit").unwrap().to_i32() as u16;
-            self.miss = *msg.get("miss").unwrap().to_i32() as u16;
-            self.score = *msg.get("score").unwrap().to_i32();
-            self.avg_hit_time = *msg.get("avg_hit_time").unwrap().to_f32();
+            self.hit = match *msg.get("hit").unwrap() {
+                Value::I64(x) => x as u16,
+                _ => unreachable!(),
+            };
+            self.miss = match *msg.get("miss").unwrap() {
+                Value::I64(x) => x as u16,
+                _ => unreachable!(),
+            };
+            self.score = match *msg.get("score").unwrap() {
+                Value::I64(x) => x as i32,
+                _ => unreachable!(),
+            };
+            self.avg_hit_time = match *msg.get("avg_hit_time").unwrap() {
+                Value::F64(x) => x as f32,
+                _ => unreachable!(),
+            };
             self.accuracy = self.hit as f32 / (self.hit + self.miss).max(1) as f32 * 100.0;
         }
     }
@@ -100,7 +112,7 @@ pub struct ClassicScoreScene {
 }
 
 impl ClassicScoreScene {
-    pub fn new(_renderer: &mut Renderer, conrod_handle: &mut ConrodHandle) -> Self {
+    pub fn new(conrod_handle: &mut ConrodHandle) -> Self {
         let ids = ClassicScoreSceneIds::new(conrod_handle.get_ui_mut().widget_id_generator());
         Self {
             ids,

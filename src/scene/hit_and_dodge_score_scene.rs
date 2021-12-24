@@ -1,4 +1,5 @@
 use conrod_core::widget::envelope_editor::EnvelopePoint;
+use conrod_core::widget::{Canvas, Text};
 use conrod_core::{Labelable, Positionable, Sizeable, Widget};
 use winit::event_loop::ControlFlow;
 
@@ -17,7 +18,7 @@ use conrod_core::widget_ids;
 use winit::event::VirtualKeyCode;
 
 widget_ids! {
-    pub struct EliminationScoreSceneIds {
+    pub struct HitAndDodgeScoreSceneIds {
         // The main canvas
         canvas,
         title_label,
@@ -46,15 +47,14 @@ widget_ids! {
     }
 }
 
-pub struct EliminationScoreScene {
-    ids: EliminationScoreSceneIds,
+pub struct HitAndDodgeScoreScene {
+    ids: HitAndDodgeScoreSceneIds,
     score: Score,
 }
 
-impl EliminationScoreScene {
-    pub fn new(_renderer: &mut Renderer, conrod_handle: &mut ConrodHandle) -> Self {
-        let ids =
-            EliminationScoreSceneIds::new(conrod_handle.get_ui_mut().widget_id_generator());
+impl HitAndDodgeScoreScene {
+    pub fn new(conrod_handle: &mut ConrodHandle) -> Self {
+        let ids = HitAndDodgeScoreSceneIds::new(conrod_handle.get_ui_mut().widget_id_generator());
         Self {
             ids,
             score: Score::new(),
@@ -62,7 +62,7 @@ impl EliminationScoreScene {
     }
 }
 
-impl Scene for EliminationScoreScene {
+impl Scene for HitAndDodgeScoreScene {
     fn init(
         &mut self,
         _message: MaybeMessage,
@@ -97,9 +97,9 @@ impl Scene for EliminationScoreScene {
             let ropa_font_id = *conrod_handle.get_font_id_map().get("ropa").unwrap();
             let mut ui_cell = conrod_handle.get_ui_mut().set_widgets();
 
-            conrod_core::widget::Canvas::new().set(self.ids.canvas, &mut ui_cell);
+            Canvas::new().set(self.ids.canvas, &mut ui_cell);
 
-            conrod_core::widget::Text::new("Training Report")
+            Text::new("Training Report")
                 .font_id(ropa_font_id)
                 .align_middle_x()
                 .mid_top_with_margin_on(self.ids.canvas, MARGIN)
@@ -107,91 +107,91 @@ impl Scene for EliminationScoreScene {
 
             const ITEM_WIDTH: f64 = 400.0;
 
-            conrod_core::widget::Canvas::new()
+            Canvas::new()
                 .down_from(self.ids.title_label, 50.0)
                 .align_middle_x()
                 .w(ITEM_WIDTH)
                 .set(self.ids.accuracy_canvas, &mut ui_cell);
 
-            conrod_core::widget::Canvas::new()
+            Canvas::new()
                 .down_from(self.ids.accuracy_canvas, GAP_BETWEEN_ITEM)
                 .align_middle_x()
                 .w(ITEM_WIDTH)
                 .set(self.ids.hit_canvas, &mut ui_cell);
 
-            conrod_core::widget::Canvas::new()
+            Canvas::new()
                 .down_from(self.ids.hit_canvas, GAP_BETWEEN_ITEM)
                 .align_middle_x()
                 .w(ITEM_WIDTH)
                 .set(self.ids.score_canvas, &mut ui_cell);
 
-            conrod_core::widget::Canvas::new()
+            Canvas::new()
                 .down_from(self.ids.score_canvas, GAP_BETWEEN_ITEM)
                 .align_middle_x()
                 .w(ITEM_WIDTH)
                 .set(self.ids.avg_hit_time_canvas, &mut ui_cell);
 
-            conrod_core::widget::Canvas::new()
+            Canvas::new()
                 .down_from(self.ids.avg_hit_time_canvas, GAP_BETWEEN_ITEM)
                 .align_middle_x()
                 .w(ITEM_WIDTH)
                 .set(self.ids.miss_canvas, &mut ui_cell);
 
-            conrod_core::widget::Text::new("Accuracy")
+            Text::new("Accuracy")
                 .font_id(ropa_font_id)
                 .mid_left_of(self.ids.accuracy_canvas)
                 .left_justify()
                 .set(self.ids.accuracy_label, &mut ui_cell);
 
-            // conrod_core::widget::Text::new(&format!("{}", self.score.accuracy))
+            // Text::new(&format!("{}", self.score.accuracy))
             //     .font_id(ropa_font_id)
             //     .mid_right_of(self.ids.accuracy_canvas)
             //     .left_justify()
             //     .set(self.ids.accuracy_value_label, &mut ui_cell);
 
-            conrod_core::widget::Text::new("Hit")
+            Text::new("Hit")
                 .font_id(ropa_font_id)
                 .mid_left_of(self.ids.hit_canvas)
                 .left_justify()
                 .set(self.ids.hit_label, &mut ui_cell);
 
-            conrod_core::widget::Text::new(&format!("{}", self.score.hit))
+            Text::new(&format!("{}", self.score.hit))
                 .font_id(ropa_font_id)
                 .mid_right_of(self.ids.hit_canvas)
                 .left_justify()
                 .set(self.ids.hit_value_label, &mut ui_cell);
 
-            conrod_core::widget::Text::new("Score")
+            Text::new("Score")
                 .font_id(ropa_font_id)
                 .mid_left_of(self.ids.score_canvas)
                 .left_justify()
                 .set(self.ids.score_label, &mut ui_cell);
 
-            conrod_core::widget::Text::new(&format!("{}", self.score.score))
+            Text::new(&format!("{}", self.score.score))
                 .font_id(ropa_font_id)
                 .mid_right_of(self.ids.score_canvas)
                 .left_justify()
                 .set(self.ids.score_value_label, &mut ui_cell);
 
-            conrod_core::widget::Text::new("Avg hit time")
+            Text::new("Avg hit time")
                 .font_id(ropa_font_id)
                 .mid_left_of(self.ids.avg_hit_time_canvas)
                 .left_justify()
                 .set(self.ids.avg_hit_time_label, &mut ui_cell);
 
-            // conrod_core::widget::Text::new(&format!("{}", self.score.avg_hit_time))
+            // Text::new(&format!("{}", self.score.avg_hit_time))
             //     .font_id(ropa_font_id)
             //     .mid_right_of(self.ids.avg_hit_time_canvas)
             //     .left_justify()
             //     .set(self.ids.avg_hit_time_value_label, &mut ui_cell);
 
-            conrod_core::widget::Text::new("Miss")
+            Text::new("Miss")
                 .font_id(ropa_font_id)
                 .mid_left_of(self.ids.miss_canvas)
                 .left_justify()
                 .set(self.ids.miss_label, &mut ui_cell);
 
-            conrod_core::widget::Text::new(&format!("{}", self.score.miss))
+            Text::new(&format!("{}", self.score.miss))
                 .font_id(ropa_font_id)
                 .mid_right_of(self.ids.miss_canvas)
                 .left_justify()

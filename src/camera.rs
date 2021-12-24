@@ -54,7 +54,7 @@ impl Camera {
     }
 
     pub fn get_frustum(&self) -> Frustum {
-        const Z_FAR: f32 = 100.0;
+        const Z_FAR: f32 = 150.0;
         const Z_NEAR: f32 = 0.1;
         let half_v_side = Z_FAR * (self.fov * 0.5).tan();
         let half_h_side = half_v_side * 1.5;

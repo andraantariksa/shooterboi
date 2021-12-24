@@ -114,4 +114,16 @@ impl InputManager {
     pub fn is_keyboard_pressed(&self, key: &VirtualKeyCode) -> bool {
         self.keyboard_buttons_pressed.contains(key)
     }
+
+    pub fn is_any_press(&self) -> bool {
+        !self.keyboard_buttons.is_empty() || !self.mouse_buttons.is_empty()
+    }
+
+    pub fn is_any_keyboard_press(&self) -> bool {
+        !self.keyboard_buttons.is_empty()
+    }
+
+    pub fn is_any_mouse_press(&self) -> bool {
+        !self.mouse_buttons.is_empty()
+    }
 }

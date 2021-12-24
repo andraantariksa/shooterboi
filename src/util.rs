@@ -1,3 +1,4 @@
+use crate::frustum::ObjectBound;
 use std::ops::{Add, Mul, Sub};
 
 #[inline]

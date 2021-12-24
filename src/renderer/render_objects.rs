@@ -1,7 +1,7 @@
 use crate::frustum::{Frustum, ObjectBound};
 use nalgebra::{Matrix4, Vector3, Vector4};
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Clone, Copy)]
 #[repr(u32)]
 pub enum ShapeType {
     None = 0,
@@ -12,7 +12,7 @@ pub enum ShapeType {
     Gunman = 5,
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Clone, Copy)]
 #[repr(u32)]
 pub enum MaterialType {
     Green = 0,
@@ -29,9 +29,16 @@ pub enum MaterialType {
     Target = 11,
     Grass = 12,
     StoneWall = 13,
+    Building = 14,
+    TargetDimmed = 15,
+    TreeBark = 16,
+    Leaves = 17,
+    RGBANoiseMedium = 18,
+    GrayNoiseSmall = 19,
+    Asphalt = 20,
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct RenderQueueData {
     pub position: Vector3<f32>,
     _p1: [i32; 1],
@@ -59,6 +66,18 @@ impl RenderQueueData {
             shape_data2: nalgebra::Vector4::new(0.0, 0.0, 0.0, 0.0),
             _p1: [0; 1],
             _p2: [0; 1],
+        }
+    }
+
+    pub fn get_bounding_sphere_radius(&self) -> ObjectBound {
+        match self.shape_type_material_ids.0 {
+            ShapeType::None => ObjectBound::None,
+            ShapeType::Box => {
+                let a = self.shape_data1.xyz();
+                ObjectBound::Sphere(a.component_mul(&a).magnitude())
+            }
+            ShapeType::Sphere => ObjectBound::Sphere(self.shape_data1.x),
+            _ => unreachable!(),
         }
     }
 }
@@ -111,13 +130,13 @@ impl RenderObjects {
         let mut index = 0;
         for (object, bound) in self.render_objects_static.iter() {
             if frustum.is_on_frustum(&object.position, bound) {
-                resulted_objects[index] = *object;
+                resulted_objects[index] = object.clone();
                 index += 1;
             }
         }
         for (object, bound) in self.render_objects.iter() {
             if frustum.is_on_frustum(&object.position, bound) {
-                resulted_objects[index] = *object;
+                resulted_objects[index] = object.clone();
                 index += 1;
             }
         }

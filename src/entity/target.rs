@@ -5,13 +5,15 @@ use crate::timer::Timer;
 pub struct Target {
     shooted: bool,
     delete_timer: Option<Timer>,
+    fake: bool,
 }
 
 impl Target {
-    pub fn new() -> Self {
+    pub fn new(fake: bool) -> Self {
         Self {
             shooted: false,
             delete_timer: None,
+            fake,
         }
     }
 
@@ -19,6 +21,7 @@ impl Target {
         Self {
             shooted: false,
             delete_timer: Some(timer),
+            fake: false,
         }
     }
 
@@ -33,7 +36,7 @@ impl Target {
 
     pub fn get_material(&self) -> MaterialType {
         if self.shooted {
-            MaterialType::Yellow
+            MaterialType::TargetDimmed
         } else {
             MaterialType::Target
         }

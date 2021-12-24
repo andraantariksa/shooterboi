@@ -1,7 +1,7 @@
 #define SENTINEL_IDX 9999
 
 #define EPS 0.0001
-#define MAX_DISTANCE 100.0
+#define MAX_DISTANCE 500.0
 #define MAX_QUEUE 100
 
 #define SHAPE_TYPE_NONE 0
@@ -12,6 +12,9 @@
 #define SHAPE_TYPE_GUNMAN 5
 
 #define DEBUG_POSITION 0
+
+#define PI 3.1415
+#define PI2 6.2832
 
 struct RenderQueue
 {
@@ -28,16 +31,38 @@ layout(std140, binding = 0) uniform rendering_info {
     vec3 cam_pos;
     vec3 cam_dir;
     vec2 fov_shootanim;
-    uvec3 queuecount_raymarchmaxstep_aostep;
+    uvec4 queuecount_raymarchmaxstep_aostep_background_type;
 };
 
 #ifdef IS_WEB
 layout(std140, binding = 1) uniform render_queue {
 #else
-    layout(std430, binding = 1) readonly buffer render_queue {
+layout(std430, binding = 1) readonly buffer render_queue {
     #endif
     RenderQueue queue[70];
 };
+
+#define MATERIAL_GREEN 0
+#define MATERIAL_YELLOW 1
+#define MATERIAL_WHITE 2
+#define MATERIAL_BLACK 3
+#define MATERIAL_CHECKER 4
+#define MATERIAL_RED 5
+#define MATERIAL_ORANGE 6
+#define MATERIAL_CRATE 7
+#define MATERIAL_PEBBLES 8
+#define MATERIAL_COBBLESTONE_PAVING 9
+#define MATERIAL_CONTAINER 10
+#define MATERIAL_TARGET 11
+#define MATERIAL_GRASS 12
+#define MATERIAL_STONE_WALL 13
+#define MATERIAL_BUILDING 14
+#define MATERIAL_TARGET_DIMMED 15
+#define MATERIAL_TREE_BARK 16
+#define MATERIAL_LEAVES 17
+#define MATERIAL_RGBA_NOISE_MEDIUM 18
+#define MATERIAL_GRAY_NOISE_SMALL 19
+#define MATERIAL_ASPHALT 20
 
 layout(binding = 2) uniform sampler common_sampler;
 layout(binding = 3) uniform texture2D checker_texture;
@@ -50,6 +75,11 @@ layout(binding = 9) uniform texture2D container_texture;
 layout(binding = 10) uniform texture2D target_texture;
 layout(binding = 11) uniform texture2D grass_texture;
 layout(binding = 12) uniform texture2D stone_wall_texture;
+layout(binding = 13) uniform texture2D tree_bark_texture;
+layout(binding = 14) uniform texture2D leaves_texture;
+layout(binding = 15) uniform texture2D rgba_noise_medium;
+layout(binding = 16) uniform texture2D gray_noise_small_texture;
+layout(binding = 17) uniform texture2D asphalt_texture;
 
 layout(location = 0) out vec4 outColor;
 
@@ -67,6 +97,11 @@ struct Distance
 };
 
 Distance scene_dist(vec3 pos);
+
+// Constant
+
+const float tau = 6.283185;
+const float pi = 3.14159;
 
 // Main
 
@@ -87,11 +122,11 @@ Distance ray_march(vec3 ray_origin, vec3 ray_dir) {
     uint idx = 0;
     vec3 current_pos = vec3(0);
 
-    for (uint i = 0u; i < queuecount_raymarchmaxstep_aostep.y; i++) {
+    for (uint i = 0u; i < queuecount_raymarchmaxstep_aostep_background_type.y; i++) {
         current_pos = ray_origin + d * ray_dir;
         Distance closest_distance = scene_dist(current_pos);
 
-        if (abs(closest_distance.distance) < 0.0001 || d >= 100.0) {
+        if (abs(closest_distance.distance) < EPS || d >= MAX_DISTANCE) {
             break;
         }
 
@@ -135,7 +170,7 @@ vec3 n)
 float ambient_ocl(in vec3 pos, in vec3 nor) {
     float occ = 0.0;
     float sca = 1.0;
-    for (uint i = 0; i < queuecount_raymarchmaxstep_aostep.z; i++)
+    for (uint i = 0; i < queuecount_raymarchmaxstep_aostep_background_type.z; i++)
     {
         float h = 0.001 + 0.15 * float(i) / 4.0;
         Distance d = scene_dist(pos + h * nor);
@@ -215,4 +250,13 @@ float smin(float a, float b, float k)
 vec3 repeat(vec3 pos, vec3 c)
 {
     return mod(pos + 0.5 * c, c) - 0.5 * c;
+}
+
+// Fog
+
+const vec3 FOG_COLOR = vec3(111., 106., 165.) / 255.;
+const float FOG_DENSITY = .3;
+vec3 mix_fog(vec3 color, float distance) {
+    const float fog_intensity = exp(-FOG_DENSITY * max(distance - MAX_DISTANCE * .8, 0.));
+    return mix(FOG_COLOR, color, fog_intensity);
 }

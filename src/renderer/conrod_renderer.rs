@@ -81,10 +81,16 @@ impl ConrodSceneRenderer {
                     render_pass.set_bind_group(0, bind_group, &[]);
                 }
                 conrod_wgpu::RenderPassCommand::SetScissor {
-                    top_left: [_x, _y],
-                    dimensions: [w, h],
+                    top_left: [x, y],
+                    dimensions: [mut w, mut h],
                 } => {
-                    render_pass.set_scissor_rect(0, 0, w, h);
+                    if w + x > surface_config.surface.width {
+                        w = surface_config.surface.width - x;
+                    }
+                    if h + y > surface_config.surface.height {
+                        h = surface_config.surface.height - y;
+                    }
+                    render_pass.set_scissor_rect(x, y, w, h);
                 }
                 conrod_wgpu::RenderPassCommand::Draw { vertex_range } => {
                     render_pass.draw(vertex_range, 0..1);

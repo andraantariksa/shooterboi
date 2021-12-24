@@ -1,4 +1,5 @@
-enum InOutAnimationState {
+#[derive(Clone)]
+pub enum InOutAnimationState {
     Stopped,
     Foward,
     Backward,
@@ -18,6 +19,15 @@ impl InOutAnimation {
             sec_to_forward,
             sec_to_backward,
             state: InOutAnimationState::Stopped,
+        }
+    }
+
+    pub fn new_started(sec_to_forward: f32, sec_to_backward: f32) -> Self {
+        Self {
+            value: 0.0,
+            sec_to_forward,
+            sec_to_backward,
+            state: InOutAnimationState::Foward,
         }
     }
 
@@ -47,5 +57,9 @@ impl InOutAnimation {
 
     pub fn get_value(&self) -> f32 {
         self.value
+    }
+
+    pub fn get_state(&self) -> InOutAnimationState {
+        self.state.clone()
     }
 }

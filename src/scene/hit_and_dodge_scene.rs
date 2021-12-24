@@ -2,10 +2,11 @@ use conrod_core::widget::envelope_editor::EnvelopePoint;
 use conrod_core::{Color, Colorable, Positionable, Sizeable, Widget};
 use std::collections::HashMap;
 
+use conrod_core::widget::{Canvas, Text};
 use std::io::{BufReader, Cursor};
 
 use hecs::{Entity, World};
-
+use instant::Instant;
 use rapier3d::prelude::*;
 use winit::event::{MouseButton, VirtualKeyCode};
 use winit::event_loop::ControlFlow;
@@ -14,12 +15,18 @@ use crate::animation::InOutAnimation;
 use crate::audio::{AudioContext, AUDIO_FILE_SHOOT};
 use crate::audio::{Sink, AUDIO_FILE_SHOOTED};
 use crate::database::Database;
+use crate::entity::enemy::gunman::Gunman;
+use crate::entity::enemy::swordman::Swordman;
+use crate::entity::target::Target;
+use crate::entity::Crate;
+use crate::entity::HasMaterial;
 use crate::frustum::ObjectBound;
 use crate::gui::ConrodHandle;
 use crate::input_manager::InputManager;
 use crate::physics::GamePhysics;
 use crate::renderer::render_objects::MaterialType;
 use crate::renderer::render_objects::ShapeType;
+use crate::renderer::rendering_info::BackgroundType;
 use crate::renderer::Renderer;
 use crate::scene::classic_score_scene::ClassicScoreScene;
 use crate::scene::pause_scene::PauseScene;
@@ -27,27 +34,24 @@ use crate::scene::{
     GameState, MaybeMessage, Message, Scene, SceneOp, FINISHING_DURATION, MAX_RAYCAST_DISTANCE,
     PREPARE_DURATION,
 };
+use crate::systems::gunman::{enqueue_gunman, spawn_gunman, update_gunmans};
+use crate::systems::player::{init_player, setup_player_collider};
+use crate::systems::swordman::{enqueue_swordman, spawn_swordman, update_swordmans};
+use crate::systems::target::{enqueue_target, spawn_target};
+use crate::systems::update_player_movement::update_player_position;
+use crate::systems::wall::spawn_wall;
 use crate::timer::{Stopwatch, Timer};
 use crate::util::lerp;
 use crate::window::Window;
-use conrod_core::widget::{Canvas, Text};
 use conrod_core::widget_ids;
 use gluesql::data::Value;
-
-use crate::entity::target::Target;
-use crate::entity::Wall;
-use crate::renderer::rendering_info::BackgroundType;
-use crate::systems::player::{init_player, setup_player_collider};
-use crate::systems::target::{enqueue_target, spawn_target};
-use crate::systems::update_player_movement::update_player_position;
-use crate::systems::wall::enqueue_wall;
-use nalgebra::Vector3;
+use nalgebra::{Point3, Vector3};
 use rand::distributions::Uniform;
 use rand::prelude::SmallRng;
 use rand::{Rng, SeedableRng};
 
 widget_ids! {
-    pub struct EliminationGameSceneIds {
+    pub struct HitAndDodgeGameSceneIds {
         // The main canvas
         canvas,
         canvas_duration,
@@ -84,8 +88,8 @@ impl Score {
     }
 }
 
-pub struct EliminationGameScene {
-    ids: EliminationGameSceneIds,
+pub struct HitAndDodgeGameScene {
+    ids: HitAndDodgeGameSceneIds,
     world: World,
     physics: GamePhysics,
     player_rigid_body_handle: RigidBodyHandle,
@@ -101,47 +105,56 @@ pub struct EliminationGameScene {
     game_state: GameState,
 }
 
-impl EliminationGameScene {
+impl HitAndDodgeGameScene {
     pub fn new(_renderer: &mut Renderer, conrod_handle: &mut ConrodHandle) -> Self {
         let mut world = World::new();
         let mut physics = GamePhysics::new();
 
         // Ground
-        let ground_rigid_body_handle = physics.rigid_body_set.insert(
-            RigidBodyBuilder::new(RigidBodyType::Static)
-                .translation(Vector3::new(0.0, 35.0, 0.0))
+        physics.collider_set.insert(
+            ColliderBuilder::new(SharedShape::cuboid(15.0, 0.5, 15.0))
+                .translation(Vector3::new(0.0, 0.0, 0.0))
                 .build(),
         );
-        physics.collider_set.insert_with_parent(
-            ColliderBuilder::new(SharedShape::cuboid(3.0, 35.0, 3.0)).build(),
-            ground_rigid_body_handle,
-            &mut physics.rigid_body_set,
-        );
 
-        // Player
         let player_rigid_body_handle =
-            setup_player_collider(&mut physics, Vector3::new(0.0, 71.0, 0.0));
+            setup_player_collider(&mut physics, Vector3::new(0.0, 1.5, 0.0));
+
+        let mut rng = SmallRng::from_entropy();
+
+        spawn_gunman(
+            &mut world,
+            &mut physics,
+            Vector3::<f32>::new(2.0, 2.5, -2.0),
+            Gunman::new(&mut rng),
+        );
+        spawn_swordman(
+            &mut world,
+            &mut physics,
+            Vector3::<f32>::new(-2.0, 2.5, -2.0),
+            Swordman::new(),
+        );
 
         Self {
             world,
             physics,
             player_rigid_body_handle,
-            ids: EliminationGameSceneIds::new(conrod_handle.get_ui_mut().widget_id_generator()),
+            ids: HitAndDodgeGameSceneIds::new(conrod_handle.get_ui_mut().widget_id_generator()),
             score: Score::new(),
             delta_shoot_time: Stopwatch::new(),
             shoot_timer: Timer::new_finished(),
             game_running: false,
-            rng: SmallRng::from_entropy(),
+            rng,
             shoot_animation: InOutAnimation::new(3.0, 5.0),
-            freeze: false,
-            round_timer: Timer::new(100.0),
             entity_to_remove: Vec::new(),
+            round_timer: Timer::new(100.0),
+            freeze: false,
             game_state: GameState::Preround,
         }
     }
 }
 
-impl Scene for EliminationGameScene {
+impl Scene for HitAndDodgeGameScene {
     fn init(
         &mut self,
         _message: MaybeMessage,
@@ -154,7 +167,7 @@ impl Scene for EliminationGameScene {
         renderer.is_render_gui = true;
         renderer.is_render_game = true;
 
-        renderer.rendering_info.background_type = BackgroundType::City;
+        renderer.rendering_info.background_type = BackgroundType::Snow;
 
         init_player(
             &mut self.physics,
@@ -164,10 +177,10 @@ impl Scene for EliminationGameScene {
 
         // Ground
         let (objects, ref mut bound) = renderer.render_objects.next_static();
-        objects.position = nalgebra::Vector3::new(0.0, 35.0, 0.0);
+        objects.position = nalgebra::Vector3::new(0.0, 0.0, 0.0);
         objects.shape_type_material_ids.0 = ShapeType::Box;
         objects.shape_type_material_ids.1 = MaterialType::CobblestonePaving;
-        objects.shape_data1 = nalgebra::Vector4::new(3.0, 35.0, 3.0, 0.0);
+        objects.shape_data1 = nalgebra::Vector4::new(20.0, 1.0, 10.0, 0.0);
         *bound = objects.get_bounding_sphere_radius();
 
         window.set_is_cursor_grabbed(true);
@@ -267,26 +280,6 @@ impl Scene for EliminationGameScene {
                     .set(self.ids.start_duration_label, &mut ui_cell);
 
                 if timer.is_finished() {
-                    if !self.freeze {
-                        for y in 0..10 {
-                            for _ in 0..15 {
-                                let r = self.rng.sample(Uniform::new(8.0, 20.0));
-                                let angle = self.rng.sample(Uniform::new(
-                                    -std::f32::consts::PI,
-                                    std::f32::consts::PI,
-                                ));
-                                let pos =
-                                    Vector3::new(r * angle.cos(), (y + 71) as f32, r * angle.sin());
-
-                                spawn_target(
-                                    &mut self.world,
-                                    &mut self.physics,
-                                    pos,
-                                    Target::new(false),
-                                );
-                            }
-                        }
-                    }
                     self.freeze = false;
                     self.game_state = GameState::Round;
                     renderer.game_renderer.render_crosshair = true;
@@ -296,6 +289,20 @@ impl Scene for EliminationGameScene {
                 self.round_timer.update(delta_time);
                 self.shoot_timer.update(delta_time);
                 self.delta_shoot_time.update(delta_time);
+
+                update_gunmans(
+                    &mut self.world,
+                    &mut self.physics,
+                    delta_time,
+                    &renderer.camera.position,
+                    &mut self.rng,
+                );
+                update_swordmans(
+                    &mut self.world,
+                    &mut self.physics,
+                    delta_time,
+                    &renderer.camera.position,
+                );
 
                 let mut missed = || {
                     self.score.score -= 100;
@@ -340,10 +347,10 @@ impl Scene for EliminationGameScene {
                         let collider = self.physics.collider_set.get(handle).unwrap();
                         let entity = Entity::from_bits(collider.user_data as u64);
 
-                        if let Ok(mut target) = self.world.get_mut::<Target>(entity) {
-                            target.shooted();
-                        } else {
-                            missed();
+                        if let Ok(mut gunman) = self.world.get_mut::<Gunman>(entity) {
+                            gunman.hit();
+                        } else if let Ok(mut swordman) = self.world.get_mut::<Swordman>(entity) {
+                            swordman.hit();
                         }
                     } else {
                         missed();
@@ -396,13 +403,9 @@ impl Scene for EliminationGameScene {
         _conrod_handle: &mut ConrodHandle,
         _audio_context: &mut AudioContext,
     ) {
+        enqueue_gunman(&mut self.world, &mut self.physics, renderer);
+        enqueue_swordman(&mut self.world, &mut self.physics, renderer);
         enqueue_target(&mut self.world, &mut self.physics, renderer);
-        enqueue_wall(
-            &mut self.world,
-            &mut self.physics,
-            renderer,
-            MaterialType::Asphalt,
-        );
     }
 
     fn deinit(

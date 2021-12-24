@@ -2,7 +2,6 @@ mod animation;
 mod audio;
 mod camera;
 mod database;
-mod enemy;
 mod entity;
 mod frustum;
 mod game;

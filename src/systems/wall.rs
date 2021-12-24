@@ -29,10 +29,6 @@ pub fn spawn_wall(
         rb_handle,
         &mut physics.rigid_body_set,
     );
-    println!(
-        "bounding sphere {}",
-        (size.x.powf(2.0) * size.y.powf(2.0) * size.z.powf(2.0)).sqrt()
-    );
     world.spawn_at(
         entity,
         (
@@ -43,7 +39,12 @@ pub fn spawn_wall(
     );
 }
 
-pub fn enqueue_wall(world: &mut World, physics: &mut GamePhysics, renderer: &mut Renderer) {
+pub fn enqueue_wall(
+    world: &mut World,
+    physics: &mut GamePhysics,
+    renderer: &mut Renderer,
+    material: MaterialType,
+) {
     for (_id, (_wall, rb_handle, object_bound)) in
         world.query_mut::<(&Wall, &RigidBodyHandle, &ObjectBound)>()
     {
@@ -53,7 +54,7 @@ pub fn enqueue_wall(world: &mut World, physics: &mut GamePhysics, renderer: &mut
         let (objects, ref mut bound) = renderer.render_objects.next();
         objects.position = *rb.translation();
         objects.shape_type_material_ids.0 = ShapeType::Box;
-        objects.shape_type_material_ids.1 = MaterialType::StoneWall;
+        objects.shape_type_material_ids.1 = material;
         objects.rotation = rb.rotation().to_homogeneous();
 
         let shape = collider.shape().as_cuboid().unwrap();

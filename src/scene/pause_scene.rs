@@ -1,5 +1,6 @@
 use conrod_core::widget::envelope_editor::EnvelopePoint;
 use conrod_core::{Labelable, Positionable, Sizeable, Widget};
+use std::collections::HashMap;
 use winit::event_loop::ControlFlow;
 
 use crate::audio::AudioContext;
@@ -11,6 +12,7 @@ use crate::scene::settings_scene::SettingsScene;
 use crate::scene::{MaybeMessage, Scene, SceneOp, BUTTON_HEIGHT, BUTTON_WIDTH, MARGIN};
 use crate::window::Window;
 use conrod_core::widget_ids;
+use gluesql::data::Value;
 
 widget_ids! {
     pub struct PauseSceneIds {
@@ -84,7 +86,14 @@ impl Scene for PauseScene {
                 .wh(conrod_core::Dimensions::new(BUTTON_WIDTH, BUTTON_HEIGHT))
                 .set(self.ids.resume_button, &mut ui_cell)
             {
-                scene_op = SceneOp::Pop(1, None);
+                scene_op = SceneOp::Pop(
+                    1,
+                    Some({
+                        let mut m = HashMap::new();
+                        m.insert("from_pause", Value::Null);
+                        m
+                    }),
+                );
             }
 
             for _ in conrod_core::widget::Button::new()
@@ -94,7 +103,14 @@ impl Scene for PauseScene {
                 .wh(conrod_core::Dimensions::new(BUTTON_WIDTH, BUTTON_HEIGHT))
                 .set(self.ids.quit_buton, &mut ui_cell)
             {
-                scene_op = SceneOp::Pop(2, None);
+                scene_op = SceneOp::Pop(
+                    2,
+                    Some({
+                        let mut m = HashMap::new();
+                        m.insert("from_pause", Value::Null);
+                        m
+                    }),
+                );
             }
         }
 

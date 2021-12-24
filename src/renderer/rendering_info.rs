@@ -1,6 +1,15 @@
 use winit::dpi::PhysicalSize;
 
 #[derive(Debug, Clone)]
+#[repr(u32)]
+pub enum BackgroundType {
+    None = 0,
+    Forest = 1,
+    City = 2,
+    Snow = 3,
+}
+
+#[derive(Debug, Clone)]
 pub struct RenderingInfo {
     pub reso_time: nalgebra::Vector3<f32>,
     _p1: [i32; 1],
@@ -11,7 +20,7 @@ pub struct RenderingInfo {
     pub fov_shootanim: nalgebra::Vector2<f32>,
     _p4: [i32; 2],
     pub queuecount_raymarchmaxstep_aostep: nalgebra::Vector3<u32>,
-    _p5: [i32; 1],
+    pub background_type: BackgroundType,
 }
 
 impl RenderingInfo {
@@ -26,11 +35,11 @@ impl RenderingInfo {
             cam_dir: nalgebra::Vector3::new(0.0, 0.0, -1.0),
             fov_shootanim: nalgebra::Vector2::new(90.0f32.to_radians(), 0.0),
             queuecount_raymarchmaxstep_aostep: nalgebra::Vector3::new(0, 50, 3),
-            _p1: [0; 1],
+            background_type: BackgroundType::None,
             _p2: [0; 1],
             _p3: [0; 1],
             _p4: [0; 2],
-            _p5: [0; 1],
+            _p1: [0; 1],
         }
     }
 

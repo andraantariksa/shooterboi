@@ -1,5 +1,4 @@
-use conrod_core::widget::envelope_editor::EnvelopePoint;
-use conrod_core::{Colorable, Positionable, Sizeable, Widget};
+use conrod_core::{Color, Colorable, Dimensions, Positionable, Sizeable, Widget};
 use std::collections::HashMap;
 
 use std::io::{BufReader, Cursor};
@@ -22,20 +21,27 @@ use crate::input_manager::InputManager;
 use crate::physics::GamePhysics;
 
 use crate::renderer::render_objects::{MaterialType, ShapeType};
+use crate::renderer::rendering_info::BackgroundType;
 use crate::renderer::Renderer;
 use crate::scene::classic_score_scene::ClassicScoreScene;
 use crate::scene::pause_scene::PauseScene;
-use crate::scene::{MaybeMessage, Message, Scene, SceneOp, Value};
+use crate::scene::{
+    GameState, MaybeMessage, Message, Scene, SceneOp, FINISHING_DURATION, MAX_RAYCAST_DISTANCE,
+    PREPARE_DURATION,
+};
 use crate::systems::container::{enqueue_container, spawn_container};
 use crate::systems::crate_box::{enqueue_crate, spawn_crate};
-use crate::systems::setup_player_collider::setup_player_collider;
-use crate::systems::spawn_target::spawn_target;
+use crate::systems::player::{init_player, setup_player_collider};
+use crate::systems::target::{enqueue_target, spawn_target};
 use crate::systems::update_player_movement::update_player_position;
 use crate::systems::wall::{enqueue_wall, spawn_wall};
 use crate::timer::{Stopwatch, Timer};
 use crate::util::lerp;
 use crate::window::Window;
+use conrod_core::widget::envelope_editor::EnvelopePoint;
+use conrod_core::widget::{Canvas, Text};
 use conrod_core::widget_ids;
+use gluesql::data::Value;
 use nalgebra::{Vector3, Vector4};
 use rand::distributions::Uniform;
 use rand::prelude::SmallRng;
@@ -74,12 +80,12 @@ impl Score {
     }
 
     pub fn write_message(&self, message: &mut Message) {
-        message.insert("hit", Value::I32(self.hit as i32));
-        message.insert("miss", Value::I32(self.miss as i32));
-        message.insert("score", Value::I32(self.score));
+        message.insert("hit", Value::I64(self.hit as i64));
+        message.insert("miss", Value::I64(self.miss as i64));
+        message.insert("score", Value::I64(self.score as i64));
         message.insert(
             "avg_hit_time",
-            Value::F32(self.total_shoot_time / self.hit.max(1) as f32),
+            Value::F64(self.total_shoot_time as f64 / self.hit.max(1) as f64),
         );
     }
 }
@@ -89,17 +95,17 @@ pub struct ClassicGameScene {
     world: World,
     physics: GamePhysics,
     player_rigid_body_handle: RigidBodyHandle,
-    game_timer: Timer,
+    game_state: GameState,
     delta_shoot_time: Stopwatch,
     shoot_timer: Timer,
-    game_start_timer: Timer,
     score: Score,
-    game_running: bool,
     rng: SmallRng,
+    round_timer: Timer,
     shoot_animation: InOutAnimation,
     target_spawn_state: TargetSpawnState,
     secondary_delete_duration: Timer,
     entity_to_remove: Vec<Entity>,
+    freeze: bool,
 }
 
 impl ClassicGameScene {
@@ -112,13 +118,14 @@ impl ClassicGameScene {
             .collider_set
             .insert(ColliderBuilder::new(SharedShape::cuboid(20.0, 1.0, 10.0)).build());
 
-        let player_rigid_body_handle = setup_player_collider(&mut physics);
+        let player_rigid_body_handle =
+            setup_player_collider(&mut physics, Vector3::new(0.0, 1.0, 0.0));
 
         spawn_target(
             &mut world,
             &mut physics,
-            Vector3::new(0.0, 3.0, -10.0),
-            Target::new(),
+            Vector3::new(0.0, 3.0, -15.0),
+            Target::new(false),
         );
 
         spawn_container(
@@ -185,15 +192,15 @@ impl ClassicGameScene {
             ids: ClassicGameSceneIds::new(conrod_handle.get_ui_mut().widget_id_generator()),
             score: Score::new(),
             delta_shoot_time: Stopwatch::new(),
-            game_timer: Timer::new(100.0),
-            game_start_timer: Timer::new_finished(),
+            game_state: GameState::Preround,
             shoot_timer: Timer::new_finished(),
-            game_running: false,
             target_spawn_state: TargetSpawnState::Primary,
             rng: SmallRng::from_entropy(),
             shoot_animation: InOutAnimation::new(3.0, 5.0),
             secondary_delete_duration: Timer::new(1.0),
             entity_to_remove: Vec::new(),
+            round_timer: Timer::new(100.0),
+            freeze: false,
         }
     }
 }
@@ -201,7 +208,7 @@ impl ClassicGameScene {
 impl Scene for ClassicGameScene {
     fn init(
         &mut self,
-        _message: MaybeMessage,
+        message: MaybeMessage,
         window: &mut Window,
         renderer: &mut Renderer,
         _conrod_handle: &mut ConrodHandle,
@@ -211,112 +218,41 @@ impl Scene for ClassicGameScene {
         renderer.is_render_gui = true;
         renderer.is_render_game = true;
 
+        renderer.rendering_info.background_type = BackgroundType::Forest;
+
+        init_player(
+            &mut self.physics,
+            renderer,
+            self.player_rigid_body_handle.clone(),
+        );
+
         // Ground
         let (objects, ref mut bound) = renderer.render_objects.next_static();
         objects.position = nalgebra::Vector3::new(0.0, 0.0, 0.0);
         objects.shape_type_material_ids.0 = ShapeType::Box;
         objects.shape_type_material_ids.1 = MaterialType::CobblestonePaving;
         objects.shape_data1 = nalgebra::Vector4::new(20.0, 1.0, 10.0, 0.0);
-        *bound = ObjectBound::None;
+        *bound = objects.get_bounding_sphere_radius();
 
-        // Wall
+        // Back Wall
         let (objects, ref mut bound) = renderer.render_objects.next_static();
         objects.position = nalgebra::Vector3::new(0.0, 0.0, -40.0);
         objects.shape_type_material_ids.0 = ShapeType::Box;
         objects.shape_type_material_ids.1 = MaterialType::StoneWall;
         objects.shape_data1 = nalgebra::Vector4::new(20.0, 12.0, 1.0, 0.0);
-        *bound = ObjectBound::Sphere(20.0);
-        //     self.physics.collider_set.insert(
-        //         ColliderBuilder::new(SharedShape::cuboid(
-        //             objects.shape_data1.x,
-        //             objects.shape_data1.y,
-        //             objects.shape_data1.z,
-        //         ))
-        //         .translation(objects.position)
-        //         .user_data(entity.to_bits() as u128)
-        //         .build(),
-        //     );
-        //     self.world.spawn_at(entity, (Wall,));
-        // }
-
-        // {
-        //     let entity = self.world.reserve_entity();
-        //     let (objects, ref mut bound) = renderer.render_objects.next_static();
-        //     objects.position = nalgebra::Vector3::new(0.0, 0.0, 10.0);
-        //     objects.shape_type_material_ids.0 = ShapeType::Box;
-        //     objects.shape_type_material_ids.1 = MaterialType::Checker;
-        //     objects.shape_data1 = nalgebra::Vector4::new(20.0, 5.0, 1.0, 0.0);
-        //     *bound = ObjectBound::Sphere(20.0);
-        //     self.physics.collider_set.insert(
-        //         ColliderBuilder::new(SharedShape::cuboid(
-        //             objects.shape_data1.x,
-        //             objects.shape_data1.y,
-        //             objects.shape_data1.z,
-        //         ))
-        //         .translation(objects.position)
-        //         .user_data(entity.to_bits() as u128)
-        //         .build(),
-        //     );
-        //     self.world.spawn_at(entity, (Label("Wall"),));
-        // }
-        //
-        // {
-        //     let entity = self.world.reserve_entity();
-        //     let (objects, ref mut bound) = renderer.render_objects.next_static();
-        //     objects.position = nalgebra::Vector3::new(-20.0, 0.0, -5.0);
-        //     objects.shape_type_material_ids.0 = ShapeType::Box;
-        //     objects.shape_type_material_ids.1 = MaterialType::Checker;
-        //     objects.shape_data1 = nalgebra::Vector4::new(1.0, 5.0, 15.0, 0.0);
-        //     *bound = ObjectBound::Sphere(15.0);
-        //     self.physics.collider_set.insert(
-        //         ColliderBuilder::new(SharedShape::cuboid(
-        //             objects.shape_data1.x,
-        //             objects.shape_data1.y,
-        //             objects.shape_data1.z,
-        //         ))
-        //         .translation(objects.position)
-        //         .user_data(entity.to_bits() as u128)
-        //         .build(),
-        //     );
-        //     self.world.spawn_at(entity, (Label("Wall"),));
-        // }
-        //
-        // {
-        //     let entity = self.world.reserve_entity();
-        //     let (objects, ref mut bound) = renderer.render_objects.next_static();
-        //     objects.position = nalgebra::Vector3::new(20.0, 0.0, -5.0);
-        //     objects.shape_type_material_ids.0 = ShapeType::Box;
-        //     objects.shape_type_material_ids.1 = MaterialType::Checker;
-        //     objects.shape_data1 = nalgebra::Vector4::new(1.0, 5.0, 15.0, 0.0);
-        //     *bound = ObjectBound::Sphere(15.0);
-        //     self.physics.collider_set.insert(
-        //         ColliderBuilder::new(SharedShape::cuboid(
-        //             objects.shape_data1.x,
-        //             objects.shape_data1.y,
-        //             objects.shape_data1.z,
-        //         ))
-        //         .translation(objects.position)
-        //         .user_data(entity.to_bits() as u128)
-        //         .build(),
-        //     );
-        //     self.world.spawn_at(entity, (Label("Wall"),));
-        // }
-
-        {
-            let player_rigid_body = self
-                .physics
-                .rigid_body_set
-                .get(self.player_rigid_body_handle)
-                .unwrap();
-            renderer.camera.position = *player_rigid_body.translation();
-        }
+        *bound = objects.get_bounding_sphere_radius();
 
         window.set_is_cursor_grabbed(true);
 
-        audio_context.global_sinks_map.remove("bgm");
+        if let Some(m) = message {
+            if m.contains_key("from_pause") {
+                self.freeze = true;
+                renderer.game_renderer.render_crosshair = false;
+                self.game_state = GameState::Prepare(Timer::new(PREPARE_DURATION))
+            }
+        }
 
-        self.game_start_timer.reset(3.0);
-        self.game_running = false;
+        audio_context.global_sinks_map.remove("bgm");
     }
 
     fn update(
@@ -330,103 +266,35 @@ impl Scene for ClassicGameScene {
         _control_flow: &mut ControlFlow,
         _database: &mut Database,
     ) -> SceneOp {
-        renderer.camera.move_direction(input_manager.mouse_movement);
-
-        let sec = self.game_timer.get_duration();
+        let round_timer_sec = self.round_timer.get_duration();
 
         let mut ui_cell = conrod_handle.get_ui_mut().set_widgets();
         {
-            conrod_core::widget::Canvas::new()
-                .color(conrod_core::color::TRANSPARENT)
+            Canvas::new()
+                .color(Color::Rgba(0.0, 0.0, 0.0, 0.0))
                 .set(self.ids.canvas, &mut ui_cell);
 
-            conrod_core::widget::Canvas::new()
-                .color(conrod_core::Color::Rgba(1.0, 1.0, 1.0, 0.3))
+            Canvas::new()
+                .color(Color::Rgba(1.0, 1.0, 1.0, 0.3))
                 .mid_top_of(self.ids.canvas)
-                .wh(conrod_core::Dimensions::new(100.0, 30.0))
+                .wh(Dimensions::new(100.0, 30.0))
                 .set(self.ids.canvas_duration, &mut ui_cell);
 
-            conrod_core::widget::Text::new(&format!(
+            Text::new(&format!(
                 "{:02}:{:02}",
-                (sec / 60.0) as i32,
-                (sec % 60.0) as i32
+                (round_timer_sec / 60.0) as i32,
+                (round_timer_sec % 60.0) as i32
             ))
             .color(conrod_core::color::BLACK)
             .middle_of(self.ids.canvas_duration)
             .set(self.ids.duration_label, &mut ui_cell);
         }
 
+        let mut game_finished = false;
+
         let mut scene_op = SceneOp::None;
 
-        if !self.game_running {
-            if self.game_start_timer.is_finished() {
-                self.game_running = true;
-            } else {
-                self.game_start_timer.update(delta_time);
-                conrod_core::widget::Text::new(&format!(
-                    "{:.1}",
-                    self.game_start_timer.get_duration()
-                ))
-                .align_middle_x_of(self.ids.canvas)
-                .align_middle_y_of(self.ids.canvas)
-                .set(self.ids.start_duration_label, &mut ui_cell);
-            }
-        } else {
-            self.game_timer.update(delta_time);
-            self.shoot_timer.update(delta_time);
-            self.delta_shoot_time.update(delta_time);
-
-            let mut missed = || {
-                self.score.score -= 100;
-                self.score.miss += 1;
-            };
-
-            let mut missed_secondary = false;
-
-            for (id, (target, collider_handle)) in
-                self.world.query_mut::<(&mut Target, &ColliderHandle)>()
-            {
-                if target.is_need_to_be_deleted(delta_time) {
-                    self.entity_to_remove.push(id);
-                    self.physics.collider_set.remove(
-                        *collider_handle,
-                        &mut self.physics.island_manager,
-                        &mut self.physics.rigid_body_set,
-                        false,
-                    );
-
-                    if !target.is_shooted() {
-                        missed_secondary = true;
-                    }
-                }
-            }
-
-            for entity in self.entity_to_remove.iter() {
-                self.world.despawn(*entity).unwrap();
-            }
-            self.entity_to_remove.clear();
-
-            if missed_secondary {
-                self.target_spawn_state = match self.target_spawn_state {
-                    TargetSpawnState::Secondary => TargetSpawnState::Primary,
-                    _ => unreachable!(),
-                };
-                missed();
-                spawn_target(
-                    &mut self.world,
-                    &mut self.physics,
-                    Vector3::new(0.0, 3.0, self.rng.sample(Uniform::new(-19.0, -13.0))),
-                    Target::new(),
-                );
-            }
-
-            self.shoot_animation.update(delta_time);
-            renderer.rendering_info.fov_shootanim.y = lerp(
-                0.0f32,
-                -20.0f32.to_radians(),
-                self.shoot_animation.get_value(),
-            );
-
+        if !self.freeze {
             self.physics.physics_pipeline.step(
                 &self.physics.gravity,
                 &self.physics.integration_parameters,
@@ -446,6 +314,8 @@ impl Scene for ClassicGameScene {
                 &self.physics.collider_set,
             );
 
+            renderer.camera.move_direction(input_manager.mouse_movement);
+
             let _player_position = update_player_position(
                 delta_time,
                 input_manager,
@@ -453,108 +323,212 @@ impl Scene for ClassicGameScene {
                 &mut self.physics,
                 self.player_rigid_body_handle,
             );
+        }
 
-            if input_manager.is_mouse_press(&MouseButton::Left) && self.shoot_timer.is_finished() {
-                self.shoot_animation.trigger();
-                self.shoot_timer.reset(0.4);
+        match self.game_state {
+            GameState::Preround => {
+                Text::new("Press any mouse key to start")
+                    .align_middle_x_of(self.ids.canvas)
+                    .align_middle_y_of(self.ids.canvas)
+                    .set(self.ids.start_duration_label, &mut ui_cell);
 
-                let sink = rodio::Sink::try_new(&audio_context.output_stream_handle).unwrap();
-                sink.append(
-                    rodio::Decoder::new(BufReader::new(Cursor::new(AUDIO_FILE_SHOOT.to_vec())))
-                        .unwrap(),
-                );
-                audio_context.push(Sink::Regular(sink));
+                if input_manager.is_any_mouse_press() {
+                    self.game_state = GameState::Prepare(Timer::new(PREPARE_DURATION));
+                }
+            }
+            GameState::Prepare(ref mut timer) => {
+                timer.update(delta_time);
 
-                let ray = Ray::new(
-                    nalgebra::Point::from(
-                        renderer.camera.position
-                            + renderer.camera.get_direction().into_inner() * 1.0,
-                    ),
-                    renderer.camera.get_direction().into_inner(),
-                );
-                const MAX_RAYCAST_DISTANCE: f32 = 1000.0;
-                if let Some((handle, _distance)) = self.physics.query_pipeline.cast_ray(
-                    &self.physics.collider_set,
-                    &ray,
-                    MAX_RAYCAST_DISTANCE,
-                    true,
-                    self.physics.interaction_groups,
-                    None,
-                ) {
-                    let collider = self.physics.collider_set.get(handle).unwrap();
-                    let entity = Entity::from_bits(collider.user_data as u64);
+                Text::new(&format!("{:.1}", timer.get_duration()))
+                    .align_middle_x_of(self.ids.canvas)
+                    .align_middle_y_of(self.ids.canvas)
+                    .set(self.ids.start_duration_label, &mut ui_cell);
 
-                    let mut need_to_spawn = false;
-                    if let Ok(mut target) = self.world.get_mut::<Target>(entity) {
-                        let sink =
-                            rodio::Sink::try_new(&audio_context.output_stream_handle).unwrap();
-                        sink.append(
-                            rodio::Decoder::new(BufReader::new(Cursor::new(
-                                AUDIO_FILE_SHOOTED.to_vec(),
-                            )))
-                            .unwrap(),
+                if timer.is_finished() {
+                    self.freeze = false;
+                    self.game_state = GameState::Round;
+                    renderer.game_renderer.render_crosshair = true;
+                }
+            }
+            GameState::Round => {
+                self.round_timer.update(delta_time);
+                self.shoot_timer.update(delta_time);
+                self.delta_shoot_time.update(delta_time);
+
+                let mut missed = || {
+                    self.score.score -= 100;
+                    self.score.miss += 1;
+                };
+
+                let mut missed_secondary = false;
+
+                for (id, (target, collider_handle)) in
+                    self.world.query_mut::<(&mut Target, &ColliderHandle)>()
+                {
+                    if target.is_need_to_be_deleted(delta_time) {
+                        self.entity_to_remove.push(id);
+                        self.physics.collider_set.remove(
+                            *collider_handle,
+                            &mut self.physics.island_manager,
+                            &mut self.physics.rigid_body_set,
+                            false,
                         );
-                        audio_context.push(Sink::Regular(sink));
 
                         if !target.is_shooted() {
-                            let shoot_time = self.delta_shoot_time.get_duration();
-                            self.delta_shoot_time.reset();
+                            missed_secondary = true;
+                        }
+                    }
+                }
 
-                            self.score.total_shoot_time += shoot_time;
+                for entity in self.entity_to_remove.iter() {
+                    self.world.despawn(*entity).unwrap();
+                }
+                self.entity_to_remove.clear();
 
-                            need_to_spawn = true;
-                            target.shooted();
+                if missed_secondary {
+                    self.target_spawn_state = match self.target_spawn_state {
+                        TargetSpawnState::Secondary => TargetSpawnState::Primary,
+                        _ => unreachable!(),
+                    };
+                    missed();
+                    spawn_target(
+                        &mut self.world,
+                        &mut self.physics,
+                        Vector3::new(0.0, 3.0, self.rng.sample(Uniform::new(-19.0, -13.0))),
+                        Target::new(false),
+                    );
+                }
 
-                            self.target_spawn_state = match self.target_spawn_state {
-                                TargetSpawnState::Primary => TargetSpawnState::Secondary,
-                                TargetSpawnState::Secondary => TargetSpawnState::Primary,
-                            };
+                self.shoot_animation.update(delta_time);
+                renderer.rendering_info.fov_shootanim.y = lerp(
+                    0.0f32,
+                    -20.0f32.to_radians(),
+                    self.shoot_animation.get_value(),
+                );
 
-                            self.score.score += ((300.0 * (3.0 - shoot_time)) as i32).max(0);
-                            self.score.hit += 1;
+                if input_manager.is_mouse_press(&MouseButton::Left)
+                    && self.shoot_timer.is_finished()
+                {
+                    self.shoot_animation.trigger();
+                    self.shoot_timer.reset(0.4);
+
+                    let sink = rodio::Sink::try_new(&audio_context.output_stream_handle).unwrap();
+                    sink.append(
+                        rodio::Decoder::new(BufReader::new(Cursor::new(AUDIO_FILE_SHOOT.to_vec())))
+                            .unwrap(),
+                    );
+                    audio_context.push(Sink::Regular(sink));
+
+                    let ray = Ray::new(
+                        nalgebra::Point::from(
+                            renderer.camera.position
+                                + renderer.camera.get_direction().into_inner() * 1.0,
+                        ),
+                        renderer.camera.get_direction().into_inner(),
+                    );
+                    if let Some((handle, _distance)) = self.physics.query_pipeline.cast_ray(
+                        &self.physics.collider_set,
+                        &ray,
+                        MAX_RAYCAST_DISTANCE,
+                        true,
+                        self.physics.interaction_groups,
+                        None,
+                    ) {
+                        let collider = self.physics.collider_set.get(handle).unwrap();
+                        let entity = Entity::from_bits(collider.user_data as u64);
+
+                        let mut need_to_spawn = false;
+                        if let Ok(mut target) = self.world.get_mut::<Target>(entity) {
+                            let sink =
+                                rodio::Sink::try_new(&audio_context.output_stream_handle).unwrap();
+                            sink.append(
+                                rodio::Decoder::new(BufReader::new(Cursor::new(
+                                    AUDIO_FILE_SHOOTED.to_vec(),
+                                )))
+                                .unwrap(),
+                            );
+                            audio_context.push(Sink::Regular(sink));
+
+                            if !target.is_shooted() {
+                                let shoot_time = self.delta_shoot_time.get_duration();
+                                self.delta_shoot_time.reset();
+
+                                self.score.total_shoot_time += shoot_time;
+
+                                need_to_spawn = true;
+                                target.shooted();
+
+                                self.target_spawn_state = match self.target_spawn_state {
+                                    TargetSpawnState::Primary => TargetSpawnState::Secondary,
+                                    TargetSpawnState::Secondary => TargetSpawnState::Primary,
+                                };
+
+                                self.score.score += ((300.0 * (3.0 - shoot_time)) as i32).max(0);
+                                self.score.hit += 1;
+                            } else {
+                                missed();
+                            }
                         } else {
                             missed();
+                        }
+
+                        if need_to_spawn {
+                            match self.target_spawn_state {
+                                TargetSpawnState::Primary => spawn_target(
+                                    &mut self.world,
+                                    &mut self.physics,
+                                    Vector3::new(
+                                        0.0,
+                                        3.0,
+                                        self.rng.sample(Uniform::new(-39.0, -15.0)),
+                                    ),
+                                    Target::new(false),
+                                ),
+                                TargetSpawnState::Secondary => {
+                                    let pos = nalgebra::Vector3::new(
+                                        self.rng.sample(Uniform::new(-13.0, 13.0)),
+                                        self.rng.sample(Uniform::new(1.0, 5.0)),
+                                        self.rng.sample(Uniform::new(-39.0, -18.0)),
+                                    );
+                                    spawn_target(
+                                        &mut self.world,
+                                        &mut self.physics,
+                                        pos,
+                                        Target::new_with_delete_duration(
+                                            self.secondary_delete_duration.clone(),
+                                        ),
+                                    );
+                                }
+                            }
                         }
                     } else {
                         missed();
                     }
+                }
 
-                    if need_to_spawn {
-                        match self.target_spawn_state {
-                            TargetSpawnState::Primary => spawn_target(
-                                &mut self.world,
-                                &mut self.physics,
-                                Vector3::new(0.0, 3.0, self.rng.sample(Uniform::new(-19.0, -13.0))),
-                                Target::new(),
-                            ),
-                            TargetSpawnState::Secondary => {
-                                let pos = nalgebra::Vector3::new(
-                                    self.rng.sample(Uniform::new(-5.0, 5.0)),
-                                    self.rng.sample(Uniform::new(0.5, 5.0)),
-                                    self.rng.sample(Uniform::new(-19.0, -13.0)),
-                                );
-                                spawn_target(
-                                    &mut self.world,
-                                    &mut self.physics,
-                                    pos,
-                                    Target::new_with_delete_duration(
-                                        self.secondary_delete_duration.clone(),
-                                    ),
-                                );
-                            }
-                        }
-                    }
-                } else {
-                    missed();
+                if self.round_timer.is_finished() {
+                    self.game_state = GameState::Finishing(Timer::new(FINISHING_DURATION));
                 }
             }
-        }
+            GameState::Finishing(ref mut timer) => {
+                timer.update(delta_time);
+
+                Text::new("Time out!")
+                    .align_middle_x_of(self.ids.canvas)
+                    .align_middle_y_of(self.ids.canvas)
+                    .set(self.ids.start_duration_label, &mut ui_cell);
+
+                if timer.is_finished() {
+                    game_finished = true;
+                }
+            }
+        };
 
         drop(ui_cell);
 
-        if sec <= 0.0 {
+        if game_finished {
             scene_op = SceneOp::Push(
-                Box::new(ClassicScoreScene::new(renderer, conrod_handle)),
+                Box::new(ClassicScoreScene::new(conrod_handle)),
                 Some({
                     let mut m = HashMap::new();
                     self.score.write_message(&mut m);
@@ -578,26 +552,14 @@ impl Scene for ClassicGameScene {
         _conrod_handle: &mut ConrodHandle,
         _audio_context: &mut AudioContext,
     ) {
-        for (_id, (collider_handle, target)) in self.world.query_mut::<(&ColliderHandle, &Target)>()
-        {
-            let collider = self.physics.collider_set.get_mut(*collider_handle).unwrap();
-            let (objects, ref mut bound) = renderer.render_objects.next();
-            objects.position = *collider.translation();
-            objects.shape_type_material_ids.0 = ShapeType::Sphere;
-            objects.shape_type_material_ids.1 = target.get_material();
-            // let cam_to_obj = nalgebra::Unit::new_normalize(position.0 - renderer.camera.position);
-            // let inner_cam_to_obj = cam_to_obj.into_inner() * -0.1;
-
-            // objects.shape_data1.x = inner_cam_to_obj.x;
-            // objects.shape_data1.y = inner_cam_to_obj.y;
-            // objects.shape_data1.z = inner_cam_to_obj.z;
-            objects.shape_data1.x = collider.shape().as_ball().unwrap().radius;
-
-            *bound = ObjectBound::Sphere(0.5);
-        }
-
+        enqueue_target(&mut self.world, &mut self.physics, renderer);
         enqueue_crate(&mut self.world, &mut self.physics, renderer);
-        enqueue_wall(&mut self.world, &mut self.physics, renderer);
+        enqueue_wall(
+            &mut self.world,
+            &mut self.physics,
+            renderer,
+            MaterialType::StoneWall,
+        );
         enqueue_container(&mut self.world, &mut self.physics, renderer);
     }
 
