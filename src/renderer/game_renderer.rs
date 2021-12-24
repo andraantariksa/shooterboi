@@ -296,6 +296,21 @@ impl GameSceneRenderer {
             border_color: None,
         });
 
+        let noise_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            label: Some("Noise sampler"),
+            address_mode_u: wgpu::AddressMode::Repeat,
+            address_mode_v: wgpu::AddressMode::Repeat,
+            address_mode_w: wgpu::AddressMode::Repeat,
+            mag_filter: wgpu::FilterMode::Nearest,
+            min_filter: wgpu::FilterMode::Nearest,
+            mipmap_filter: wgpu::FilterMode::Nearest,
+            lod_min_clamp: 0.0,
+            lod_max_clamp: 0.0,
+            compare: None,
+            anisotropy_clamp: None,
+            border_color: None,
+        });
+
         let main_bindgroup_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
                 label: Some("Bind group layout descriptor main"),
@@ -357,6 +372,15 @@ impl GameSceneRenderer {
                     default_texture_bind_group_layout_entry(15),
                     default_texture_bind_group_layout_entry(16),
                     default_texture_bind_group_layout_entry(17),
+                    wgpu::BindGroupLayoutEntry {
+                        count: None,
+                        binding: 18,
+                        ty: wgpu::BindingType::Sampler {
+                            filtering: false,
+                            comparison: false,
+                        },
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                    },
                 ],
             });
 
@@ -442,6 +466,10 @@ impl GameSceneRenderer {
                 wgpu::BindGroupEntry {
                     binding: 17,
                     resource: wgpu::BindingResource::TextureView(&asphalt_texture_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 18,
+                    resource: wgpu::BindingResource::Sampler(&noise_sampler),
                 },
             ],
         });

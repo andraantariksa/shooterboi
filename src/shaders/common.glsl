@@ -80,6 +80,7 @@ layout(binding = 14) uniform texture2D leaves_texture;
 layout(binding = 15) uniform texture2D rgba_noise_medium;
 layout(binding = 16) uniform texture2D gray_noise_small_texture;
 layout(binding = 17) uniform texture2D asphalt_texture;
+layout(binding = 18) uniform sampler noise_sampler;
 
 layout(location = 0) out vec4 outColor;
 
