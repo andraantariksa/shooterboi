@@ -644,9 +644,8 @@ void main()
         post_color += ray_hit_pos * 0.3;
         #endif
         post_color *= ambient_ocl(ray_hit_pos, normal);
-        //post_color = apply_fog(post_color, d.distance);
+        post_color = apply_fog(post_color, d.distance);
         outColor = vec4(post_color, 1.0);
     }
 
-    outColor = vec4(outColor.xyz, outColor.w);
 }

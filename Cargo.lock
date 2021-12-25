@@ -2884,6 +2884,7 @@ dependencies = [
  "console_error_panic_hook",
  "console_log",
  "criterion",
+ "crossbeam",
  "env_logger",
  "getrandom",
  "glob",
