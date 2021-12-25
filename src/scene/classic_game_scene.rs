@@ -26,8 +26,8 @@ use crate::renderer::Renderer;
 use crate::scene::classic_score_scene::ClassicScoreScene;
 use crate::scene::pause_scene::PauseScene;
 use crate::scene::{
-    GameState, MaybeMessage, Message, Scene, SceneOp, FINISHING_DURATION, MAX_RAYCAST_DISTANCE,
-    PREPARE_DURATION,
+    GameDifficulty, GameState, MaybeMessage, Message, Scene, SceneOp, FINISHING_DURATION,
+    MAX_RAYCAST_DISTANCE, PREPARE_DURATION,
 };
 use crate::systems::container::{enqueue_container, spawn_container};
 use crate::systems::crate_box::{enqueue_crate, spawn_crate};
@@ -106,10 +106,15 @@ pub struct ClassicGameScene {
     secondary_delete_duration: Timer,
     entity_to_remove: Vec<Entity>,
     freeze: bool,
+    difficulty: GameDifficulty,
 }
 
 impl ClassicGameScene {
-    pub fn new(_renderer: &mut Renderer, conrod_handle: &mut ConrodHandle) -> Self {
+    pub fn new(
+        _renderer: &mut Renderer,
+        conrod_handle: &mut ConrodHandle,
+        difficulty: GameDifficulty,
+    ) -> Self {
         let mut world = World::new();
         let mut physics = GamePhysics::new();
 
@@ -125,7 +130,7 @@ impl ClassicGameScene {
             &mut world,
             &mut physics,
             Vector3::new(0.0, 3.0, -15.0),
-            Target::new(false),
+            Target::new(None, None),
         );
 
         spawn_container(
@@ -201,6 +206,7 @@ impl ClassicGameScene {
             entity_to_remove: Vec::new(),
             round_timer: Timer::new(100.0),
             freeze: false,
+            difficulty,
         }
     }
 }
@@ -243,6 +249,7 @@ impl Scene for ClassicGameScene {
         *bound = objects.get_bounding_sphere_radius();
 
         window.set_is_cursor_grabbed(true);
+        audio_context.global_sinks_map.remove("bgm");
 
         if let Some(m) = message {
             if m.contains_key("from_pause") {
@@ -251,8 +258,6 @@ impl Scene for ClassicGameScene {
                 self.game_state = GameState::Prepare(Timer::new(PREPARE_DURATION))
             }
         }
-
-        audio_context.global_sinks_map.remove("bgm");
     }
 
     fn update(
@@ -361,7 +366,6 @@ impl Scene for ClassicGameScene {
                 };
 
                 let mut missed_secondary = false;
-
                 for (id, (target, collider_handle)) in
                     self.world.query_mut::<(&mut Target, &ColliderHandle)>()
                 {
@@ -379,7 +383,6 @@ impl Scene for ClassicGameScene {
                         }
                     }
                 }
-
                 for entity in self.entity_to_remove.iter() {
                     self.world.despawn(*entity).unwrap();
                 }
@@ -395,7 +398,7 @@ impl Scene for ClassicGameScene {
                         &mut self.world,
                         &mut self.physics,
                         Vector3::new(0.0, 3.0, self.rng.sample(Uniform::new(-19.0, -13.0))),
-                        Target::new(false),
+                        Target::new(None, None),
                     );
                 }
 
@@ -482,7 +485,7 @@ impl Scene for ClassicGameScene {
                                         3.0,
                                         self.rng.sample(Uniform::new(-39.0, -15.0)),
                                     ),
-                                    Target::new(false),
+                                    Target::new(None, None),
                                 ),
                                 TargetSpawnState::Secondary => {
                                     let pos = nalgebra::Vector3::new(
@@ -496,6 +499,8 @@ impl Scene for ClassicGameScene {
                                         pos,
                                         Target::new_with_delete_duration(
                                             self.secondary_delete_duration.clone(),
+                                            None,
+                                            None,
                                         ),
                                     );
                                 }

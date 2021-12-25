@@ -1,3 +1,4 @@
+use chrono::NaiveDateTime;
 use conrod_core::widget::envelope_editor::EnvelopePoint;
 use conrod_core::widget::{Canvas, Text};
 use conrod_core::{Labelable, Positionable, Sizeable, Widget};
@@ -9,13 +10,65 @@ use crate::input_manager::InputManager;
 use crate::renderer::Renderer;
 
 use crate::database::Database;
-use crate::scene::classic_game_scene::Score;
 use crate::scene::{
     MaybeMessage, Scene, SceneOp, BUTTON_HEIGHT, BUTTON_WIDTH, GAP_BETWEEN_ITEM, MARGIN,
 };
 use crate::window::Window;
 use conrod_core::widget_ids;
+use gluesql::data::Value;
 use winit::event::VirtualKeyCode;
+
+pub struct HitAndDodgeGameScoreDisplay {
+    pub accuracy: f32,
+    pub hit: u16,
+    pub miss: u16,
+    pub score: i32,
+    pub avg_hit_time: f32,
+    pub created_at: NaiveDateTime,
+}
+
+impl HitAndDodgeGameScoreDisplay {
+    pub fn new() -> Self {
+        Self {
+            accuracy: 0.0,
+            hit: 0,
+            miss: 0,
+            score: 0,
+            avg_hit_time: 0.0,
+            created_at: NaiveDateTime::from_timestamp(0, 0),
+        }
+    }
+
+    pub fn read_message(&mut self, message: &MaybeMessage) {
+        if let Some(msg) = message {
+            self.hit = match *msg.get("hit").unwrap() {
+                Value::I64(x) => x,
+                _ => unreachable!(),
+            } as u16;
+            self.miss = match *msg.get("miss").unwrap() {
+                Value::I64(x) => x,
+                _ => unreachable!(),
+            } as u16;
+            self.score = match *msg.get("score").unwrap() {
+                Value::I64(x) => x,
+                _ => unreachable!(),
+            } as i32;
+            self.accuracy = match *msg.get("accuracy").unwrap() {
+                Value::F64(x) => x,
+                _ => unreachable!(),
+            } as f32;
+            self.created_at = match *msg.get("created_at").unwrap() {
+                Value::Timestamp(x) => x,
+                _ => unreachable!(),
+            };
+            self.avg_hit_time = match *msg.get("avg_hit_time").unwrap() {
+                Value::F64(x) => x,
+                _ => unreachable!(),
+            } as f32;
+            self.accuracy = self.hit as f32 / (self.hit + self.miss).max(1) as f32 * 100.0;
+        }
+    }
+}
 
 widget_ids! {
     pub struct HitAndDodgeScoreSceneIds {
@@ -49,7 +102,7 @@ widget_ids! {
 
 pub struct HitAndDodgeScoreScene {
     ids: HitAndDodgeScoreSceneIds,
-    score: Score,
+    score: HitAndDodgeGameScoreDisplay,
 }
 
 impl HitAndDodgeScoreScene {
@@ -57,7 +110,7 @@ impl HitAndDodgeScoreScene {
         let ids = HitAndDodgeScoreSceneIds::new(conrod_handle.get_ui_mut().widget_id_generator());
         Self {
             ids,
-            score: Score::new(),
+            score: HitAndDodgeGameScoreDisplay::new(),
         }
     }
 }

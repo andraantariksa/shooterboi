@@ -31,15 +31,15 @@ use crate::renderer::Renderer;
 use crate::scene::classic_score_scene::ClassicScoreScene;
 use crate::scene::pause_scene::PauseScene;
 use crate::scene::{
-    GameState, MaybeMessage, Message, Scene, SceneOp, FINISHING_DURATION, MAX_RAYCAST_DISTANCE,
-    PREPARE_DURATION,
+    GameDifficulty, GameState, MaybeMessage, Message, Scene, SceneOp, FINISHING_DURATION,
+    MAX_RAYCAST_DISTANCE, PREPARE_DURATION,
 };
-use crate::systems::gunman::{enqueue_gunman, spawn_gunman, update_gunmans};
+use crate::systems::gunman::{enqueue_bullet, enqueue_gunman, spawn_gunman, update_gunmans};
 use crate::systems::player::{init_player, setup_player_collider};
 use crate::systems::swordman::{enqueue_swordman, spawn_swordman, update_swordmans};
 use crate::systems::target::{enqueue_target, spawn_target};
 use crate::systems::update_player_movement::update_player_position;
-use crate::systems::wall::spawn_wall;
+use crate::systems::wall::{enqueue_wall, spawn_wall};
 use crate::timer::{Stopwatch, Timer};
 use crate::util::lerp;
 use crate::window::Window;
@@ -96,24 +96,28 @@ pub struct HitAndDodgeGameScene {
     delta_shoot_time: Stopwatch,
     shoot_timer: Timer,
     score: Score,
-    game_running: bool,
     rng: SmallRng,
     shoot_animation: InOutAnimation,
     entity_to_remove: Vec<Entity>,
     round_timer: Timer,
     freeze: bool,
     game_state: GameState,
+    difficulty: GameDifficulty,
 }
 
 impl HitAndDodgeGameScene {
-    pub fn new(_renderer: &mut Renderer, conrod_handle: &mut ConrodHandle) -> Self {
+    pub fn new(
+        _renderer: &mut Renderer,
+        conrod_handle: &mut ConrodHandle,
+        difficulty: GameDifficulty,
+    ) -> Self {
         let mut world = World::new();
         let mut physics = GamePhysics::new();
 
         // Ground
         physics.collider_set.insert(
-            ColliderBuilder::new(SharedShape::cuboid(15.0, 0.5, 15.0))
-                .translation(Vector3::new(0.0, 0.0, 0.0))
+            ColliderBuilder::new(SharedShape::cuboid(10.0, 0.5, 10.0))
+                .translation(Vector3::new(0.0, -0.5, 0.0))
                 .build(),
         );
 
@@ -135,6 +139,31 @@ impl HitAndDodgeGameScene {
             Swordman::new(),
         );
 
+        spawn_wall(
+            &mut world,
+            &mut physics,
+            Vector3::new(0.0, 1.4, -9.5),
+            Vector3::new(10.0, 0.398, 0.5),
+        );
+        spawn_wall(
+            &mut world,
+            &mut physics,
+            Vector3::new(0.0, 1.4, 9.5),
+            Vector3::new(10.0, 0.398, 0.5),
+        );
+        // spawn_wall(
+        //     &mut world,
+        //     &mut physics,
+        //     Vector3::new(19.5, 1.4, 0.0),
+        //     Vector3::new(0.5, 0.398, 9.99),
+        // );
+        // spawn_wall(
+        //     &mut world,
+        //     &mut physics,
+        //     Vector3::new(-19.5, 1.4, 0.0),
+        //     Vector3::new(0.5, 0.398, 9.99),
+        // );
+
         Self {
             world,
             physics,
@@ -143,13 +172,13 @@ impl HitAndDodgeGameScene {
             score: Score::new(),
             delta_shoot_time: Stopwatch::new(),
             shoot_timer: Timer::new_finished(),
-            game_running: false,
             rng,
             shoot_animation: InOutAnimation::new(3.0, 5.0),
             entity_to_remove: Vec::new(),
             round_timer: Timer::new(100.0),
             freeze: false,
             game_state: GameState::Preround,
+            difficulty,
         }
     }
 }
@@ -157,7 +186,7 @@ impl HitAndDodgeGameScene {
 impl Scene for HitAndDodgeGameScene {
     fn init(
         &mut self,
-        _message: MaybeMessage,
+        message: MaybeMessage,
         window: &mut Window,
         renderer: &mut Renderer,
         _conrod_handle: &mut ConrodHandle,
@@ -167,7 +196,7 @@ impl Scene for HitAndDodgeGameScene {
         renderer.is_render_gui = true;
         renderer.is_render_game = true;
 
-        renderer.rendering_info.background_type = BackgroundType::Snow;
+        renderer.rendering_info.background_type = BackgroundType::Forest;
 
         init_player(
             &mut self.physics,
@@ -177,17 +206,29 @@ impl Scene for HitAndDodgeGameScene {
 
         // Ground
         let (objects, ref mut bound) = renderer.render_objects.next_static();
-        objects.position = nalgebra::Vector3::new(0.0, 0.0, 0.0);
+        objects.position = nalgebra::Vector3::new(0.0, -0.5, 0.0);
         objects.shape_type_material_ids.0 = ShapeType::Box;
         objects.shape_type_material_ids.1 = MaterialType::CobblestonePaving;
-        objects.shape_data1 = nalgebra::Vector4::new(20.0, 1.0, 10.0, 0.0);
+        objects.shape_data1 = nalgebra::Vector4::new(10.0, 0.5, 10.0, 0.0);
         *bound = objects.get_bounding_sphere_radius();
 
         window.set_is_cursor_grabbed(true);
-
         audio_context.global_sinks_map.remove("bgm");
 
-        self.game_running = false;
+        if let Some(m) = message {
+            if m.contains_key("from_pause") {
+                self.freeze = true;
+                renderer.game_renderer.render_crosshair = false;
+                self.game_state = GameState::Prepare(Timer::new(PREPARE_DURATION))
+            }
+
+            match m.get("difficulty").unwrap() {
+                Value::I64(x) => {
+                    self.difficulty = GameDifficulty::from(*x as usize);
+                }
+                _ => unreachable!(),
+            };
+        }
     }
 
     fn update(
@@ -404,8 +445,15 @@ impl Scene for HitAndDodgeGameScene {
         _audio_context: &mut AudioContext,
     ) {
         enqueue_gunman(&mut self.world, &mut self.physics, renderer);
+        enqueue_bullet(&mut self.world, &mut self.physics, renderer);
         enqueue_swordman(&mut self.world, &mut self.physics, renderer);
         enqueue_target(&mut self.world, &mut self.physics, renderer);
+        enqueue_wall(
+            &mut self.world,
+            &mut self.physics,
+            renderer,
+            MaterialType::StoneWall,
+        );
     }
 
     fn deinit(

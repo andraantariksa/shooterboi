@@ -24,8 +24,8 @@ use crate::renderer::Renderer;
 use crate::scene::classic_score_scene::ClassicScoreScene;
 use crate::scene::pause_scene::PauseScene;
 use crate::scene::{
-    GameState, MaybeMessage, Message, Scene, SceneOp, FINISHING_DURATION, MAX_RAYCAST_DISTANCE,
-    PREPARE_DURATION,
+    GameDifficulty, GameState, MaybeMessage, Message, Scene, SceneOp, FINISHING_DURATION,
+    MAX_RAYCAST_DISTANCE, PREPARE_DURATION,
 };
 use crate::timer::{Stopwatch, Timer};
 use crate::util::lerp;
@@ -92,17 +92,21 @@ pub struct EliminationGameScene {
     delta_shoot_time: Stopwatch,
     shoot_timer: Timer,
     score: Score,
-    game_running: bool,
     rng: SmallRng,
     shoot_animation: InOutAnimation,
     entity_to_remove: Vec<Entity>,
     round_timer: Timer,
     freeze: bool,
     game_state: GameState,
+    difficulty: GameDifficulty,
 }
 
 impl EliminationGameScene {
-    pub fn new(_renderer: &mut Renderer, conrod_handle: &mut ConrodHandle) -> Self {
+    pub fn new(
+        _renderer: &mut Renderer,
+        conrod_handle: &mut ConrodHandle,
+        difficulty: GameDifficulty,
+    ) -> Self {
         let mut world = World::new();
         let mut physics = GamePhysics::new();
 
@@ -130,13 +134,13 @@ impl EliminationGameScene {
             score: Score::new(),
             delta_shoot_time: Stopwatch::new(),
             shoot_timer: Timer::new_finished(),
-            game_running: false,
             rng: SmallRng::from_entropy(),
             shoot_animation: InOutAnimation::new(3.0, 5.0),
             freeze: false,
             round_timer: Timer::new(100.0),
             entity_to_remove: Vec::new(),
             game_state: GameState::Preround,
+            difficulty,
         }
     }
 }
@@ -144,7 +148,7 @@ impl EliminationGameScene {
 impl Scene for EliminationGameScene {
     fn init(
         &mut self,
-        _message: MaybeMessage,
+        message: MaybeMessage,
         window: &mut Window,
         renderer: &mut Renderer,
         _conrod_handle: &mut ConrodHandle,
@@ -174,7 +178,20 @@ impl Scene for EliminationGameScene {
 
         audio_context.global_sinks_map.remove("bgm");
 
-        self.game_running = false;
+        if let Some(m) = message {
+            if m.contains_key("from_pause") {
+                self.freeze = true;
+                renderer.game_renderer.render_crosshair = false;
+                self.game_state = GameState::Prepare(Timer::new(PREPARE_DURATION))
+            }
+
+            match m.get("difficulty").unwrap() {
+                Value::I64(x) => {
+                    self.difficulty = GameDifficulty::from(*x as usize);
+                }
+                _ => unreachable!(),
+            };
+        }
     }
 
     fn update(
@@ -282,7 +299,7 @@ impl Scene for EliminationGameScene {
                                     &mut self.world,
                                     &mut self.physics,
                                     pos,
-                                    Target::new(false),
+                                    Target::new(None, None),
                                 );
                             }
                         }
@@ -301,6 +318,24 @@ impl Scene for EliminationGameScene {
                     self.score.score -= 100;
                     self.score.miss += 1;
                 };
+
+                for (id, (target, collider_handle)) in
+                    self.world.query_mut::<(&mut Target, &ColliderHandle)>()
+                {
+                    if target.is_need_to_be_deleted(delta_time) {
+                        self.entity_to_remove.push(id);
+                        self.physics.collider_set.remove(
+                            *collider_handle,
+                            &mut self.physics.island_manager,
+                            &mut self.physics.rigid_body_set,
+                            false,
+                        );
+                    }
+                }
+                for entity in self.entity_to_remove.iter() {
+                    self.world.despawn(*entity).unwrap();
+                }
+                self.entity_to_remove.clear();
 
                 self.shoot_animation.update(delta_time);
                 renderer.rendering_info.fov_shootanim.y = lerp(
@@ -341,7 +376,29 @@ impl Scene for EliminationGameScene {
                         let entity = Entity::from_bits(collider.user_data as u64);
 
                         if let Ok(mut target) = self.world.get_mut::<Target>(entity) {
-                            target.shooted();
+                            let sink =
+                                rodio::Sink::try_new(&audio_context.output_stream_handle).unwrap();
+                            sink.append(
+                                rodio::Decoder::new(BufReader::new(Cursor::new(
+                                    AUDIO_FILE_SHOOTED.to_vec(),
+                                )))
+                                .unwrap(),
+                            );
+                            audio_context.push(Sink::Regular(sink));
+
+                            if !target.is_shooted() {
+                                let shoot_time = self.delta_shoot_time.get_duration();
+                                self.delta_shoot_time.reset();
+
+                                self.score.total_shoot_time += shoot_time;
+
+                                target.shooted();
+
+                                self.score.score += ((300.0 * (3.0 - shoot_time)) as i32).max(0);
+                                self.score.hit += 1;
+                            } else {
+                                missed();
+                            }
                         } else {
                             missed();
                         }

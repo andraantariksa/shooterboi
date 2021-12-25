@@ -1,18 +1,39 @@
 use crate::animation::{InOutAnimation, InOutAnimationState};
+use hecs::World;
 
 use crate::renderer::render_objects::MaterialType;
 
 use crate::entity::enemy::{HITTED_MATERIAL_DURATION, ROTATION_SPEED};
 use crate::entity::HasMaterial;
+use crate::physics::GamePhysics;
 use crate::timer::Timer;
 use nalgebra::{Unit, Vector2, Vector3};
 use rand::distributions::Uniform;
 use rand::prelude::*;
 
+pub struct Bullet;
+
+impl HasMaterial for Bullet {
+    fn get_material(&self) -> MaterialType {
+        MaterialType::Black
+    }
+}
+
+pub const BULLET_SPEED: f32 = 50.0;
+pub const BULLET_RAD: f32 = 0.2;
+
 pub enum ShootState {
     Shoot(InOutAnimation),
     Focus(Timer),
     Idle(Timer),
+}
+
+pub enum GunmanOp {
+    None,
+    Shoot {
+        pos: Vector3<f32>,
+        dir: Vector3<f32>,
+    },
 }
 
 pub enum EnemyMaterialState {
@@ -31,7 +52,7 @@ pub struct Gunman {
 impl Gunman {
     pub fn new(rng: &mut SmallRng) -> Self {
         Self {
-            shoot_state: ShootState::Idle(Timer::new(3.0)),
+            shoot_state: ShootState::Idle(Timer::new(0.5)),
             rotation: 0.0,
             dir: Vector3::new(0.0, 1.0, 0.0),
             material_state: EnemyMaterialState::None,
@@ -48,7 +69,7 @@ impl Gunman {
         delta_time: f32,
         obj_pos: &mut Vector3<f32>,
         player_pos: &Vector3<f32>,
-    ) {
+    ) -> GunmanOp {
         match self.material_state {
             EnemyMaterialState::Hitted(ref mut timer) => {
                 timer.update(delta_time);
@@ -71,6 +92,8 @@ impl Gunman {
         //     obj_pos.x += next_pos.x;
         //     obj_pos.z += next_pos.y;
         // }
+
+        let mut op = GunmanOp::None;
 
         match self.shoot_state {
             ShootState::Idle(ref mut timer) => {
@@ -106,20 +129,25 @@ impl Gunman {
             ShootState::Focus(ref mut timer) => {
                 timer.update(delta_time);
                 if timer.is_finished() {
+                    op = GunmanOp::Shoot {
+                        dir: self.dir,
+                        pos: *obj_pos,
+                    };
                     self.shoot_state = ShootState::Shoot(InOutAnimation::new_started(3.0, 5.0));
                 }
             }
             ShootState::Shoot(ref mut anim) => {
-                println!("Shoot");
                 anim.update(delta_time);
                 match anim.get_state() {
                     InOutAnimationState::Stopped => {
-                        self.shoot_state = ShootState::Idle(Timer::new(3.0));
+                        self.shoot_state = ShootState::Idle(Timer::new(0.5));
                     }
                     _ => {}
                 };
             }
         };
+
+        op
     }
 
     pub fn get_direction(&self) -> Vector3<f32> {

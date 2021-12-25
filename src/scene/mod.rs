@@ -1,5 +1,6 @@
 use gluesql::data::Value;
 use std::collections::HashMap;
+use std::fmt::{Display, Formatter};
 
 use winit::event_loop::ControlFlow;
 
@@ -51,6 +52,56 @@ pub enum SceneOp {
     Push(Box<dyn Scene>, MaybeMessage),
     Pop(u8, MaybeMessage),
     Replace(Box<dyn Scene>, MaybeMessage),
+}
+
+#[repr(u8)]
+pub enum GameMode {
+    Classic = 0,
+    Elimination = 1,
+    HitAndDodge = 2,
+}
+
+impl From<usize> for GameMode {
+    fn from(x: usize) -> Self {
+        match x {
+            0 => GameMode::Classic,
+            1 => GameMode::Elimination,
+            2 => GameMode::HitAndDodge,
+            _ => unreachable!(),
+        }
+    }
+}
+
+#[repr(u8)]
+pub enum GameDifficulty {
+    Easy = 0,
+    Medium = 1,
+    Hard = 2,
+}
+
+impl Display for GameDifficulty {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                GameDifficulty::Easy => "Easy",
+                GameDifficulty::Medium => "Medium",
+                GameDifficulty::Hard => "Hard",
+            }
+        )
+    }
+}
+
+impl From<usize> for GameDifficulty {
+    fn from(x: usize) -> Self {
+        match x {
+            0 => GameDifficulty::Easy,
+            1 => GameDifficulty::Medium,
+            2 => GameDifficulty::Hard,
+            _ => unreachable!(),
+        }
+    }
 }
 
 pub trait Scene {

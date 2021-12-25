@@ -1,3 +1,4 @@
+use chrono::NaiveDateTime;
 use conrod_core::widget::envelope_editor::EnvelopePoint;
 use conrod_core::widget::{Button, Canvas, Text};
 use conrod_core::{Labelable, Positionable, Sizeable, Widget};
@@ -15,7 +16,66 @@ use crate::scene::{
 };
 use crate::window::Window;
 use conrod_core::widget_ids;
+use gluesql::data::Value;
 use winit::event::VirtualKeyCode;
+
+pub struct EliminationGameScoreDisplay {
+    pub accuracy: f32,
+    pub hit: u16,
+    pub miss: u16,
+    pub hit_fake_target: u16,
+    pub score: i32,
+    pub avg_hit_time: f32,
+    pub created_at: NaiveDateTime,
+}
+
+impl EliminationGameScoreDisplay {
+    pub fn new() -> Self {
+        Self {
+            accuracy: 0.0,
+            hit: 0,
+            miss: 0,
+            score: 0,
+            avg_hit_time: 0.0,
+            created_at: NaiveDateTime::from_timestamp(0, 0),
+            hit_fake_target: 0,
+        }
+    }
+
+    pub fn read_message(&mut self, message: &MaybeMessage) {
+        if let Some(msg) = message {
+            self.hit = match *msg.get("hit").unwrap() {
+                Value::I64(x) => x as u16,
+                _ => unreachable!(),
+            };
+            self.miss = match *msg.get("miss").unwrap() {
+                Value::I64(x) => x as u16,
+                _ => unreachable!(),
+            };
+            self.score = match *msg.get("score").unwrap() {
+                Value::I64(x) => x as i32,
+                _ => unreachable!(),
+            };
+            self.hit_fake_target = match *msg.get("hit_fake_target").unwrap() {
+                Value::I64(x) => x as u16,
+                _ => unreachable!(),
+            };
+            self.accuracy = match *msg.get("accuracy").unwrap() {
+                Value::F64(x) => x as f32,
+                _ => unreachable!(),
+            };
+            self.created_at = match *msg.get("created_at").unwrap() {
+                Value::Timestamp(x) => x,
+                _ => unreachable!(),
+            };
+            self.avg_hit_time = match *msg.get("avg_hit_time").unwrap() {
+                Value::F64(x) => x as f32,
+                _ => unreachable!(),
+            };
+            self.accuracy = self.hit as f32 / (self.hit + self.miss).max(1) as f32 * 100.0;
+        }
+    }
+}
 
 widget_ids! {
     pub struct EliminationScoreSceneIds {
@@ -49,16 +109,15 @@ widget_ids! {
 
 pub struct EliminationScoreScene {
     ids: EliminationScoreSceneIds,
-    score: Score,
+    score: EliminationGameScoreDisplay,
 }
 
 impl EliminationScoreScene {
     pub fn new(_renderer: &mut Renderer, conrod_handle: &mut ConrodHandle) -> Self {
-        let ids =
-            EliminationScoreSceneIds::new(conrod_handle.get_ui_mut().widget_id_generator());
+        let ids = EliminationScoreSceneIds::new(conrod_handle.get_ui_mut().widget_id_generator());
         Self {
             ids,
-            score: Score::new(),
+            score: EliminationGameScoreDisplay::new(),
         }
     }
 }

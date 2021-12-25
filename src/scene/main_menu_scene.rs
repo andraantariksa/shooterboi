@@ -15,7 +15,7 @@ use crate::scene::game_selection_scene::GameSelectionScene;
 use crate::scene::guide_scene::GuideScene;
 use crate::scene::settings_scene::SettingsScene;
 use crate::scene::{
-    MaybeMessage, Scene, SceneOp, Value, BUTTON_HEIGHT, BUTTON_WIDTH, MARGIN,
+    GameDifficulty, MaybeMessage, Scene, SceneOp, Value, BUTTON_HEIGHT, BUTTON_WIDTH, MARGIN,
 };
 use crate::window::Window;
 use conrod_core::widget_ids;
@@ -48,7 +48,6 @@ impl Scores {
 
 pub struct MainMenuScene {
     ids: MainMenuSceneIds,
-    scores: Scores,
 }
 
 pub fn play_bgm(message: &MaybeMessage, audio_context: &mut AudioContext) {
@@ -81,7 +80,6 @@ impl MainMenuScene {
     pub fn new(_renderer: &mut Renderer, conrod_handle: &mut ConrodHandle) -> Self {
         Self {
             ids: MainMenuSceneIds::new(conrod_handle.get_ui_mut().widget_id_generator()),
-            scores: Scores::new(),
         }
     }
 }
@@ -98,8 +96,6 @@ impl Scene for MainMenuScene {
     ) {
         renderer.is_render_gui = true;
         renderer.is_render_game = false;
-
-        self.scores.classic_game = database.read_classic_game_score();
 
         play_bgm(&message, audio_context);
     }

@@ -76,33 +76,27 @@ impl ClassicGameScoreDisplay {
     pub fn read_message(&mut self, message: &MaybeMessage) {
         if let Some(msg) = message {
             self.hit = match *msg.get("hit").unwrap() {
-                Value::I64(x) => x as u16,
+                Value::I64(x) => x,
                 _ => unreachable!(),
-            };
+            } as u16;
             self.miss = match *msg.get("miss").unwrap() {
-                Value::I64(x) => x as u16,
+                Value::I64(x) => x,
                 _ => unreachable!(),
-            };
+            } as u16;
             self.score = match *msg.get("score").unwrap() {
-                Value::I64(x) => x as i32,
+                Value::I64(x) => x,
+                _ => unreachable!(),
+            } as i32;
+            self.created_at = match *msg.get("created_at").unwrap() {
+                Value::Timestamp(x) => x,
                 _ => unreachable!(),
             };
             self.avg_hit_time = match *msg.get("avg_hit_time").unwrap() {
-                Value::F64(x) => x as f32,
+                Value::F64(x) => x,
                 _ => unreachable!(),
-            };
+            } as f32;
             self.accuracy = self.hit as f32 / (self.hit + self.miss).max(1) as f32 * 100.0;
         }
-    }
-}
-
-impl Display for ClassicGameScoreDisplay {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        writeln!(
-            f,
-            "Score: {}\nAccuracy: {}\nHit: {}\nMiss: {}\nAverage hit time: {}\n{}",
-            self.score, self.accuracy, self.hit, self.miss, self.avg_hit_time, self.created_at
-        )
     }
 }
 

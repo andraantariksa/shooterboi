@@ -6,7 +6,6 @@ pub enum BackgroundType {
     None = 0,
     Forest = 1,
     City = 2,
-    Snow = 3,
 }
 
 #[derive(Debug, Clone)]

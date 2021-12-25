@@ -1,8 +1,13 @@
 use crate::audio::AudioContext;
 use crate::renderer::Renderer;
 use crate::scene::classic_score_scene::ClassicGameScoreDisplay;
-use chrono::{NaiveDateTime};
+use chrono::NaiveDateTime;
 
+use crate::database::GameModeScores::Classic;
+use crate::scene::elimination_score_scene::EliminationGameScoreDisplay;
+use crate::scene::hit_and_dodge_score_scene::HitAndDodgeGameScoreDisplay;
+use crate::scene::{GameDifficulty, GameMode};
+use core::default::Default;
 use gluesql::data::Value;
 #[cfg(target_arch = "wasm32")]
 use gluesql::prelude::MemoryStorage as Storage;
@@ -13,6 +18,228 @@ use gluesql::prelude::{Glue, Payload};
 use gluesql::sled::IVec as Debug;
 #[cfg(target_arch = "wasm32")]
 use gluesql::storages::memory_storage::Key as Debug;
+
+pub enum GameModeScores {
+    Classic(Vec<ClassicGameScoreDisplay>),
+    Elimination(Vec<EliminationGameScoreDisplay>),
+    HitAndDodge(Vec<HitAndDodgeGameScoreDisplay>),
+}
+
+impl Default for GameModeScores {
+    fn default() -> Self {
+        GameModeScores::Classic(Default::default())
+    }
+}
+
+impl GameModeScores {
+    pub fn read(
+        database: &mut Database,
+        game_mode: GameMode,
+        difficulty: GameDifficulty,
+    ) -> GameModeScores {
+        match game_mode {
+            GameMode::Classic => {
+                let output = database
+                    .glue
+                    .execute(&format!(
+                        "SELECT * FROM classic_game_score WHERE difficulty = {} ORDER BY created_at DESC",
+                        difficulty as u8
+                    ))
+                    .unwrap();
+                let mut score_rows = Vec::new();
+                match output {
+                    Payload::Select { labels, rows } => {
+                        for row in rows {
+                            let mut classic_score = ClassicGameScoreDisplay::new();
+                            for (idx, label) in labels.iter().enumerate() {
+                                match label.as_str() {
+                                    "accuracy" => {
+                                        classic_score.accuracy = match row[idx] {
+                                            Value::F64(x) => x,
+                                            _ => unreachable!(),
+                                        }
+                                            as f32;
+                                    }
+                                    "hit" => {
+                                        classic_score.hit = match row[idx] {
+                                            Value::I64(x) => x,
+                                            _ => unreachable!(),
+                                        }
+                                            as u16;
+                                    }
+                                    "miss" => {
+                                        classic_score.miss = match row[idx] {
+                                            Value::I64(x) => x,
+                                            _ => unreachable!(),
+                                        }
+                                            as u16;
+                                    }
+                                    "score" => {
+                                        classic_score.score = match row[idx] {
+                                            Value::I64(x) => x,
+                                            _ => unreachable!(),
+                                        }
+                                            as i32;
+                                    }
+                                    "avg_hit_time" => {
+                                        classic_score.avg_hit_time = match row[idx] {
+                                            Value::F64(x) => x,
+                                            _ => unreachable!(),
+                                        }
+                                            as f32;
+                                    }
+                                    "created_at" => {
+                                        classic_score.created_at = match row[idx] {
+                                            Value::Timestamp(x) => x,
+                                            _ => unreachable!(),
+                                        };
+                                    }
+                                    _ => unreachable!(),
+                                }
+                            }
+                            score_rows.push(classic_score);
+                        }
+                    }
+                    _ => {}
+                };
+                GameModeScores::Classic(score_rows)
+            }
+            GameMode::Elimination => {
+                let output = database
+                    .glue
+                    .execute(&format!("SELECT * FROM hit_and_dodge_game_score WHERE difficulty = {} ORDER BY created_at DESC", difficulty as u8))
+                    .unwrap();
+                let mut score_rows = Vec::new();
+                match output {
+                    Payload::Select { labels, rows } => {
+                        for row in rows {
+                            let mut classic_score = EliminationGameScoreDisplay::new();
+                            for (idx, label) in labels.iter().enumerate() {
+                                match label.as_str() {
+                                    "accuracy" => {
+                                        classic_score.accuracy = match row[idx] {
+                                            Value::F64(x) => x,
+                                            _ => unreachable!(),
+                                        }
+                                            as f32;
+                                    }
+                                    "hit" => {
+                                        classic_score.hit = match row[idx] {
+                                            Value::I64(x) => x,
+                                            _ => unreachable!(),
+                                        }
+                                            as u16;
+                                    }
+                                    "miss" => {
+                                        classic_score.miss = match row[idx] {
+                                            Value::I64(x) => x,
+                                            _ => unreachable!(),
+                                        }
+                                            as u16;
+                                    }
+                                    "score" => {
+                                        classic_score.score = match row[idx] {
+                                            Value::I64(x) => x,
+                                            _ => unreachable!(),
+                                        }
+                                            as i32;
+                                    }
+                                    "hit_fake_target" => {
+                                        classic_score.hit_fake_target = match row[idx] {
+                                            Value::I64(x) => x,
+                                            _ => unreachable!(),
+                                        }
+                                            as u16;
+                                    }
+                                    "avg_hit_time" => {
+                                        classic_score.avg_hit_time = match row[idx] {
+                                            Value::F64(x) => x,
+                                            _ => unreachable!(),
+                                        }
+                                            as f32;
+                                    }
+                                    "created_at" => {
+                                        classic_score.created_at = match row[idx] {
+                                            Value::Timestamp(x) => x,
+                                            _ => unreachable!(),
+                                        };
+                                    }
+                                    _ => unreachable!(),
+                                }
+                            }
+                            score_rows.push(classic_score);
+                        }
+                    }
+                    _ => {}
+                };
+                GameModeScores::Elimination(score_rows)
+            }
+            GameMode::HitAndDodge => {
+                let output = database
+                    .glue
+                    .execute(&format!("SELECT * FROM hit_and_dodge_game_score WHERE difficulty = {} ORDER BY created_at DESC", difficulty as u8))
+                    .unwrap();
+                let mut score_rows = Vec::new();
+                match output {
+                    Payload::Select { labels, rows } => {
+                        for row in rows {
+                            let mut classic_score = HitAndDodgeGameScoreDisplay::new();
+                            for (idx, label) in labels.iter().enumerate() {
+                                match label.as_str() {
+                                    "accuracy" => {
+                                        classic_score.accuracy = match row[idx] {
+                                            Value::F64(x) => x,
+                                            _ => unreachable!(),
+                                        }
+                                            as f32;
+                                    }
+                                    "hit" => {
+                                        classic_score.hit = match row[idx] {
+                                            Value::I64(x) => x,
+                                            _ => unreachable!(),
+                                        }
+                                            as u16;
+                                    }
+                                    "miss" => {
+                                        classic_score.miss = match row[idx] {
+                                            Value::I64(x) => x,
+                                            _ => unreachable!(),
+                                        }
+                                            as u16;
+                                    }
+                                    "score" => {
+                                        classic_score.score = match row[idx] {
+                                            Value::I64(x) => x,
+                                            _ => unreachable!(),
+                                        }
+                                            as i32;
+                                    }
+                                    "avg_hit_time" => {
+                                        classic_score.avg_hit_time = match row[idx] {
+                                            Value::F64(x) => x,
+                                            _ => unreachable!(),
+                                        }
+                                            as f32;
+                                    }
+                                    "created_at" => {
+                                        classic_score.created_at = match row[idx] {
+                                            Value::Timestamp(x) => x,
+                                            _ => unreachable!(),
+                                        };
+                                    }
+                                    _ => unreachable!(),
+                                }
+                            }
+                            score_rows.push(classic_score);
+                        }
+                    }
+                    _ => {}
+                };
+                GameModeScores::HitAndDodge(score_rows)
+            }
+        }
+    }
+}
 
 pub struct Database {
     pub glue: Glue<Debug, Storage>,
@@ -59,6 +286,34 @@ impl Database {
         self.glue
             .execute(
                 "CREATE TABLE IF NOT EXISTS classic_game_score (
+    difficulty INTEGER NOT NULL,
+    accuracy FLOAT NOT NULL,
+    hit INTEGER NOT NULL,
+    miss INTEGER NOT NULL,
+    score INTEGER NOT NULL,
+    avg_hit_time FLOAT NOT NULL,
+    created_at TIMESTAMP NOT NULL,
+)",
+            )
+            .unwrap();
+        self.glue
+            .execute(
+                "CREATE TABLE IF NOT EXISTS elimination_game_score (
+    difficulty INTEGER NOT NULL,
+    accuracy FLOAT NOT NULL,
+    hit INTEGER NOT NULL,
+    miss INTEGER NOT NULL,
+    score INTEGER NOT NULL,
+    avg_hit_time FLOAT NOT NULL,
+    hit_fake_target INTEGER NOT NULL,
+    created_at TIMESTAMP NOT NULL,
+)",
+            )
+            .unwrap();
+        self.glue
+            .execute(
+                "CREATE TABLE IF NOT EXISTS hit_and_dodge_game_score (
+    difficulty INTEGER NOT NULL,
     accuracy FLOAT NOT NULL,
     hit INTEGER NOT NULL,
     miss INTEGER NOT NULL,
@@ -85,73 +340,6 @@ impl Database {
             }
             _ => {}
         };
-    }
-
-    pub fn read_classic_game_score(&mut self) -> Vec<ClassicGameScoreDisplay> {
-        let output = self
-            .glue
-            .execute("SELECT * FROM classic_game_score")
-            .unwrap();
-        let mut score_rows = Vec::new();
-        match output {
-            Payload::Select { labels, rows } => {
-                for row in rows {
-                    let mut classic_score = ClassicGameScoreDisplay {
-                        score: 0,
-                        accuracy: 0.0,
-                        miss: 0,
-                        avg_hit_time: 0.0,
-                        created_at: NaiveDateTime::from_timestamp(0, 0),
-                        hit: 0,
-                    };
-                    for (idx, label) in labels.iter().enumerate() {
-                        match label.as_str() {
-                            "accuracy" => {
-                                classic_score.accuracy = match row[idx] {
-                                    Value::F64(x) => x,
-                                    _ => unreachable!(),
-                                } as f32;
-                            }
-                            "hit" => {
-                                classic_score.hit = match row[idx] {
-                                    Value::I64(x) => x,
-                                    _ => unreachable!(),
-                                } as u16;
-                            }
-                            "miss" => {
-                                classic_score.miss = match row[idx] {
-                                    Value::I64(x) => x,
-                                    _ => unreachable!(),
-                                } as u16;
-                            }
-                            "score" => {
-                                classic_score.score = match row[idx] {
-                                    Value::I64(x) => x,
-                                    _ => unreachable!(),
-                                } as i32;
-                            }
-                            "avg_hit_time" => {
-                                classic_score.avg_hit_time = match row[idx] {
-                                    Value::F64(x) => x,
-                                    _ => unreachable!(),
-                                }
-                                    as f32;
-                            }
-                            "created_at" => {
-                                classic_score.created_at = match row[idx] {
-                                    Value::Timestamp(x) => x,
-                                    _ => unreachable!(),
-                                };
-                            }
-                            _ => unreachable!(),
-                        }
-                    }
-                    score_rows.push(classic_score);
-                }
-            }
-            _ => {}
-        };
-        score_rows
     }
 
     pub fn init_settings(&mut self, audio_context: &mut AudioContext, renderer: &mut Renderer) {

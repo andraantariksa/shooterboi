@@ -34,7 +34,7 @@ pub fn enqueue_target(world: &mut World, physics: &mut GamePhysics, renderer: &m
         let (objects, ref mut bound) = renderer.render_objects.next();
         objects.position = *collider.translation();
         objects.shape_type_material_ids.0 = ShapeType::Sphere;
-        objects.shape_type_material_ids.1 = MaterialType::Target;
+        objects.shape_type_material_ids.1 = target.get_material();
         objects.rotation = collider.rotation().to_homogeneous();
 
         let shape = collider.shape().as_ball().unwrap();

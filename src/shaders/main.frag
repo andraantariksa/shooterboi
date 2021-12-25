@@ -619,8 +619,6 @@ void main()
                     color = get_night_sky(ray_world_dir);
                     break;
                 }
-                case SCENE_SNOW:
-                break;
                 default:
                 break;
             }

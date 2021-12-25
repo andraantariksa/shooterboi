@@ -16,11 +16,15 @@ use crate::scene::elimination_game_scene::EliminationGameScene;
 use crate::scene::hit_and_dodge_scene::HitAndDodgeGameScene;
 use crate::scene::scores_scene::ScoresScene;
 
-use crate::scene::{MaybeMessage, Scene, SceneOp, Value, BUTTON_HEIGHT, BUTTON_WIDTH, MARGIN};
+use crate::scene::{
+    GameDifficulty, MaybeMessage, Scene, SceneOp, Value, BUTTON_HEIGHT, BUTTON_WIDTH, MARGIN,
+};
 use crate::window::Window;
 use conrod_core::widget_ids;
 
 use winit::event::VirtualKeyCode;
+
+use super::GAP_BETWEEN_ITEM;
 
 widget_ids! {
     pub struct GameSelectionSceneIds {
@@ -55,7 +59,7 @@ widget_ids! {
     }
 }
 
-struct GameMode {
+struct GameModeDetails {
     image: conrod_core::image::Id,
     title: &'static str,
     description: &'static str,
@@ -111,17 +115,17 @@ impl Scene for GameSelectionScene {
         let image_id = *conrod_handle.get_image_id_map().get("title").unwrap();
 
         let game_modes = [
-            GameMode {
+            GameModeDetails {
                 image: image_id,
                 title: "Classic",
                 description: "You have to shoot every spawned target (colored red). The target will be disappeared after you shoot it and another target will be spawned.",
             },
-            GameMode {
+            GameModeDetails {
                 image: image_id,
                 title: "Elimination",
                 description: "The multiple target will appear. The player needs to shoot all of the target before appear too much.",
             },
-            GameMode {
+            GameModeDetails {
                 image: image_id,
                 title: "Move and shoot",
                 description: "You have to move and shoot the target.",
@@ -144,19 +148,7 @@ impl Scene for GameSelectionScene {
                                         self.ids.description_text_canvas,
                                         Canvas::new().length(120.0),
                                     ),
-                                    (
-                                        self.ids.buttons_canvas,
-                                        Canvas::new().flow_right(&[(
-                                            self.ids.play_canvas,
-                                            Canvas::new()
-                                                .flow_down(&[
-                                                    (self.ids.play_button_1_canvas, Canvas::new()),
-                                                    (self.ids.play_button_2_canvas, Canvas::new()),
-                                                    (self.ids.play_button_3_canvas, Canvas::new()),
-                                                ])
-                                                .pad(MARGIN), //.rgb(0.0, 1.0, 0.0), //.length(1.0)
-                                        )]),
-                                    ),
+                                    (self.ids.buttons_canvas, Canvas::new()),
                                 ]),
                             ),
                         ]),
@@ -225,8 +217,7 @@ impl Scene for GameSelectionScene {
                 .set(self.ids.description_text, &mut ui_cell);
             play_1_button = Button::new()
                 .label("Easy")
-                .middle_of(self.ids.play_button_1_canvas)
-                .padded_w_of(self.ids.play_button_1_canvas, MARGIN)
+                .mid_top_with_margin_on(self.ids.buttons_canvas, MARGIN)
                 .wh(conrod_core::Dimensions::new(
                     BUTTON_WIDTH - MARGIN,
                     BUTTON_HEIGHT,
@@ -234,8 +225,7 @@ impl Scene for GameSelectionScene {
                 .set(self.ids.play_button_1, &mut ui_cell);
             play_2_button = Button::new()
                 .label("Medium")
-                .middle_of(self.ids.play_button_2_canvas)
-                .padded_w_of(self.ids.play_button_2_canvas, MARGIN)
+                .down_from(self.ids.play_button_1, GAP_BETWEEN_ITEM)
                 .wh(conrod_core::Dimensions::new(
                     BUTTON_WIDTH - MARGIN,
                     BUTTON_HEIGHT,
@@ -243,8 +233,7 @@ impl Scene for GameSelectionScene {
                 .set(self.ids.play_button_2, &mut ui_cell);
             play_3_button = Button::new()
                 .label("Hard")
-                .middle_of(self.ids.play_button_3_canvas)
-                .padded_w_of(self.ids.play_button_3_canvas, MARGIN)
+                .down_from(self.ids.play_button_2, GAP_BETWEEN_ITEM)
                 .wh(conrod_core::Dimensions::new(
                     BUTTON_WIDTH - MARGIN,
                     BUTTON_HEIGHT,
@@ -255,9 +244,21 @@ impl Scene for GameSelectionScene {
         if play_1_button.was_clicked() {
             scene_op = SceneOp::Push(
                 match self.selected_game_mode_idx {
-                    0 => Box::new(ClassicGameScene::new(renderer, conrod_handle)),
-                    1 => Box::new(EliminationGameScene::new(renderer, conrod_handle)),
-                    2 => Box::new(HitAndDodgeGameScene::new(renderer, conrod_handle)),
+                    0 => Box::new(ClassicGameScene::new(
+                        renderer,
+                        conrod_handle,
+                        GameDifficulty::Easy,
+                    )),
+                    1 => Box::new(EliminationGameScene::new(
+                        renderer,
+                        conrod_handle,
+                        GameDifficulty::Easy,
+                    )),
+                    2 => Box::new(HitAndDodgeGameScene::new(
+                        renderer,
+                        conrod_handle,
+                        GameDifficulty::Easy,
+                    )),
                     _ => unreachable!(),
                 },
                 None,
@@ -267,9 +268,21 @@ impl Scene for GameSelectionScene {
         if play_2_button.was_clicked() {
             scene_op = SceneOp::Push(
                 match self.selected_game_mode_idx {
-                    0 => Box::new(ClassicGameScene::new(renderer, conrod_handle)),
-                    1 => Box::new(EliminationGameScene::new(renderer, conrod_handle)),
-                    2 => Box::new(HitAndDodgeGameScene::new(renderer, conrod_handle)),
+                    0 => Box::new(ClassicGameScene::new(
+                        renderer,
+                        conrod_handle,
+                        GameDifficulty::Medium,
+                    )),
+                    1 => Box::new(EliminationGameScene::new(
+                        renderer,
+                        conrod_handle,
+                        GameDifficulty::Medium,
+                    )),
+                    2 => Box::new(HitAndDodgeGameScene::new(
+                        renderer,
+                        conrod_handle,
+                        GameDifficulty::Medium,
+                    )),
                     _ => unreachable!(),
                 },
                 None,
@@ -279,9 +292,21 @@ impl Scene for GameSelectionScene {
         if play_3_button.was_clicked() {
             scene_op = SceneOp::Push(
                 match self.selected_game_mode_idx {
-                    0 => Box::new(ClassicGameScene::new(renderer, conrod_handle)),
-                    1 => Box::new(EliminationGameScene::new(renderer, conrod_handle)),
-                    2 => Box::new(HitAndDodgeGameScene::new(renderer, conrod_handle)),
+                    0 => Box::new(ClassicGameScene::new(
+                        renderer,
+                        conrod_handle,
+                        GameDifficulty::Hard,
+                    )),
+                    1 => Box::new(EliminationGameScene::new(
+                        renderer,
+                        conrod_handle,
+                        GameDifficulty::Hard,
+                    )),
+                    2 => Box::new(HitAndDodgeGameScene::new(
+                        renderer,
+                        conrod_handle,
+                        GameDifficulty::Hard,
+                    )),
                     _ => unreachable!(),
                 },
                 None,
@@ -289,7 +314,14 @@ impl Scene for GameSelectionScene {
         }
 
         if score_button.was_clicked() {
-            scene_op = SceneOp::Push(Box::new(ScoresScene::new(renderer, conrod_handle)), None);
+            scene_op = SceneOp::Push(
+                Box::new(ScoresScene::new(renderer, conrod_handle)),
+                Some({
+                    let mut m = HashMap::new();
+                    m.insert("mode", Value::I64(self.selected_game_mode_idx as i64));
+                    m
+                }),
+            );
         }
 
         if input_manager.is_keyboard_pressed(&VirtualKeyCode::Escape) || back_button.was_clicked() {
