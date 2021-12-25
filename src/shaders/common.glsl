@@ -67,7 +67,7 @@ layout(std430, binding = 1) readonly buffer render_queue {
 layout(binding = 2) uniform sampler common_sampler;
 layout(binding = 3) uniform texture2D checker_texture;
 layout(binding = 4) uniform texture3D noise_vol_gray_texture;
-layout(binding = 16) uniform texture2D crate_texture;
+layout(binding = 5) uniform texture2D crate_texture;
 layout(binding = 6) uniform texture2D pebbles_texture;
 layout(binding = 7) uniform texture2D abstract3_texture;
 layout(binding = 8) uniform texture2D cobblestone_paving_texture;
@@ -78,7 +78,7 @@ layout(binding = 12) uniform texture2D stone_wall_texture;
 layout(binding = 13) uniform texture2D tree_bark_texture;
 layout(binding = 14) uniform texture2D leaves_texture;
 layout(binding = 15) uniform texture2D rgba_noise_medium;
-layout(binding = 5) uniform texture2D gray_noise_small_texture;
+layout(binding = 16) uniform texture2D gray_noise_small_texture;
 layout(binding = 17) uniform texture2D asphalt_texture;
 layout(binding = 18) uniform sampler noise_sampler;
 

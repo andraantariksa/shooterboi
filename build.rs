@@ -93,7 +93,11 @@ fn main() -> BuildScriptResult<()> {
             "main",
             Some(&compile_options),
         )?;
-        println!("{}", compiled.get_warning_messages());
+        println!(
+            "({}) warning: {}",
+            compiled.get_num_warnings(),
+            compiled.get_warning_messages()
+        );
         write(shader.spv_path, compiled.as_binary_u8())?;
     }
 
