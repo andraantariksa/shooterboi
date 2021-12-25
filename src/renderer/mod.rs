@@ -74,7 +74,7 @@ impl Renderer {
             .unwrap();
         let surface_config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-            format: wgpu::TextureFormat::Bgra8Unorm, //surface.get_preferred_format(&adapter).unwrap(),
+            format: wgpu::TextureFormat::Bgra8UnormSrgb, //surface.get_preferred_format(&adapter).unwrap(),
             width: window_size.width,
             height: window_size.height,
             present_mode: wgpu::PresentMode::Fifo,

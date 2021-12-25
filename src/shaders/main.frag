@@ -648,5 +648,5 @@ void main()
         outColor = vec4(post_color, 1.0);
     }
 
-    outColor = vec4(sqrt(outColor.xyz), outColor.w);
+    outColor = vec4(outColor.xyz, outColor.w);
 }
