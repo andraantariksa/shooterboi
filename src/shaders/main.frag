@@ -458,11 +458,12 @@ vec3 apply_street_color(vec3 color, float y) {
 }
 
 vec3 get_night_sky(vec3 dir) {
-    float rand = textureLod(sampler2D(gray_noise_small_texture, common_sampler), dir.xz*.2, 0.).r;
-    vec3 stars = pow(textureLod(sampler2D(rgba_noise_medium, common_sampler), 6.*dir.xz + .5, 0.).xxx,vec3(60.))*rand;
-    vec3 moon  = vec3(2.) * textureLod(sampler2D(rgba_noise_medium, common_sampler), dir.xy*.5, 0.).xxx
+    float rand = textureLod(sampler2D(rgba_noise_medium, noise_sampler), dir.xz*.2, 0.).r;
+    vec3 stars = pow(textureLod(sampler2D(gray_noise_small_texture, noise_sampler), 6.*dir.xz + .5, 0.).xxx,vec3(60.))*rand;
+    vec3 moon  = vec3(2.) * textureLod(sampler2D(gray_noise_small_texture, common_sampler), dir.xy*.5, 0.).xxx
         * (1. - step(max(pow(dot(dir,normalize(vec3(25.,25.,55.))),360.),0.), .7));
     return mix(fog_color, stars, smoothstep(-5., 1., dir.y)) + moon;
+    //return vec3(rand);
 }
 
 vec3 color_mapping(vec3 ray_hit_pos, vec3 normal, Distance d)
@@ -604,7 +605,7 @@ void main()
     vec3 normal = get_normal(ray_hit_pos);
 
     vec3 color = vec3(0.);
-    if (d.distance > MAX_DISTANCE - EPS) {
+    if (d.distance > MAX_DISTANCE * 0.5 - EPS) {
         if (dot(ray_world_dir, WORLD_UP) > 0.) {
             switch (queuecount_raymarchmaxstep_aostep_background_type.w) {
                 case SCENE_FOREST:
@@ -628,7 +629,7 @@ void main()
         }
     } else {
         color = color_mapping(ray_hit_pos, normal, d);
-        const vec3 ambient_light = SKYCOLOR * color * 0.5;
+        const vec3 ambient_light = SKYCOLOR * color * 0.3;
         vec3 post_color = ambient_light;
         post_color += blinn_phong(
         color,
@@ -643,7 +644,9 @@ void main()
         post_color += ray_hit_pos * 0.3;
         #endif
         post_color *= ambient_ocl(ray_hit_pos, normal);
-        post_color = apply_fog(post_color, d.distance);
+        //post_color = apply_fog(post_color, d.distance);
         outColor = vec4(post_color, 1.0);
     }
+
+    outColor = vec4(sqrt(outColor.xyz), outColor.w);
 }
