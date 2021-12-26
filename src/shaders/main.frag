@@ -652,6 +652,4 @@ void main()
         outColor = vec4(post_color, 1.0);
     }
 
-    // Gamma correction
-    outColor.xyz = sqrt(outColor.xyz);
 }

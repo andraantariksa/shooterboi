@@ -305,5 +305,5 @@ void main()
     color += ray_hit_pos * 0.3;
 #endif
     color *= ambient_ocl(ray_hit_pos, normal);
-    outColor = vec4(sqrt(color), 1.0);
+    outColor = vec4(color, 1.0);
 }
