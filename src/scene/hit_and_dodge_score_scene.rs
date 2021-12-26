@@ -23,6 +23,7 @@ pub struct HitAndDodgeGameScoreDisplay {
     pub hit: u16,
     pub miss: u16,
     pub score: i32,
+    pub hit_taken: u16,
     pub avg_hit_time: f32,
     pub created_at: NaiveDateTime,
 }
@@ -34,6 +35,7 @@ impl HitAndDodgeGameScoreDisplay {
             hit: 0,
             miss: 0,
             score: 0,
+            hit_taken: 0,
             avg_hit_time: 0.0,
             created_at: NaiveDateTime::from_timestamp(0, 0),
         }

@@ -1,3 +1,4 @@
+use crossbeam::channel::Receiver;
 use rapier3d::prelude::*;
 
 pub struct GamePhysics {
@@ -13,10 +14,15 @@ pub struct GamePhysics {
     pub ccd_solver: CCDSolver,
     pub query_pipeline: QueryPipeline,
     pub interaction_groups: InteractionGroups,
+    pub event_handler: ChannelEventCollector,
+    pub contact_recv: Receiver<ContactEvent>,
+    pub intersection_recv: Receiver<IntersectionEvent>,
 }
 
 impl GamePhysics {
     pub(crate) fn new() -> Self {
+        let (contact_send, contact_recv) = crossbeam::channel::unbounded();
+        let (intersection_send, intersection_recv) = crossbeam::channel::unbounded();
         Self {
             gravity: nalgebra::Vector3::new(0.0, -9.81, 0.0),
             rigid_body_set: RigidBodySet::new(),
@@ -30,6 +36,9 @@ impl GamePhysics {
             ccd_solver: CCDSolver::new(),
             query_pipeline: QueryPipeline::new(),
             interaction_groups: InteractionGroups::all(),
+            event_handler: ChannelEventCollector::new(intersection_send, contact_send),
+            contact_recv,
+            intersection_recv,
         }
     }
 }

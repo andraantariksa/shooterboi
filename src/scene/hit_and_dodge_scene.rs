@@ -1,5 +1,5 @@
 use conrod_core::widget::envelope_editor::EnvelopePoint;
-use conrod_core::{Color, Colorable, Positionable, Sizeable, Widget};
+use conrod_core::{color, Color, Colorable, Positionable, Sizeable, Widget};
 use std::collections::HashMap;
 
 use conrod_core::widget::{Canvas, Text};
@@ -15,11 +15,11 @@ use crate::animation::InOutAnimation;
 use crate::audio::{AudioContext, AUDIO_FILE_SHOOT};
 use crate::audio::{Sink, AUDIO_FILE_SHOOTED};
 use crate::database::Database;
-use crate::entity::enemy::gunman::Gunman;
+use crate::entity::enemy::gunman::{Bullet, Gunman};
 use crate::entity::enemy::swordman::Swordman;
 use crate::entity::target::Target;
-use crate::entity::Crate;
 use crate::entity::HasMaterial;
+use crate::entity::{Crate, Player};
 use crate::frustum::ObjectBound;
 use crate::gui::ConrodHandle;
 use crate::input_manager::InputManager;
@@ -54,9 +54,16 @@ widget_ids! {
     pub struct HitAndDodgeGameSceneIds {
         // The main canvas
         canvas,
-        canvas_duration,
+        start_duration_label,
+
+        indicator_canvas,
+
+        duration_canvas,
         duration_label,
-        start_duration_label
+        score_canvas,
+        score_label,
+        accuracy_canvas,
+        accuracy_label,
     }
 }
 
@@ -64,6 +71,7 @@ pub struct Score {
     pub hit: u16,
     pub miss: u16,
     pub score: i32,
+    pub hit_taken: u16,
     pub total_shoot_time: f32,
 }
 
@@ -73,6 +81,7 @@ impl Score {
             hit: 0,
             miss: 0,
             score: 0,
+            hit_taken: 0,
             total_shoot_time: 0.0,
         }
     }
@@ -81,6 +90,7 @@ impl Score {
         message.insert("hit", Value::I64(self.hit as i64));
         message.insert("miss", Value::I64(self.miss as i64));
         message.insert("score", Value::I64(self.score as i64));
+        message.insert("hit_taken", Value::I64(self.hit_taken as i64));
         message.insert(
             "avg_hit_time",
             Value::F64(self.total_shoot_time as f64 / self.hit.max(1) as f64),
@@ -115,14 +125,12 @@ impl HitAndDodgeGameScene {
         let mut physics = GamePhysics::new();
 
         // Ground
-        physics.collider_set.insert(
-            ColliderBuilder::new(SharedShape::cuboid(10.0, 0.5, 10.0))
-                .translation(Vector3::new(0.0, -0.5, 0.0))
-                .build(),
-        );
+        physics
+            .collider_set
+            .insert(ColliderBuilder::new(SharedShape::cuboid(10.0, 1.0, 10.0)).build());
 
         let player_rigid_body_handle =
-            setup_player_collider(&mut physics, Vector3::new(0.0, 1.5, 0.0));
+            setup_player_collider(&mut physics, Vector3::new(0.0, 1.0, 0.0));
 
         let mut rng = SmallRng::from_entropy();
 
@@ -151,18 +159,18 @@ impl HitAndDodgeGameScene {
             Vector3::new(0.0, 1.4, 9.5),
             Vector3::new(10.0, 0.398, 0.5),
         );
-        // spawn_wall(
-        //     &mut world,
-        //     &mut physics,
-        //     Vector3::new(19.5, 1.4, 0.0),
-        //     Vector3::new(0.5, 0.398, 9.99),
-        // );
-        // spawn_wall(
-        //     &mut world,
-        //     &mut physics,
-        //     Vector3::new(-19.5, 1.4, 0.0),
-        //     Vector3::new(0.5, 0.398, 9.99),
-        // );
+        spawn_wall(
+            &mut world,
+            &mut physics,
+            Vector3::new(9.5, 1.4, 0.0),
+            Vector3::new(0.5, 0.398, 9.99),
+        );
+        spawn_wall(
+            &mut world,
+            &mut physics,
+            Vector3::new(-9.5, 1.4, 0.0),
+            Vector3::new(0.5, 0.398, 9.99),
+        );
 
         Self {
             world,
@@ -206,10 +214,10 @@ impl Scene for HitAndDodgeGameScene {
 
         // Ground
         let (objects, ref mut bound) = renderer.render_objects.next_static();
-        objects.position = nalgebra::Vector3::new(0.0, -0.5, 0.0);
+        objects.position = nalgebra::Vector3::new(0.0, 0.0, 0.0);
         objects.shape_type_material_ids.0 = ShapeType::Box;
         objects.shape_type_material_ids.1 = MaterialType::CobblestonePaving;
-        objects.shape_data1 = nalgebra::Vector4::new(10.0, 0.5, 10.0, 0.0);
+        objects.shape_data1 = nalgebra::Vector4::new(10.0, 1.0, 10.0, 0.0);
         *bound = objects.get_bounding_sphere_radius();
 
         window.set_is_cursor_grabbed(true);
@@ -221,13 +229,6 @@ impl Scene for HitAndDodgeGameScene {
                 renderer.game_renderer.render_crosshair = false;
                 self.game_state = GameState::Prepare(Timer::new(PREPARE_DURATION))
             }
-
-            match m.get("difficulty").unwrap() {
-                Value::I64(x) => {
-                    self.difficulty = GameDifficulty::from(*x as usize);
-                }
-                _ => unreachable!(),
-            };
         }
     }
 
@@ -253,17 +254,53 @@ impl Scene for HitAndDodgeGameScene {
             Canvas::new()
                 .color(Color::Rgba(1.0, 1.0, 1.0, 0.3))
                 .mid_top_of(self.ids.canvas)
-                .wh(conrod_core::Dimensions::new(100.0, 30.0))
-                .set(self.ids.canvas_duration, &mut ui_cell);
+                .flow_right(&[
+                    (
+                        self.ids.score_canvas,
+                        Canvas::new()
+                            .length_weight(0.3)
+                            .color(Color::Rgba(1.0, 1.0, 1.0, 0.2)),
+                    ),
+                    (
+                        self.ids.duration_canvas,
+                        Canvas::new()
+                            .length_weight(0.4)
+                            .color(Color::Rgba(1.0, 1.0, 1.0, 0.4)),
+                    ),
+                    (
+                        self.ids.accuracy_canvas,
+                        Canvas::new()
+                            .length_weight(0.3)
+                            .color(Color::Rgba(1.0, 1.0, 1.0, 0.2)),
+                    ),
+                ])
+                .wh(conrod_core::Dimensions::new(200.0, 30.0))
+                .set(self.ids.indicator_canvas, &mut ui_cell);
 
             Text::new(&format!(
                 "{:02}:{:02}",
                 (round_timer_sec / 60.0) as i32,
                 (round_timer_sec % 60.0) as i32
             ))
-            .rgba(1.0, 1.0, 1.0, 1.0)
-            .middle_of(self.ids.canvas_duration)
+            .color(color::BLACK)
+            .middle_of(self.ids.duration_canvas)
             .set(self.ids.duration_label, &mut ui_cell);
+
+            let w_duration_label = ui_cell.w_of(self.ids.duration_label).unwrap();
+
+            Text::new(&format!("{}", self.score.score))
+                .font_size(12)
+                .color(color::BLACK)
+                .middle_of(self.ids.score_canvas)
+                .set(self.ids.score_label, &mut ui_cell);
+            Text::new(&format!(
+                "{}",
+                (self.score.hit) as f32 / (self.score.hit + self.score.miss).min(1) as f32 * 100.0
+            ))
+            .font_size(12)
+            .color(color::BLACK)
+            .middle_of(self.ids.accuracy_canvas)
+            .set(self.ids.accuracy_label, &mut ui_cell);
         }
 
         let mut game_finished = false;
@@ -282,7 +319,7 @@ impl Scene for HitAndDodgeGameScene {
                 &mut self.physics.joint_set,
                 &mut self.physics.ccd_solver,
                 &(),
-                &(),
+                &self.physics.event_handler,
             );
             self.physics.query_pipeline.update(
                 &self.physics.island_manager,
@@ -397,6 +434,44 @@ impl Scene for HitAndDodgeGameScene {
                         missed();
                     }
                 }
+
+                while let Ok(contact_event) = self.physics.contact_recv.try_recv() {
+                    match contact_event {
+                        ContactEvent::Started(maybe_player_handle, maybe_bullet_handle) => {
+                            let collider =
+                                self.physics.collider_set.get(maybe_bullet_handle).unwrap();
+                            let entity = Entity::from_bits(collider.user_data as u64);
+
+                            let mut bullet_hit = false;
+
+                            if self.world.get::<Bullet>(entity).is_ok() {
+                                let rb = collider.parent().unwrap();
+                                self.physics.rigid_body_set.remove(
+                                    rb,
+                                    &mut self.physics.island_manager,
+                                    &mut self.physics.collider_set,
+                                    &mut self.physics.joint_set,
+                                );
+                                self.entity_to_remove.push(entity);
+
+                                bullet_hit = true;
+                            }
+
+                            let collider =
+                                self.physics.collider_set.get(maybe_player_handle).unwrap();
+                            let entity = Entity::from_bits(collider.user_data as u64);
+
+                            if self.world.get::<Player>(entity).is_ok() && bullet_hit {
+                                self.score.score -= 500;
+                            }
+                        }
+                        ContactEvent::Stopped(_, _) => {}
+                    }
+                }
+                for entity in self.entity_to_remove.iter() {
+                    self.world.despawn(*entity).unwrap();
+                }
+                self.entity_to_remove.clear();
 
                 if self.round_timer.is_finished() {
                     self.game_state = GameState::Finishing(Timer::new(FINISHING_DURATION));

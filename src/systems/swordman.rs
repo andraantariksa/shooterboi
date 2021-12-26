@@ -24,9 +24,9 @@ pub fn spawn_swordman(
     );
     physics.collider_set.insert_with_parent(
         ColliderBuilder::new(SharedShape::capsule(
-            Point3::<f32>::new(0.0, 1.0, 0.0),
-            Point3::<f32>::new(0.0, -1.0, 0.0),
-            0.5,
+            Point3::<f32>::new(0.0, 3.1 * 0.2, 0.0),
+            Point3::<f32>::new(0.0, -4.5 * 0.2, 0.0),
+            1.0 * 0.2,
         ))
         .user_data(entity.to_bits() as u128)
         .build(),
@@ -42,6 +42,7 @@ pub fn enqueue_swordman(world: &mut World, physics: &mut GamePhysics, renderer: 
 
         let (objects, ref mut bound) = renderer.render_objects.next();
         objects.position = *rb.translation();
+        objects.scale = 0.2;
         objects.shape_data2.y = swordman.get_rotation();
         objects.shape_type_material_ids.0 = ShapeType::Swordman;
         objects.shape_type_material_ids.1 = swordman.get_material();

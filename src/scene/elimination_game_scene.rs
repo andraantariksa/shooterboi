@@ -184,13 +184,6 @@ impl Scene for EliminationGameScene {
                 renderer.game_renderer.render_crosshair = false;
                 self.game_state = GameState::Prepare(Timer::new(PREPARE_DURATION))
             }
-
-            match m.get("difficulty").unwrap() {
-                Value::I64(x) => {
-                    self.difficulty = GameDifficulty::from(*x as usize);
-                }
-                _ => unreachable!(),
-            };
         }
     }
 

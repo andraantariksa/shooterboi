@@ -27,7 +27,7 @@ pub fn spawn_gunman(
         ColliderBuilder::new(SharedShape::capsule(
             Point3::<f32>::new(0.0, 3.1 * 0.2, 0.0),
             Point3::<f32>::new(0.0, -4.5 * 0.2, 0.0),
-            0.5,
+            1.0 * 0.2,
         ))
         .user_data(entity.to_bits() as u128)
         .build(),
@@ -45,6 +45,7 @@ pub fn enqueue_gunman(world: &mut World, physics: &mut GamePhysics, renderer: &m
         objects.position = *rb.translation();
         objects.shape_data1.x = gunman.shootanim();
         objects.shape_data1.y = gunman.get_rotation();
+        objects.scale = 0.2;
         objects.shape_type_material_ids.0 = ShapeType::Gunman;
         objects.shape_type_material_ids.1 = gunman.get_material();
         objects.shape_type_material_ids.2 = MaterialType::Black;
@@ -96,6 +97,7 @@ pub fn spawn_bullet(
     physics.collider_set.insert_with_parent(
         ColliderBuilder::new(SharedShape::ball(BULLET_RAD))
             .user_data(entity.to_bits() as u128)
+            .active_events(ActiveEvents::CONTACT_EVENTS)
             .build(),
         rigid_body_handle,
         &mut physics.rigid_body_set,

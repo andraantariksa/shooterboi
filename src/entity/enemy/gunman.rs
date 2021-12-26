@@ -80,18 +80,18 @@ impl Gunman {
             _ => {}
         };
 
-        // let current_xz_pos = obj_pos.xz();
-        // if current_xz_pos.relative_eq(&self.next_dest, f32::EPSILON, 0.5) {
-        //     self.next_dest = Vector2::new(
-        //         rng.sample(Uniform::new(-13.0, 13.0)),
-        //         rng.sample(Uniform::new(-13.0, 13.0)),
-        //     );
-        // } else {
-        //     let dir = Unit::new_normalize(self.next_dest - current_xz_pos);
-        //     let next_pos = dir.into_inner() * 3.0 * delta_time;
-        //     obj_pos.x += next_pos.x;
-        //     obj_pos.z += next_pos.y;
-        // }
+        let current_xz_pos = obj_pos.xz();
+        if current_xz_pos.relative_eq(&self.next_dest, f32::EPSILON, 0.5) {
+            self.next_dest = Vector2::new(
+                rng.sample(Uniform::new(-9.0, 9.0)),
+                rng.sample(Uniform::new(-9.0, 9.0)),
+            );
+        } else {
+            let dir = Unit::new_normalize(self.next_dest - current_xz_pos);
+            let next_pos = dir.into_inner() * 3.0 * delta_time;
+            obj_pos.x += next_pos.x;
+            obj_pos.z += next_pos.y;
+        }
 
         let mut op = GunmanOp::None;
 

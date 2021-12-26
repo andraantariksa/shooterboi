@@ -41,9 +41,7 @@ pub enum MaterialType {
 #[derive(Debug, Clone, Copy)]
 pub struct RenderQueueData {
     pub position: Vector3<f32>,
-    _p1: [i32; 1],
-    pub scale: Vector3<f32>,
-    _p2: [i32; 1],
+    pub scale: f32,
     pub rotation: Matrix4<f32>,
     pub shape_data1: Vector4<f32>,
     pub shape_data2: Vector4<f32>,
@@ -54,7 +52,7 @@ impl RenderQueueData {
     pub fn new_none() -> Self {
         Self {
             position: nalgebra::Vector3::new(0.0, 0.0, 0.0),
-            scale: nalgebra::Vector3::new(0.0, 0.0, 0.0),
+            scale: 1.0,
             rotation: Matrix4::identity(),
             shape_type_material_ids: (
                 ShapeType::None,
@@ -64,8 +62,6 @@ impl RenderQueueData {
             ),
             shape_data1: nalgebra::Vector4::new(0.0, 0.0, 0.0, 0.0),
             shape_data2: nalgebra::Vector4::new(0.0, 0.0, 0.0, 0.0),
-            _p1: [0; 1],
-            _p2: [0; 1],
         }
     }
 

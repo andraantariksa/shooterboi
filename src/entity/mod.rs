@@ -8,6 +8,8 @@ pub struct Wall;
 pub struct Crate;
 pub struct Container;
 
+pub struct Player;
+
 pub trait HasMaterial {
     fn get_material(&self) -> MaterialType;
 }

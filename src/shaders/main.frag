@@ -324,82 +324,86 @@ Distance scene_dist(vec3 pos) {
 
     switch (queuecount_raymarchmaxstep_aostep_background_type.w) {
         case SCENE_FOREST:
+        {
             m = Distance(pos.y - sd_terrain(pos.xz), MATERIAL_GRASS, SENTINEL_IDX);
             m = sd_union(m, sd_trees(pos - vec3(0., -1.8, 0.), MATERIAL_TREE_BARK, MATERIAL_LEAVES));
             break;
+        }
         case SCENE_CITY:
+        {
             m = sd_city(pos);
             break;
+        }
         case SCENE_SNOW:
+        {
             m = Distance(pos.y + sd_terrain(pos.xz), MATERIAL_GRASS, SENTINEL_IDX);
             break;
+        }
         default:
             break;
     }
-    //m = sd_union(m, Distance(sd_box(pos - vec3(0., -0.5, 0.), vec3(10., .5, 10.)), MATERIAL_COBBLESTONE_PAVING, SENTINEL_IDX));
-    //m = sd_union(m, sd_ground(pos - vec3(0., -0.5, 0.)));
 
     for (uint i = 0u; i < queuecount_raymarchmaxstep_aostep_background_type.x; i++) {
-        vec3 pos_transformed = (vec4(pos - queue[i].position, 1.) * queue[i].rotation).xyz;
+        vec3 pos_transformed = (vec4(pos - queue[i].position_scale.xyz, 1.) * queue[i].rotation).xyz;
+        pos_transformed /= queue[i].position_scale.w;
+
+        Distance d;
         switch (queue[i].shape_type_materials_id.x) {
             case SHAPE_TYPE_BOX:
-                m = sd_union(m,
-                    Distance(
+                d = Distance(
                         sd_box(
                             pos_transformed,
                             queue[i].shape_data1.xyz),
                             queue[i].shape_type_materials_id.y,
-                            i));
+                            i);
                 break;
             case SHAPE_TYPE_SPHERE:
-                m = sd_union(m,
-                    Distance(
-                        sd_sphere(
-                            pos_transformed,
-                            queue[i].shape_data1.x),
-                            queue[i].shape_type_materials_id.y,
-                            i));
+            {
+                d = Distance(
+                    sd_sphere(
+                        pos_transformed,
+                        queue[i].shape_data1.x),
+                        queue[i].shape_type_materials_id.y,
+                        i);
                 break;
+            }
             case SHAPE_TYPE_CYLINDER:
-                m = sd_union(m,
-                    Distance(
-                        sd_cylinder(
-                            pos_transformed,
-                            queue[i].shape_data1.xyz,
-                            queue[i].shape_data2.xyz,
-                            queue[i].shape_data1.w),
-                            queue[i].shape_type_materials_id.y,
-                            i));
+            {
+                d = Distance(
+                    sd_cylinder(
+                        pos_transformed,
+                        queue[i].shape_data1.xyz,
+                        queue[i].shape_data2.xyz,
+                        queue[i].shape_data1.w),
+                        queue[i].shape_type_materials_id.y,
+                        i);
                 break;
+            }
             case SHAPE_TYPE_GUNMAN:
-                {
-                    const float s = 0.2;
-                    Distance d = sd_gunman(
-                        (pos_transformed) / s * rot_y(queue[i].shape_data1.y),
+            {
+                d = sd_gunman(
+                        pos_transformed * rot_y(queue[i].shape_data1.y),
                         queue[i].shape_data1.x,
                         queue[i].shape_type_materials_id.y,
                         queue[i].shape_type_materials_id.z,
                         i);
-                    d.distance *= s;
-                    m = sd_union(m, d);
-                }
                 break;
+            }
             case SHAPE_TYPE_SWORDMAN:
-                {
-                    const float s = 0.2;
-                    Distance d = sd_swordman(
-                        (pos_transformed) / s * rot_y(queue[i].shape_data2.y),
+            {
+                d = sd_swordman(
+                        pos_transformed * rot_y(queue[i].shape_data2.y),
                         queue[i].shape_data2.x,
                         queue[i].shape_type_materials_id.y,
                         queue[i].shape_type_materials_id.z,
                         i);
-                    d.distance *= s;
-                    m = sd_union(m, d);
-                }
                 break;
+            }
             default:
                 return m;
         }
+        d.distance *= queue[i].position_scale.w;
+        m = sd_union(m, d);
     }
 
     return m;
@@ -500,9 +504,9 @@ vec3 color_mapping(vec3 ray_hit_pos, vec3 normal, Distance d)
         {
             // Assuming SHAPE_TYPE_BOX
             // Top back right
-            const vec3 tbr = queue[d.idx].position + queue[d.idx].shape_data1.xyz;
+            const vec3 tbr = queue[d.idx].position_scale.xyz + queue[d.idx].shape_data1.xyz;
             // Bottom front left
-            const vec3 bfl = queue[d.idx].position - queue[d.idx].shape_data1.xyz;
+            const vec3 bfl = queue[d.idx].position_scale.xyz - queue[d.idx].shape_data1.xyz;
             col = texture_map_triplanar(
             crate_texture,
             ray_hit_pos,
@@ -538,9 +542,9 @@ vec3 color_mapping(vec3 ray_hit_pos, vec3 normal, Distance d)
 
             // Assuming SHAPE_TYPE_BOX
             // Top back right
-            const vec3 tbr = queue[d.idx].position + queue[d.idx].shape_data1.xyz;
+            const vec3 tbr = queue[d.idx].position_scale.xyz + queue[d.idx].shape_data1.xyz;
             // Bottom front left
-            const vec3 bfl = queue[d.idx].position - queue[d.idx].shape_data1.xyz;
+            const vec3 bfl = queue[d.idx].position_scale.xyz - queue[d.idx].shape_data1.xyz;
             col = texture_map_triplanar(
             container_texture,
             ray_hit_pos,
@@ -555,13 +559,13 @@ vec3 color_mapping(vec3 ray_hit_pos, vec3 normal, Distance d)
         }
         case MATERIAL_TARGET:
         {
-            float dd = dot(normal, normalize(queue[d.idx].position - cam_pos)) * -1. / 3.;
+            float dd = dot(normal, normalize(queue[d.idx].position_scale.xyz - cam_pos)) * -1. / 3.;
             col = textureLod(sampler2D(target_texture, common_sampler), vec2(1. - dd), 0.).rgb;
             break;
         }
         case MATERIAL_TARGET_DIMMED:
         {
-            float dd = dot(normal, normalize(queue[d.idx].position - cam_pos)) * -1. / 3.;
+            float dd = dot(normal, normalize(queue[d.idx].position_scale.xyz - cam_pos)) * -1. / 3.;
             col = textureLod(sampler2D(target_texture, common_sampler), vec2(1. - dd), 0.).rgb;
             col /= 3.;
             break;

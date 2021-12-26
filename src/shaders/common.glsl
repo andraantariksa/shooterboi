@@ -18,8 +18,7 @@
 
 struct RenderQueue
 {
-    vec3 position;
-    vec3 scale;
+    vec4 position_scale;
     mat4 rotation;
     vec4 shape_data1;
     vec4 shape_data2;
