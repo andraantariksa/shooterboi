@@ -6,9 +6,10 @@ use crate::renderer::render_objects::MaterialType;
 use crate::renderer::render_objects::ShapeType;
 use crate::renderer::Renderer;
 use hecs::World;
-use nalgebra::{Point3, Vector3};
+use nalgebra::{Matrix4, Point3, Vector3};
 use rand::prelude::SmallRng;
 use rapier3d::prelude::*;
+use std::ops::Mul;
 
 pub fn spawn_gunman(
     world: &mut World,
@@ -44,12 +45,11 @@ pub fn enqueue_gunman(world: &mut World, physics: &mut GamePhysics, renderer: &m
         let (objects, ref mut bound) = renderer.render_objects.next();
         objects.position = *rb.translation();
         objects.shape_data1.x = gunman.shootanim();
-        objects.shape_data1.y = gunman.get_rotation();
         objects.scale = 0.2;
         objects.shape_type_material_ids.0 = ShapeType::Gunman;
         objects.shape_type_material_ids.1 = gunman.get_material();
         objects.shape_type_material_ids.2 = MaterialType::Black;
-        objects.rotation = rb.rotation().to_homogeneous();
+        objects.rotation = rb.rotation().inverse().to_homogeneous();
 
         *bound = ObjectBound::Sphere(3.0);
     }
@@ -68,6 +68,7 @@ pub fn update_gunmans(
         let mut gunman_pos = *gunman_rigid_body.translation();
         gunman_ops.push(gunman.update(rng, delta_time, &mut gunman_pos, player_position));
         gunman_rigid_body.set_translation(gunman_pos, true);
+        gunman_rigid_body.set_rotation(gunman.get_rotation(), true);
     }
 
     for op in gunman_ops {
@@ -121,7 +122,7 @@ pub fn enqueue_bullet(world: &mut World, physics: &mut GamePhysics, renderer: &m
         objects.shape_data1.x = collider.radius;
         objects.shape_type_material_ids.0 = ShapeType::Sphere;
         objects.shape_type_material_ids.1 = bullet.get_material();
-        objects.rotation = rb.rotation().to_homogeneous();
+        objects.rotation = rb.rotation().inverse().to_homogeneous();
 
         *bound = ObjectBound::Sphere(collider.radius);
     }

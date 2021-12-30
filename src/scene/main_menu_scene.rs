@@ -9,13 +9,12 @@ use crate::gui::ConrodHandle;
 use crate::input_manager::InputManager;
 use crate::renderer::Renderer;
 
-use crate::scene::classic_score_scene::ClassicGameScoreDisplay;
 use crate::scene::exit_confirm_scene::QuitConfirmScene;
 use crate::scene::game_selection_scene::GameSelectionScene;
 use crate::scene::guide_scene::GuideScene;
 use crate::scene::settings_scene::SettingsScene;
 use crate::scene::{
-    GameDifficulty, MaybeMessage, Scene, SceneOp, Value, BUTTON_HEIGHT, BUTTON_WIDTH, MARGIN,
+    MaybeMessage, Scene, SceneOp, Value, BUTTON_HEIGHT, BUTTON_WIDTH, MARGIN,
 };
 use crate::window::Window;
 use conrod_core::widget_ids;
@@ -31,18 +30,6 @@ widget_ids! {
         settings_button,
         start_classic_mode_button,
         title_image
-    }
-}
-
-pub struct Scores {
-    classic_game: Vec<ClassicGameScoreDisplay>,
-}
-
-impl Scores {
-    fn new() -> Self {
-        Self {
-            classic_game: Vec::new(),
-        }
     }
 }
 
@@ -92,7 +79,7 @@ impl Scene for MainMenuScene {
         renderer: &mut Renderer,
         _conrod_handle: &mut ConrodHandle,
         audio_context: &mut AudioContext,
-        database: &mut Database,
+        _database: &mut Database,
     ) {
         renderer.is_render_gui = true;
         renderer.is_render_game = false;

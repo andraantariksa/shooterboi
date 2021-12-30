@@ -74,7 +74,11 @@ fn main() -> BuildScriptResult<()> {
     if profile.contains("debug") {
         compile_options.set_optimization_level(OptimizationLevel::Zero);
         compile_options.set_generate_debug_info();
+    } else {
+        compile_options.set_optimization_level(OptimizationLevel::Performance);
     }
+
+    println!("cargo:warning=Build profile {}", profile);
 
     if target.contains("wasm") {
         compile_options.add_macro_definition("IS_WEB", None);

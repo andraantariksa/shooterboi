@@ -211,24 +211,25 @@ float fingers(vec3 p)
 
 float sd_holding_hand(vec3 p)
 {
+    // Hand
     float d = sd_capsule(
-    p,
-    vec3(.3, -.45, 1.6),
-    vec3(.3, (-1.1 + -.45) / 2., 2.1),
-    .1,
-    .1,
-    1.);
+        p,
+        vec3(.3, -.45, 1.6),
+        vec3(.3, (-1.1 + -.45) / 2., 2.1),
+        .1,
+        .1,
+        1.);
     d = smin(d, sd_capsule(
-    p,
-    vec3(.3, -1.1, 1.6),
-    vec3(.3, (-1.1 + -.45) / 2., 2.1),
-    .1,
-    .1,
-    1.), .2);
+        p,
+        vec3(.3, -1.1, 1.6),
+        vec3(.3, (-1.1 + -.45) / 2., 2.1),
+        .1,
+        .1,
+        1.), .2);
     d = smin(d, sd_sphere(p - vec3(-.05, -.7, 1.7), .2), .5);
-
+    // Fingers
     d = smin(d, fingers(p), .2);
-
+    // Thumb
     Finger f;
     float x = -.27;
     f.a = vec4(x, -.55, .8, .12);
@@ -238,14 +239,15 @@ float sd_holding_hand(vec3 p)
     f.e = vec4(0., -.9, 1.7, .13);
     f.lengths = vec4(.1);
     d = smin(d, finger(p, f), 0.03);
+    // Lengan
     d = smin(d, sd_capsule(
-    p,
-    vec3(0., -.9, 1.9),
-    vec3(0., -.9, 3.),
-    .25,
-    .25,
-    1.
-    ), .4);
+        p,
+        vec3(0., -.9, 1.9),
+        vec3(0., -.9, 4.),
+        .25,
+        .25,
+        1.
+        ), .4);
 
     return d;
 }

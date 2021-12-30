@@ -4,14 +4,13 @@ use crate::gui::ConrodHandle;
 use crate::input_manager::InputManager;
 use crate::renderer::Renderer;
 
-
-
 use crate::scene::{main_menu_scene::MainMenuScene, Scene, SceneOp};
 use crate::window::Window;
-use instant::{Instant};
-use std::collections::{VecDeque};
+use instant::Instant;
+use std::collections::VecDeque;
+use std::env;
 
-use winit::dpi::{PhysicalSize};
+use winit::dpi::PhysicalSize;
 use winit::event::{Event, VirtualKeyCode, WindowEvent};
 use winit::event_loop::ControlFlow;
 use winit::window::Window as WinitWindow;
@@ -28,6 +27,7 @@ pub struct Game {
     conrod_handle: ConrodHandle,
     audio_context: AudioContext,
     database: Database,
+    debug: bool,
 }
 
 impl Game {
@@ -62,6 +62,9 @@ impl Game {
             &mut database,
         );
         scene_stack.push_back(Box::new(first_scene));
+
+        let debug = env::var("debug").is_ok();
+
         Self {
             window,
             scene_stack,
@@ -72,6 +75,7 @@ impl Game {
             running_time: 0.0,
             audio_context,
             database,
+            debug,
         }
     }
 
@@ -223,6 +227,10 @@ impl Game {
 
                 self.input_manager.clear();
                 self.audio_context.clear();
+
+                if self.debug {
+                    self.window.set_title(&format!("FPS: {}", 1.0 / delta_time));
+                }
             }
             _ => {}
         };

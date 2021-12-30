@@ -3,7 +3,7 @@ use crate::entity::enemy::{HITTED_MATERIAL_DURATION, ROTATION_SPEED};
 use crate::entity::HasMaterial;
 use crate::renderer::render_objects::MaterialType;
 use crate::timer::Timer;
-use nalgebra::{Unit, Vector3};
+use nalgebra::{Rotation3, Unit, Vector3};
 
 pub enum EnemyState {
     Attack(InOutAnimation),
@@ -17,7 +17,7 @@ pub enum EnemyMaterialState {
 
 pub struct Swordman {
     state: EnemyState,
-    rotation: f32,
+    rotation_y: f32,
     dir: Vector3<f32>,
     material_state: EnemyMaterialState,
 }
@@ -26,7 +26,7 @@ impl Swordman {
     pub fn new() -> Self {
         Self {
             state: EnemyState::Follow,
-            rotation: 0.0,
+            rotation_y: 0.0,
             material_state: EnemyMaterialState::None,
             dir: Vector3::new(0.0, 1.0, 0.0),
         }
@@ -68,21 +68,42 @@ impl Swordman {
         }
 
         if is_moving {
-            self.rotation = self.dir.x.atan2(self.dir.z);
+            self.rotation_y = self.dir.x.atan2(self.dir.z);
         }
+
+        match &mut self.state {
+            EnemyState::Attack(anim) => {
+                anim.update(delta_time);
+                if anim.get_value() == 0.0 {
+                    self.state = EnemyState::Follow;
+                }
+            }
+            EnemyState::Follow => {
+                let player_pos_xz = player_pos.xz();
+                let current_pos_xz = obj_pos.xz();
+                if current_pos_xz.relative_eq(&player_pos_xz, f32::EPSILON, 0.5) {
+                    self.state = EnemyState::Attack(InOutAnimation::new_started(0.2, 0.2));
+                } else {
+                    let dir = Unit::new_normalize(player_pos_xz - current_pos_xz);
+                    let next_pos = dir.into_inner() * 3.0 * delta_time;
+                    obj_pos.x += next_pos.x;
+                    obj_pos.z += next_pos.y;
+                }
+            }
+        };
     }
 
     pub fn get_direction(&self) -> Vector3<f32> {
         self.dir
     }
 
-    pub fn get_rotation(&self) -> f32 {
-        self.rotation
+    pub fn get_rotation(&self) -> Vector3<f32> {
+        Vector3::new(0.0, self.rotation_y, 0.0)
     }
 
     pub fn hitanim(&self) -> f32 {
         match self.state {
-            EnemyState::Attack(ref anim) => anim.get_value(),
+            EnemyState::Attack(ref anim) => -anim.get_value(),
             _ => 0.0,
         }
     }

@@ -1,26 +1,23 @@
 use conrod_core::widget::envelope_editor::EnvelopePoint;
 use conrod_core::{color, Color, Colorable, Positionable, Sizeable, Widget};
-use std::collections::HashMap;
 
+use chrono::Utc;
 use conrod_core::widget::{Canvas, Text};
 use std::io::{BufReader, Cursor};
 
 use hecs::{Entity, World};
-use instant::Instant;
+
 use rapier3d::prelude::*;
 use winit::event::{MouseButton, VirtualKeyCode};
 use winit::event_loop::ControlFlow;
 
 use crate::animation::InOutAnimation;
+use crate::audio::Sink;
 use crate::audio::{AudioContext, AUDIO_FILE_SHOOT};
-use crate::audio::{Sink, AUDIO_FILE_SHOOTED};
 use crate::database::Database;
 use crate::entity::enemy::gunman::{Bullet, Gunman};
 use crate::entity::enemy::swordman::Swordman;
-use crate::entity::target::Target;
-use crate::entity::HasMaterial;
-use crate::entity::{Crate, Player};
-use crate::frustum::ObjectBound;
+
 use crate::gui::ConrodHandle;
 use crate::input_manager::InputManager;
 use crate::physics::GamePhysics;
@@ -28,16 +25,16 @@ use crate::renderer::render_objects::MaterialType;
 use crate::renderer::render_objects::ShapeType;
 use crate::renderer::rendering_info::BackgroundType;
 use crate::renderer::Renderer;
-use crate::scene::classic_score_scene::ClassicScoreScene;
+use crate::scene::game_score_scene::{GameModeScore, GameScoreScene, HitAndDodgeGameScoreDisplay};
 use crate::scene::pause_scene::PauseScene;
 use crate::scene::{
     GameDifficulty, GameState, MaybeMessage, Message, Scene, SceneOp, FINISHING_DURATION,
-    MAX_RAYCAST_DISTANCE, PREPARE_DURATION,
+    IN_SHOOT_ANIM_DURATION, OUT_SHOOT_ANIM_DURATION, PREPARE_DURATION,
 };
 use crate::systems::gunman::{enqueue_bullet, enqueue_gunman, spawn_gunman, update_gunmans};
 use crate::systems::player::{init_player, setup_player_collider};
 use crate::systems::swordman::{enqueue_swordman, spawn_swordman, update_swordmans};
-use crate::systems::target::{enqueue_target, spawn_target};
+use crate::systems::target::enqueue_target;
 use crate::systems::update_player_movement::update_player_position;
 use crate::systems::wall::{enqueue_wall, spawn_wall};
 use crate::timer::{Stopwatch, Timer};
@@ -45,10 +42,13 @@ use crate::util::lerp;
 use crate::window::Window;
 use conrod_core::widget_ids;
 use gluesql::data::Value;
-use nalgebra::{Point3, Vector3};
-use rand::distributions::Uniform;
+use nalgebra::Vector3;
+
+use crate::camera::Camera;
+use crate::systems::shoot_ray::shoot_ray;
+use crate::systems::shootanim::shootanim;
 use rand::prelude::SmallRng;
-use rand::{Rng, SeedableRng};
+use rand::SeedableRng;
 
 widget_ids! {
     pub struct HitAndDodgeGameSceneIds {
@@ -85,18 +85,9 @@ impl Score {
             total_shoot_time: 0.0,
         }
     }
-
-    pub fn write_message(&self, message: &mut Message) {
-        message.insert("hit", Value::I64(self.hit as i64));
-        message.insert("miss", Value::I64(self.miss as i64));
-        message.insert("score", Value::I64(self.score as i64));
-        message.insert("hit_taken", Value::I64(self.hit_taken as i64));
-        message.insert(
-            "avg_hit_time",
-            Value::F64(self.total_shoot_time as f64 / self.hit.max(1) as f64),
-        );
-    }
 }
+
+pub const GAME_DURATION: f32 = 100.0;
 
 pub struct HitAndDodgeGameScene {
     ids: HitAndDodgeGameSceneIds,
@@ -181,9 +172,9 @@ impl HitAndDodgeGameScene {
             delta_shoot_time: Stopwatch::new(),
             shoot_timer: Timer::new_finished(),
             rng,
-            shoot_animation: InOutAnimation::new(3.0, 5.0),
+            shoot_animation: InOutAnimation::new(IN_SHOOT_ANIM_DURATION, OUT_SHOOT_ANIM_DURATION),
             entity_to_remove: Vec::new(),
-            round_timer: Timer::new(100.0),
+            round_timer: Timer::new(GAME_DURATION),
             freeze: false,
             game_state: GameState::Preround,
             difficulty,
@@ -206,11 +197,7 @@ impl Scene for HitAndDodgeGameScene {
 
         renderer.rendering_info.background_type = BackgroundType::Forest;
 
-        init_player(
-            &mut self.physics,
-            renderer,
-            self.player_rigid_body_handle.clone(),
-        );
+        init_player(&mut self.physics, renderer, self.player_rigid_body_handle);
 
         // Ground
         let (objects, ref mut bound) = renderer.render_objects.next_static();
@@ -286,16 +273,16 @@ impl Scene for HitAndDodgeGameScene {
             .middle_of(self.ids.duration_canvas)
             .set(self.ids.duration_label, &mut ui_cell);
 
-            let w_duration_label = ui_cell.w_of(self.ids.duration_label).unwrap();
+            let _w_duration_label = ui_cell.w_of(self.ids.duration_label).unwrap();
 
-            Text::new(&format!("{}", self.score.score))
+            Text::new(&format!("{:.2}%", self.score.score))
                 .font_size(12)
                 .color(color::BLACK)
                 .middle_of(self.ids.score_canvas)
                 .set(self.ids.score_label, &mut ui_cell);
             Text::new(&format!(
-                "{}",
-                (self.score.hit) as f32 / (self.score.hit + self.score.miss).min(1) as f32 * 100.0
+                "{:02}%",
+                (self.score.hit) as f32 / (self.score.hit + self.score.miss).max(1) as f32 * 100.0
             ))
             .font_size(12)
             .color(color::BLACK)
@@ -382,102 +369,22 @@ impl Scene for HitAndDodgeGameScene {
                     &renderer.camera.position,
                 );
 
-                let mut missed = || {
-                    self.score.score -= 100;
-                    self.score.miss += 1;
-                };
-
-                self.shoot_animation.update(delta_time);
-                renderer.rendering_info.fov_shootanim.y = lerp(
-                    0.0f32,
-                    -20.0f32.to_radians(),
-                    self.shoot_animation.get_value(),
+                shootanim(
+                    &mut self.shoot_animation,
+                    &mut renderer.rendering_info,
+                    delta_time,
                 );
 
-                if input_manager.is_mouse_press(&MouseButton::Left)
-                    && self.shoot_timer.is_finished()
-                {
-                    self.shoot_animation.trigger();
-                    self.shoot_timer.reset(0.4);
+                self.shoot(input_manager, audio_context, &renderer.camera, delta_time);
 
-                    let sink = rodio::Sink::try_new(&audio_context.output_stream_handle).unwrap();
-                    sink.append(
-                        rodio::Decoder::new(BufReader::new(Cursor::new(AUDIO_FILE_SHOOT.to_vec())))
-                            .unwrap(),
-                    );
-                    audio_context.push(Sink::Regular(sink));
-
-                    let ray = Ray::new(
-                        nalgebra::Point::from(
-                            renderer.camera.position
-                                + renderer.camera.get_direction().into_inner() * 1.0,
-                        ),
-                        renderer.camera.get_direction().into_inner(),
-                    );
-                    if let Some((handle, _distance)) = self.physics.query_pipeline.cast_ray(
-                        &self.physics.collider_set,
-                        &ray,
-                        MAX_RAYCAST_DISTANCE,
-                        true,
-                        self.physics.interaction_groups,
-                        None,
-                    ) {
-                        let collider = self.physics.collider_set.get(handle).unwrap();
-                        let entity = Entity::from_bits(collider.user_data as u64);
-
-                        if let Ok(mut gunman) = self.world.get_mut::<Gunman>(entity) {
-                            gunman.hit();
-                        } else if let Ok(mut swordman) = self.world.get_mut::<Swordman>(entity) {
-                            swordman.hit();
-                        }
-                    } else {
-                        missed();
-                    }
-                }
-
-                while let Ok(contact_event) = self.physics.contact_recv.try_recv() {
-                    match contact_event {
-                        ContactEvent::Started(maybe_player_handle, maybe_bullet_handle) => {
-                            let collider =
-                                self.physics.collider_set.get(maybe_bullet_handle).unwrap();
-                            let entity = Entity::from_bits(collider.user_data as u64);
-
-                            let mut bullet_hit = false;
-
-                            if self.world.get::<Bullet>(entity).is_ok() {
-                                let rb = collider.parent().unwrap();
-                                self.physics.rigid_body_set.remove(
-                                    rb,
-                                    &mut self.physics.island_manager,
-                                    &mut self.physics.collider_set,
-                                    &mut self.physics.joint_set,
-                                );
-                                self.entity_to_remove.push(entity);
-
-                                bullet_hit = true;
-                            }
-
-                            let collider =
-                                self.physics.collider_set.get(maybe_player_handle).unwrap();
-                            let entity = Entity::from_bits(collider.user_data as u64);
-
-                            if self.world.get::<Player>(entity).is_ok() && bullet_hit {
-                                self.score.score -= 500;
-                            }
-                        }
-                        ContactEvent::Stopped(_, _) => {}
-                    }
-                }
-                for entity in self.entity_to_remove.iter() {
-                    self.world.despawn(*entity).unwrap();
-                }
-                self.entity_to_remove.clear();
+                self.bullet_disposal();
 
                 if self.round_timer.is_finished() {
                     self.game_state = GameState::Finishing(Timer::new(FINISHING_DURATION));
                 }
             }
             GameState::Finishing(ref mut timer) => {
+                self.shoot_timer.update(delta_time);
                 timer.update(delta_time);
 
                 Text::new("Time out!")
@@ -494,13 +401,22 @@ impl Scene for HitAndDodgeGameScene {
         drop(ui_cell);
 
         if game_finished {
-            scene_op = SceneOp::Push(
-                Box::new(ClassicScoreScene::new(conrod_handle)),
-                Some({
-                    let mut m = HashMap::new();
-                    self.score.write_message(&mut m);
-                    m
-                }),
+            scene_op = SceneOp::Replace(
+                Box::new(GameScoreScene::new(
+                    conrod_handle,
+                    GameModeScore::HitAndDodge(HitAndDodgeGameScoreDisplay {
+                        accuracy: self.score.hit as f32 / (self.score.hit + self.score.miss) as f32
+                            * 100.0,
+                        hit: self.score.hit,
+                        miss: self.score.miss,
+                        hit_taken: self.score.hit_taken,
+                        score: self.score.score,
+                        avg_hit_time: GAME_DURATION / self.score.hit as f32,
+                        created_at: Utc::now().naive_utc(),
+                    }),
+                    self.difficulty,
+                )),
+                None,
             );
         }
 
@@ -542,5 +458,94 @@ impl Scene for HitAndDodgeGameScene {
         renderer.rendering_info.fov_shootanim.y = 0.0;
         renderer.render_objects.clear();
         window.set_is_cursor_grabbed(false);
+    }
+}
+
+impl HitAndDodgeGameScene {
+    fn shoot(
+        &mut self,
+        input_manager: &InputManager,
+        audio_context: &mut AudioContext,
+        camera: &Camera,
+        delta_time: f32,
+    ) {
+        if input_manager.is_mouse_press(&MouseButton::Left) && self.shoot_timer.is_finished() {
+            self.score.hit += 1;
+
+            self.shoot_animation.trigger();
+            self.shoot_timer.reset(0.4);
+
+            let sink = rodio::Sink::try_new(&audio_context.output_stream_handle).unwrap();
+            sink.append(
+                rodio::Decoder::new(BufReader::new(Cursor::new(AUDIO_FILE_SHOOT.to_vec())))
+                    .unwrap(),
+            );
+            audio_context.push(Sink::Regular(sink));
+
+            if let Some((handle, _distance)) = shoot_ray(&self.physics, camera) {
+                let collider = self.physics.collider_set.get(handle).unwrap();
+                let entity = Entity::from_bits(collider.user_data as u64);
+
+                if let Ok(mut gunman) = self.world.get_mut::<Gunman>(entity) {
+                    gunman.hit();
+
+                    let shoot_time = self.delta_shoot_time.get_duration();
+                    self.delta_shoot_time.reset();
+
+                    self.score.score += ((500.0 * (5.0 - shoot_time)) as i32).max(300);
+                } else if let Ok(mut swordman) = self.world.get_mut::<Swordman>(entity) {
+                    swordman.hit();
+
+                    let shoot_time = self.delta_shoot_time.get_duration();
+                    self.delta_shoot_time.reset();
+
+                    self.score.score += ((100.0 * (5.0 - shoot_time)) as i32).max(100);
+                } else {
+                    // Hit other than gunman & swordman
+                    self.score.miss += 1;
+                }
+            } else {
+                // Hit nothing
+                self.score.miss += 1;
+            }
+        }
+    }
+
+    fn bullet_disposal(&mut self) {
+        while let Ok(contact_event) = self.physics.contact_recv.try_recv() {
+            match contact_event {
+                ContactEvent::Started(maybe_player_handle, maybe_bullet_handle) => {
+                    let collider = self.physics.collider_set.get(maybe_bullet_handle).unwrap();
+                    let entity = Entity::from_bits(collider.user_data as u64);
+
+                    let mut bullet_hit = false;
+
+                    if self.world.get::<Bullet>(entity).is_ok() {
+                        let rb = collider.parent().unwrap();
+                        self.physics.rigid_body_set.remove(
+                            rb,
+                            &mut self.physics.island_manager,
+                            &mut self.physics.collider_set,
+                            &mut self.physics.joint_set,
+                        );
+                        self.entity_to_remove.push(entity);
+
+                        bullet_hit = true;
+                    }
+
+                    let collider = self.physics.collider_set.get(maybe_player_handle).unwrap();
+                    let is_player = collider.user_data == u128::MAX;
+
+                    if is_player && bullet_hit {
+                        self.score.hit_taken += 1;
+                    }
+                }
+                ContactEvent::Stopped(_, _) => {}
+            }
+        }
+        for entity in self.entity_to_remove.iter() {
+            self.world.despawn(*entity).unwrap();
+        }
+        self.entity_to_remove.clear();
     }
 }

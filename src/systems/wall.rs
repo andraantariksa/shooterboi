@@ -1,10 +1,10 @@
-use crate::entity::{Crate, Wall};
+use crate::entity::Wall;
 use crate::frustum::ObjectBound;
 use crate::physics::GamePhysics;
 use crate::renderer::render_objects::{MaterialType, ShapeType};
 use crate::renderer::Renderer;
 use hecs::World;
-use nalgebra::Vector3;
+use nalgebra::{Matrix4, Vector3};
 use rapier3d::prelude::*;
 
 pub fn spawn_wall(
@@ -55,7 +55,7 @@ pub fn enqueue_wall(
         objects.position = *rb.translation();
         objects.shape_type_material_ids.0 = ShapeType::Box;
         objects.shape_type_material_ids.1 = material;
-        objects.rotation = rb.rotation().to_homogeneous();
+        objects.rotation = rb.rotation().inverse().to_homogeneous();
 
         let shape = collider.shape().as_cuboid().unwrap();
         objects.shape_data1.x = shape.half_extents.x;

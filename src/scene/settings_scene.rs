@@ -1,4 +1,5 @@
 use conrod_core::widget::envelope_editor::EnvelopePoint;
+use conrod_core::widget::{Scrollbar, Slider, Text};
 use conrod_core::{Colorable, Labelable, Positionable, Sizeable, Widget};
 use std::collections::HashMap;
 use winit::event_loop::ControlFlow;
@@ -11,7 +12,7 @@ use crate::input_manager::InputManager;
 use crate::renderer::Renderer;
 
 use crate::scene::{MaybeMessage, Scene, SceneOp, Value, MARGIN};
-use crate::util::{any_sized_as_u8_slice};
+use crate::util::any_sized_as_u8_slice;
 use crate::window::Window;
 use conrod_core::widget_ids;
 
@@ -153,10 +154,7 @@ impl Scene for SettingsScene {
         _control_flow: &mut ControlFlow,
         _database: &mut Database,
     ) -> SceneOp {
-        let crosshair_texture_id = *conrod_handle
-            .get_image_id_map()
-            .get("crosshair")
-            .unwrap();
+        let crosshair_texture_id = *conrod_handle.get_image_id_map().get("crosshair").unwrap();
         let crosshair_image = conrod_handle
             .get_image_map()
             .get(&crosshair_texture_id)
@@ -271,12 +269,12 @@ impl Scene for SettingsScene {
             ])
             .set(self.ids.canvas, &mut ui_cell);
 
-        conrod_core::widget::Scrollbar::y_axis(self.ids.settings_canvas)
+        Scrollbar::y_axis(self.ids.settings_canvas)
             .rgb(1.0, 0.0, 0.0)
             .h_of(self.ids.settings_canvas)
             .set(self.ids.settings_canvas_scrollbar, &mut ui_cell);
 
-        conrod_core::widget::Text::new("Settings")
+        Text::new("Settings")
             .font_id(ropa_font_id)
             .middle_of(self.ids.header_canvas)
             .parent(self.ids.header_canvas)
@@ -285,12 +283,12 @@ impl Scene for SettingsScene {
         const GAP_BETWEEN_OPTION_SETTINGS: f64 = 30.0;
         const GAP_BETWEEN_LABEL_TO_OPTION_SETTINGS: f64 = 20.0;
 
-        conrod_core::widget::Text::new("Maximum raymarch step")
+        Text::new("Maximum raymarch step")
             .font_id(ropa_font_id)
             .mid_top_of(self.ids.max_march_step_canvas)
             .set(self.ids.max_march_step_slider_label, &mut ui_cell);
 
-        for value in conrod_core::widget::Slider::new(
+        for value in Slider::new(
             renderer.rendering_info.queuecount_raymarchmaxstep_aostep.y as f32,
             0f32,
             200f32,
@@ -306,12 +304,12 @@ impl Scene for SettingsScene {
             renderer.rendering_info.queuecount_raymarchmaxstep_aostep.y = value.round() as u32;
         }
 
-        conrod_core::widget::Text::new("Ambient occlusion step")
+        Text::new("Ambient occlusion step")
             .font_id(ropa_font_id)
             .mid_top_of(self.ids.ambient_occlusion_sample_canvas)
             .set(self.ids.ambient_occlusion_sample_slider_label, &mut ui_cell);
 
-        for value in conrod_core::widget::Slider::new(
+        for value in Slider::new(
             renderer.rendering_info.queuecount_raymarchmaxstep_aostep.z as f32,
             0f32,
             10f32,
@@ -327,12 +325,12 @@ impl Scene for SettingsScene {
             renderer.rendering_info.queuecount_raymarchmaxstep_aostep.z = value.round() as u32;
         }
 
-        conrod_core::widget::Text::new("Audio Volume")
+        Text::new("Audio Volume")
             .font_id(ropa_font_id)
             .mid_top_of(self.ids.volume_canvas)
             .set(self.ids.volume_slider_label, &mut ui_cell);
 
-        for value in conrod_core::widget::Slider::new(audio_context.get_volume(), 0f32, 1f32)
+        for value in Slider::new(audio_context.get_volume(), 0f32, 1f32)
             .mid_bottom_of(self.ids.volume_canvas)
             .label(&format!("{}", (audio_context.get_volume() * 100.0) as u8))
             .wh(conrod_core::Dimensions::new(200.0, 30.0))
@@ -341,7 +339,7 @@ impl Scene for SettingsScene {
             audio_context.set_volume(value);
         }
 
-        conrod_core::widget::Text::new("Center dot enabled")
+        Text::new("Center dot enabled")
             .font_id(ropa_font_id)
             .mid_top_of(self.ids.center_dot_enable_canvas)
             .set(self.ids.center_dot_enable_label, &mut ui_cell);
@@ -354,13 +352,13 @@ impl Scene for SettingsScene {
             renderer.crosshair.center_dot_enabled = value;
         }
 
-        // conrod_core::widget::Text::new("Center dot opacity")
+        // Text::new("Center dot opacity")
         //     .font_id(ropa_font_id)
         //     .mid_top_of(self.ids.center_dot_opacity_canvas)
         //     .set(self.ids.center_dot_opacity_slider_label, &mut ui_cell);
 
         // for value in
-        //     conrod_core::widget::Slider::new(renderer.crosshair.center_dot_opacity, 0f32, 1f32)
+        //     Slider::new(renderer.crosshair.center_dot_opacity, 0f32, 1f32)
         //         .mid_bottom_of(self.ids.center_dot_opacity_canvas)
         //
         //         .label(&format!("{}", renderer.crosshair.center_dot_opacity))
@@ -370,25 +368,24 @@ impl Scene for SettingsScene {
         //     renderer.crosshair.center_dot_opacity = value;
         // }
 
-        conrod_core::widget::Text::new("Center dot thickness")
+        Text::new("Center dot thickness")
             .font_id(ropa_font_id)
             .mid_top_of(self.ids.center_dot_thickness_canvas)
             .set(self.ids.center_dot_thickness_slider_label, &mut ui_cell);
 
-        for value in
-            conrod_core::widget::Slider::new(renderer.crosshair.center_dot_thickness, 0f32, 100f32)
-                .mid_bottom_of(self.ids.center_dot_thickness_canvas)
-                .label(&format!(
-                    "{}",
-                    renderer.crosshair.center_dot_thickness as u8
-                ))
-                .wh(conrod_core::Dimensions::new(200.0, 30.0))
-                .set(self.ids.center_dot_thickness_slider, &mut ui_cell)
+        for value in Slider::new(renderer.crosshair.center_dot_thickness, 0f32, 100f32)
+            .mid_bottom_of(self.ids.center_dot_thickness_canvas)
+            .label(&format!(
+                "{}",
+                renderer.crosshair.center_dot_thickness as u8
+            ))
+            .wh(conrod_core::Dimensions::new(200.0, 30.0))
+            .set(self.ids.center_dot_thickness_slider, &mut ui_cell)
         {
             renderer.crosshair.center_dot_thickness = value.round();
         }
 
-        conrod_core::widget::Text::new("Inner line enabled")
+        Text::new("Inner line enabled")
             .font_id(ropa_font_id)
             .mid_top_of(self.ids.inner_line_enable_canvas)
             .set(self.ids.inner_line_enable_label, &mut ui_cell);
@@ -401,13 +398,13 @@ impl Scene for SettingsScene {
             renderer.crosshair.inner_line_enabled = value;
         }
 
-        // conrod_core::widget::Text::new("Inner line opacity")
+        // Text::new("Inner line opacity")
         //     .font_id(ropa_font_id)
         //     .mid_top_of(self.ids.inner_line_opacity_canvas)
         //     .set(self.ids.inner_line_opacity_slider_label, &mut ui_cell);
         //
         // for value in
-        //     conrod_core::widget::Slider::new(renderer.crosshair.inner_line_opacity, 0f32, 1f32)
+        //     Slider::new(renderer.crosshair.inner_line_opacity, 0f32, 1f32)
         //         .mid_bottom_of(self.ids.inner_line_opacity_canvas)
         //
         //         .label(&format!("{}", renderer.crosshair.inner_line_opacity))
@@ -417,40 +414,38 @@ impl Scene for SettingsScene {
         //     renderer.crosshair.inner_line_opacity = value;
         // }
 
-        conrod_core::widget::Text::new("Inner line thickness")
+        Text::new("Inner line thickness")
             .font_id(ropa_font_id)
             .mid_top_of(self.ids.inner_line_thickness_canvas)
             .set(self.ids.inner_line_thickness_slider_label, &mut ui_cell);
 
-        for value in
-            conrod_core::widget::Slider::new(renderer.crosshair.inner_line_thickness, 0f32, 100f32)
-                .mid_bottom_of(self.ids.inner_line_thickness_canvas)
-                .label(&format!(
-                    "{}",
-                    renderer.crosshair.inner_line_thickness as u8
-                ))
-                .wh(conrod_core::Dimensions::new(200.0, 30.0))
-                .set(self.ids.inner_line_thickness_slider, &mut ui_cell)
+        for value in Slider::new(renderer.crosshair.inner_line_thickness, 0f32, 100f32)
+            .mid_bottom_of(self.ids.inner_line_thickness_canvas)
+            .label(&format!(
+                "{}",
+                renderer.crosshair.inner_line_thickness as u8
+            ))
+            .wh(conrod_core::Dimensions::new(200.0, 30.0))
+            .set(self.ids.inner_line_thickness_slider, &mut ui_cell)
         {
             renderer.crosshair.inner_line_thickness = value.round();
         }
 
-        conrod_core::widget::Text::new("Inner line offset")
+        Text::new("Inner line offset")
             .font_id(ropa_font_id)
             .mid_top_of(self.ids.inner_line_offset_canvas)
             .set(self.ids.inner_line_offset_slider_label, &mut ui_cell);
 
-        for value in
-            conrod_core::widget::Slider::new(renderer.crosshair.inner_line_offset, 0f32, 100f32)
-                .mid_bottom_of(self.ids.inner_line_offset_canvas)
-                .label(&format!("{}", renderer.crosshair.inner_line_offset as u8))
-                .wh(conrod_core::Dimensions::new(200.0, 30.0))
-                .set(self.ids.inner_line_offset_slider, &mut ui_cell)
+        for value in Slider::new(renderer.crosshair.inner_line_offset, 0f32, 100f32)
+            .mid_bottom_of(self.ids.inner_line_offset_canvas)
+            .label(&format!("{}", renderer.crosshair.inner_line_offset as u8))
+            .wh(conrod_core::Dimensions::new(200.0, 30.0))
+            .set(self.ids.inner_line_offset_slider, &mut ui_cell)
         {
             renderer.crosshair.inner_line_offset = value.round();
         }
 
-        conrod_core::widget::Text::new("Outer line enabled")
+        Text::new("Outer line enabled")
             .font_id(ropa_font_id)
             .mid_top_of(self.ids.outer_line_enable_canvas)
             .set(self.ids.outer_line_enable_label, &mut ui_cell);
@@ -463,13 +458,13 @@ impl Scene for SettingsScene {
             renderer.crosshair.outer_line_enabled = value;
         }
 
-        // conrod_core::widget::Text::new("Outer line opacity")
+        // Text::new("Outer line opacity")
         //     .font_id(ropa_font_id)
         //     .mid_top_of(self.ids.outer_line_opacity_canvas)
         //     .set(self.ids.outer_line_opacity_slider_label, &mut ui_cell);
         //
         // for value in
-        //     conrod_core::widget::Slider::new(renderer.crosshair.outer_line_opacity, 0f32, 1f32)
+        //     Slider::new(renderer.crosshair.outer_line_opacity, 0f32, 1f32)
         //         .mid_bottom_of(self.ids.outer_line_opacity_canvas)
         //
         //         .label(&format!("{}", renderer.crosshair.outer_line_opacity))
@@ -479,47 +474,45 @@ impl Scene for SettingsScene {
         //     renderer.crosshair.outer_line_opacity = value;
         // }
 
-        conrod_core::widget::Text::new("Outer line thickness")
+        Text::new("Outer line thickness")
             .font_id(ropa_font_id)
             .mid_top_of(self.ids.outer_line_thickness_canvas)
             .set(self.ids.outer_line_thickness_slider_label, &mut ui_cell);
 
-        for value in
-            conrod_core::widget::Slider::new(renderer.crosshair.outer_line_thickness, 0f32, 100f32)
-                .mid_bottom_of(self.ids.outer_line_thickness_canvas)
-                .label(&format!(
-                    "{}",
-                    renderer.crosshair.outer_line_thickness as u8
-                ))
-                .wh(conrod_core::Dimensions::new(200.0, 30.0))
-                .set(self.ids.outer_line_thickness_slider, &mut ui_cell)
+        for value in Slider::new(renderer.crosshair.outer_line_thickness, 0f32, 100f32)
+            .mid_bottom_of(self.ids.outer_line_thickness_canvas)
+            .label(&format!(
+                "{}",
+                renderer.crosshair.outer_line_thickness as u8
+            ))
+            .wh(conrod_core::Dimensions::new(200.0, 30.0))
+            .set(self.ids.outer_line_thickness_slider, &mut ui_cell)
         {
             renderer.crosshair.outer_line_thickness = value.round();
         }
 
-        conrod_core::widget::Text::new("Outer line offset")
+        Text::new("Outer line offset")
             .font_id(ropa_font_id)
             .mid_top_of(self.ids.outer_line_offset_canvas)
             .set(self.ids.outer_line_offset_slider_label, &mut ui_cell);
 
-        for value in
-            conrod_core::widget::Slider::new(renderer.crosshair.outer_line_offset, 0f32, 100f32)
-                .mid_bottom_of(self.ids.outer_line_offset_canvas)
-                .label(&format!("{}", renderer.crosshair.outer_line_offset as u8))
-                .wh(conrod_core::Dimensions::new(200.0, 30.0))
-                .set(self.ids.outer_line_offset_slider, &mut ui_cell)
+        for value in Slider::new(renderer.crosshair.outer_line_offset, 0f32, 100f32)
+            .mid_bottom_of(self.ids.outer_line_offset_canvas)
+            .label(&format!("{}", renderer.crosshair.outer_line_offset as u8))
+            .wh(conrod_core::Dimensions::new(200.0, 30.0))
+            .set(self.ids.outer_line_offset_slider, &mut ui_cell)
         {
             renderer.crosshair.outer_line_offset = value.round();
         }
 
-        conrod_core::widget::Text::new("Red color")
+        Text::new("Red color")
             .font_id(ropa_font_id)
             .padded_w_of(self.ids.crosshair_color_r_canvas, MARGIN)
             .center_justify()
             .mid_top_of(self.ids.crosshair_color_r_canvas)
             .set(self.ids.crosshair_color_r_label, &mut ui_cell);
 
-        for value in conrod_core::widget::Slider::new(renderer.crosshair.color.x, 0f32, 1f32)
+        for value in Slider::new(renderer.crosshair.color.x, 0f32, 1f32)
             .mid_bottom_of(self.ids.crosshair_color_r_canvas)
             .padded_w_of(self.ids.crosshair_color_r_canvas, MARGIN)
             .label(&format!("{:.3}", renderer.crosshair.color.x))
@@ -529,14 +522,14 @@ impl Scene for SettingsScene {
             renderer.crosshair.color.x = value;
         }
 
-        conrod_core::widget::Text::new("Green color")
+        Text::new("Green color")
             .font_id(ropa_font_id)
             .padded_w_of(self.ids.crosshair_color_r_canvas, MARGIN)
             .center_justify()
             .mid_top_of(self.ids.crosshair_color_g_canvas)
             .set(self.ids.crosshair_color_g_label, &mut ui_cell);
 
-        for value in conrod_core::widget::Slider::new(renderer.crosshair.color.y, 0f32, 1f32)
+        for value in Slider::new(renderer.crosshair.color.y, 0f32, 1f32)
             .mid_bottom_of(self.ids.crosshair_color_g_canvas)
             .padded_w_of(self.ids.crosshair_color_r_canvas, MARGIN)
             .label(&format!("{:.3}", renderer.crosshair.color.y))
@@ -546,14 +539,14 @@ impl Scene for SettingsScene {
             renderer.crosshair.color.y = value;
         }
 
-        conrod_core::widget::Text::new("Blue color")
+        Text::new("Blue color")
             .font_id(ropa_font_id)
             .padded_w_of(self.ids.crosshair_color_r_canvas, MARGIN)
             .center_justify()
             .mid_top_of(self.ids.crosshair_color_b_canvas)
             .set(self.ids.crosshair_color_b_label, &mut ui_cell);
 
-        for value in conrod_core::widget::Slider::new(renderer.crosshair.color.z, 0f32, 1f32)
+        for value in Slider::new(renderer.crosshair.color.z, 0f32, 1f32)
             .mid_bottom_of(self.ids.crosshair_color_b_canvas)
             .padded_w_of(self.ids.crosshair_color_r_canvas, MARGIN)
             .label(&format!("{:.3}", renderer.crosshair.color.z))

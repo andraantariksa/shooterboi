@@ -35,17 +35,19 @@ layout(std140, binding = 0) uniform rendering_info {
 
 #ifdef IS_WEB
 layout(std140, binding = 1) uniform render_queue {
+    RenderQueue queue[60];
+};
 #else
 layout(std430, binding = 1) readonly buffer render_queue {
-    #endif
-    RenderQueue queue[70];
+    RenderQueue queue[130];
 };
+#endif
 
 #define MATERIAL_GREEN 0
 #define MATERIAL_YELLOW 1
 #define MATERIAL_WHITE 2
 #define MATERIAL_BLACK 3
-#define MATERIAL_CHECKER 4
+//#define MATERIAL_CHECKER 4
 #define MATERIAL_RED 5
 #define MATERIAL_ORANGE 6
 #define MATERIAL_CRATE 7
@@ -64,7 +66,7 @@ layout(std430, binding = 1) readonly buffer render_queue {
 #define MATERIAL_ASPHALT 20
 
 layout(binding = 2) uniform sampler common_sampler;
-layout(binding = 3) uniform texture2D checker_texture;
+//layout(binding = 3) uniform texture2D checker_texture;
 layout(binding = 4) uniform texture3D noise_vol_gray_texture;
 layout(binding = 5) uniform texture2D crate_texture;
 layout(binding = 6) uniform texture2D pebbles_texture;
@@ -123,6 +125,28 @@ Distance ray_march(vec3 ray_origin, vec3 ray_dir) {
     vec3 current_pos = vec3(0);
 
     for (uint i = 0u; i < queuecount_raymarchmaxstep_aostep_background_type.y; i++) {
+        current_pos = ray_origin + d * ray_dir;
+        Distance closest_distance = scene_dist(current_pos);
+
+        if (abs(closest_distance.distance) < EPS || d >= MAX_DISTANCE) {
+            break;
+        }
+
+        d += closest_distance.distance;
+        mat_id = closest_distance.materialId;
+        idx = closest_distance.idx;
+    }
+
+    return Distance(d, mat_id, idx);
+}
+
+Distance ray_march_20(vec3 ray_origin, vec3 ray_dir) {
+    float d = 0.0;
+    uint mat_id = 0;
+    uint idx = 0;
+    vec3 current_pos = vec3(0);
+
+    for (uint i = 0u; i < 20; i++) {
         current_pos = ray_origin + d * ray_dir;
         Distance closest_distance = scene_dist(current_pos);
 

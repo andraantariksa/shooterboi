@@ -10,7 +10,7 @@ use crate::camera::Camera;
 use crate::gui::ConrodHandle;
 use crate::renderer::crosshair::Crosshair;
 use crate::renderer::rendering_info::RenderingInfo;
-use crate::util::any_sized_as_u8_slice;
+use crate::util::{any_sized_as_u8_slice, any_slice_as_u8_slice};
 
 pub mod conrod_renderer;
 pub mod crosshair;
@@ -135,7 +135,7 @@ impl Renderer {
         conrod_handle: &mut ConrodHandle,
     ) -> Result<(), wgpu::SurfaceError> {
         if self.is_render_game {
-            let (objects, objects_len) = self
+            let objects = self
                 .render_objects
                 .get_objects_and_active_len(&self.camera.get_frustum());
             self.rendering_info.fov_shootanim.x = self.camera.fov;
@@ -144,7 +144,7 @@ impl Renderer {
             self.rendering_info.reso_time.x = self.surface_and_window_config.surface.width as f32;
             self.rendering_info.reso_time.y = self.surface_and_window_config.surface.height as f32;
             self.rendering_info.reso_time.z = app_run_time;
-            self.rendering_info.queuecount_raymarchmaxstep_aostep.x = objects_len as u32;
+            self.rendering_info.queuecount_raymarchmaxstep_aostep.x = objects.len() as u32;
             self.queue.write_buffer(
                 &self.game_renderer.rendering_info_buffer,
                 0,
@@ -153,7 +153,7 @@ impl Renderer {
             self.queue.write_buffer(
                 &self.game_renderer.render_objects_buffer,
                 0,
-                any_sized_as_u8_slice(&objects),
+                any_slice_as_u8_slice(objects.as_slice()),
             );
         }
 

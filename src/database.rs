@@ -1,12 +1,11 @@
 use crate::audio::AudioContext;
-use crate::renderer::Renderer;
-use crate::scene::classic_score_scene::ClassicGameScoreDisplay;
-use chrono::NaiveDateTime;
 
-use crate::database::GameModeScores::Classic;
-use crate::scene::elimination_score_scene::EliminationGameScoreDisplay;
-use crate::scene::hit_and_dodge_score_scene::HitAndDodgeGameScoreDisplay;
+use crate::renderer::Renderer;
+use crate::scene::game_score_scene::{
+    ClassicGameScoreDisplay, EliminationGameScoreDisplay, HitAndDodgeGameScoreDisplay,
+};
 use crate::scene::{GameDifficulty, GameMode};
+
 use core::default::Default;
 use gluesql::data::Value;
 #[cfg(target_arch = "wasm32")]
@@ -94,6 +93,7 @@ impl GameModeScores {
                                             _ => unreachable!(),
                                         };
                                     }
+                                    "difficulty" => {}
                                     _ => unreachable!(),
                                 }
                             }
@@ -107,7 +107,7 @@ impl GameModeScores {
             GameMode::Elimination => {
                 let output = database
                     .glue
-                    .execute(&format!("SELECT * FROM hit_and_dodge_game_score WHERE difficulty = {} ORDER BY created_at DESC", difficulty as u8))
+                    .execute(&format!("SELECT * FROM elimination_game_score WHERE difficulty = {} ORDER BY created_at DESC", difficulty as u8))
                     .unwrap();
                 let mut score_rows = Vec::new();
                 match output {
@@ -164,6 +164,7 @@ impl GameModeScores {
                                             _ => unreachable!(),
                                         };
                                     }
+                                    "difficulty" => {}
                                     _ => unreachable!(),
                                 }
                             }
@@ -214,6 +215,13 @@ impl GameModeScores {
                                         }
                                             as i32;
                                     }
+                                    "hit_taken" => {
+                                        classic_score.score = match row[idx] {
+                                            Value::I64(x) => x,
+                                            _ => unreachable!(),
+                                        }
+                                            as i32;
+                                    }
                                     "avg_hit_time" => {
                                         classic_score.avg_hit_time = match row[idx] {
                                             Value::F64(x) => x,
@@ -227,6 +235,7 @@ impl GameModeScores {
                                             _ => unreachable!(),
                                         };
                                     }
+                                    "difficulty" => {}
                                     _ => unreachable!(),
                                 }
                             }
@@ -319,6 +328,7 @@ impl Database {
     miss INTEGER NOT NULL,
     score INTEGER NOT NULL,
     avg_hit_time FLOAT NOT NULL,
+    hit_taken INTEGER NOT NULL,
     created_at TIMESTAMP NOT NULL,
 )",
             )

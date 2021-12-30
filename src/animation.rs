@@ -1,12 +1,13 @@
+use crate::timer::Timer;
+
 #[derive(Clone)]
 pub enum InOutAnimationState {
     Stopped,
-    Foward,
-    Backward,
+    Foward(Timer),
+    Backward(Timer),
 }
 
 pub struct InOutAnimation {
-    value: f32,
     sec_to_forward: f32,
     sec_to_backward: f32,
     state: InOutAnimationState,
@@ -15,7 +16,6 @@ pub struct InOutAnimation {
 impl InOutAnimation {
     pub fn new(sec_to_forward: f32, sec_to_backward: f32) -> Self {
         Self {
-            value: 0.0,
             sec_to_forward,
             sec_to_backward,
             state: InOutAnimationState::Stopped,
@@ -24,30 +24,31 @@ impl InOutAnimation {
 
     pub fn new_started(sec_to_forward: f32, sec_to_backward: f32) -> Self {
         Self {
-            value: 0.0,
             sec_to_forward,
             sec_to_backward,
-            state: InOutAnimationState::Foward,
+            state: InOutAnimationState::Foward(Timer::new(sec_to_forward)),
         }
     }
 
     pub fn trigger(&mut self) {
-        self.state = InOutAnimationState::Foward;
+        self.state = InOutAnimationState::Foward(Timer::new(self.sec_to_forward));
     }
 
     pub fn update(&mut self, delta_time: f32) {
-        match self.state {
-            InOutAnimationState::Foward => {
-                self.value += delta_time * (100.0 / self.sec_to_forward);
-                if self.value >= 1.0 {
-                    self.value -= self.value % 1.0;
-                    self.state = InOutAnimationState::Backward;
+        match &mut self.state {
+            InOutAnimationState::Foward(timer) => {
+                let duration_left = timer.get_duration();
+                if delta_time > duration_left {
+                    self.state = InOutAnimationState::Backward(Timer::new(
+                        self.sec_to_backward + delta_time - duration_left,
+                    ));
+                    return;
                 }
+                timer.update(delta_time);
             }
-            InOutAnimationState::Backward => {
-                self.value -= delta_time * (100.0 / self.sec_to_backward);
-                if self.value < 0.0 {
-                    self.value = 0.0;
+            InOutAnimationState::Backward(timer) => {
+                timer.update(delta_time);
+                if timer.is_finished() {
                     self.state = InOutAnimationState::Stopped;
                 }
             }
@@ -56,7 +57,11 @@ impl InOutAnimation {
     }
 
     pub fn get_value(&self) -> f32 {
-        self.value
+        match &self.state {
+            InOutAnimationState::Stopped => 0.0,
+            InOutAnimationState::Foward(timer) => 1.0 - timer.get_duration() / self.sec_to_forward,
+            InOutAnimationState::Backward(timer) => timer.get_duration() / self.sec_to_backward,
+        }
     }
 
     pub fn get_state(&self) -> InOutAnimationState {

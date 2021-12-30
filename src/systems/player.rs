@@ -7,6 +7,7 @@ pub fn setup_player_collider(physics: &mut GamePhysics, position: Vector3<f32>) 
     let player_rigid_body_handle = physics.rigid_body_set.insert(
         RigidBodyBuilder::new(RigidBodyType::Dynamic)
             .translation(position)
+            .user_data(u128::MAX)
             .lock_rotations()
             .build(),
     );
@@ -16,6 +17,7 @@ pub fn setup_player_collider(physics: &mut GamePhysics, position: Vector3<f32>) 
             Point3::<f32>::new(0.0, 0.5, 0.0),
             0.5,
         ))
+        .user_data(u128::MAX)
         .build(),
         player_rigid_body_handle,
         &mut physics.rigid_body_set,

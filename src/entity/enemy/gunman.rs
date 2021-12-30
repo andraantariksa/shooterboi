@@ -1,13 +1,13 @@
 use crate::animation::{InOutAnimation, InOutAnimationState};
-use hecs::World;
 
 use crate::renderer::render_objects::MaterialType;
 
 use crate::entity::enemy::{HITTED_MATERIAL_DURATION, ROTATION_SPEED};
 use crate::entity::HasMaterial;
-use crate::physics::GamePhysics;
+
+use crate::scene::{IN_SHOOT_ANIM_DURATION, OUT_SHOOT_ANIM_DURATION};
 use crate::timer::Timer;
-use nalgebra::{Unit, Vector2, Vector3};
+use nalgebra::{Rotation3, Unit, Vector2, Vector3};
 use rand::distributions::Uniform;
 use rand::prelude::*;
 
@@ -43,7 +43,7 @@ pub enum EnemyMaterialState {
 
 pub struct Gunman {
     shoot_state: ShootState,
-    rotation: f32,
+    rotation_y: f32,
     dir: Vector3<f32>,
     material_state: EnemyMaterialState,
     next_dest: Vector2<f32>,
@@ -53,7 +53,7 @@ impl Gunman {
     pub fn new(rng: &mut SmallRng) -> Self {
         Self {
             shoot_state: ShootState::Idle(Timer::new(0.5)),
-            rotation: 0.0,
+            rotation_y: 0.0,
             dir: Vector3::new(0.0, 1.0, 0.0),
             material_state: EnemyMaterialState::None,
             next_dest: Vector2::new(
@@ -119,11 +119,9 @@ impl Gunman {
                 }
 
                 if is_moving {
-                    self.rotation = self.dir.x.atan2(self.dir.z);
-                } else {
-                    if timer.is_finished() {
-                        self.shoot_state = ShootState::Focus(Timer::new(0.5));
-                    }
+                    self.rotation_y = self.dir.x.atan2(self.dir.z);
+                } else if timer.is_finished() {
+                    self.shoot_state = ShootState::Focus(Timer::new(0.5));
                 }
             }
             ShootState::Focus(ref mut timer) => {
@@ -133,7 +131,10 @@ impl Gunman {
                         dir: self.dir,
                         pos: *obj_pos,
                     };
-                    self.shoot_state = ShootState::Shoot(InOutAnimation::new_started(3.0, 5.0));
+                    self.shoot_state = ShootState::Shoot(InOutAnimation::new_started(
+                        IN_SHOOT_ANIM_DURATION,
+                        OUT_SHOOT_ANIM_DURATION,
+                    ));
                 }
             }
             ShootState::Shoot(ref mut anim) => {
@@ -154,8 +155,8 @@ impl Gunman {
         self.dir
     }
 
-    pub fn get_rotation(&self) -> f32 {
-        self.rotation
+    pub fn get_rotation(&self) -> Vector3<f32> {
+        Vector3::new(0.0, self.rotation_y, 0.0)
     }
 
     pub fn shootanim(&self) -> f32 {

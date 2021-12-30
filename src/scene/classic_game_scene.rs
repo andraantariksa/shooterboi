@@ -1,10 +1,10 @@
-use conrod_core::{Color, Colorable, Dimensions, Positionable, Sizeable, Widget};
-use std::collections::HashMap;
+use conrod_core::{color, Color, Colorable, Positionable, Sizeable, Widget};
 
+use chrono::Utc;
 use std::io::{BufReader, Cursor};
 
 use hecs::{Entity, World};
-use instant::Instant;
+
 use rapier3d::prelude::*;
 use winit::event::{MouseButton, VirtualKeyCode};
 use winit::event_loop::ControlFlow;
@@ -13,9 +13,8 @@ use crate::animation::InOutAnimation;
 use crate::audio::{AudioContext, AUDIO_FILE_SHOOT};
 use crate::audio::{Sink, AUDIO_FILE_SHOOTED};
 use crate::database::Database;
-use crate::entity::target::Target;
+use crate::entity::target::{Patrol, Target, Validity};
 
-use crate::frustum::ObjectBound;
 use crate::gui::ConrodHandle;
 use crate::input_manager::InputManager;
 use crate::physics::GamePhysics;
@@ -23,16 +22,16 @@ use crate::physics::GamePhysics;
 use crate::renderer::render_objects::{MaterialType, ShapeType};
 use crate::renderer::rendering_info::BackgroundType;
 use crate::renderer::Renderer;
-use crate::scene::classic_score_scene::ClassicScoreScene;
+use crate::scene::game_score_scene::{ClassicGameScoreDisplay, GameModeScore, GameScoreScene};
 use crate::scene::pause_scene::PauseScene;
 use crate::scene::{
-    GameDifficulty, GameState, MaybeMessage, Message, Scene, SceneOp, FINISHING_DURATION,
-    MAX_RAYCAST_DISTANCE, PREPARE_DURATION,
+    GameDifficulty, GameState, MaybeMessage, Scene, SceneOp, FINISHING_DURATION,
+    IN_SHOOT_ANIM_DURATION, OUT_SHOOT_ANIM_DURATION, PREPARE_DURATION,
 };
 use crate::systems::container::{enqueue_container, spawn_container};
 use crate::systems::crate_box::{enqueue_crate, spawn_crate};
 use crate::systems::player::{init_player, setup_player_collider};
-use crate::systems::target::{enqueue_target, spawn_target};
+use crate::systems::target::{enqueue_target, spawn_target, update_target};
 use crate::systems::update_player_movement::update_player_position;
 use crate::systems::wall::{enqueue_wall, spawn_wall};
 use crate::timer::{Stopwatch, Timer};
@@ -41,8 +40,11 @@ use crate::window::Window;
 use conrod_core::widget::envelope_editor::EnvelopePoint;
 use conrod_core::widget::{Canvas, Text};
 use conrod_core::widget_ids;
-use gluesql::data::Value;
-use nalgebra::{Vector3, Vector4};
+
+use crate::camera::Camera;
+use crate::systems::shoot_ray::shoot_ray;
+use crate::systems::shootanim::shootanim;
+use nalgebra::Vector3;
 use rand::distributions::Uniform;
 use rand::prelude::SmallRng;
 use rand::{Rng, SeedableRng};
@@ -56,9 +58,16 @@ widget_ids! {
     pub struct ClassicGameSceneIds {
         // The main canvas
         canvas,
-        canvas_duration,
+        start_duration_label,
+
+        indicator_canvas,
+
+        duration_canvas,
         duration_label,
-        start_duration_label
+        score_canvas,
+        score_label,
+        accuracy_canvas,
+        accuracy_label,
     }
 }
 
@@ -66,7 +75,7 @@ pub struct Score {
     pub hit: u16,
     pub miss: u16,
     pub score: i32,
-    pub total_shoot_time: f32,
+    pub hit_fake_target: u16,
 }
 
 impl Score {
@@ -75,20 +84,12 @@ impl Score {
             hit: 0,
             miss: 0,
             score: 0,
-            total_shoot_time: 0.0,
+            hit_fake_target: 0,
         }
     }
-
-    pub fn write_message(&self, message: &mut Message) {
-        message.insert("hit", Value::I64(self.hit as i64));
-        message.insert("miss", Value::I64(self.miss as i64));
-        message.insert("score", Value::I64(self.score as i64));
-        message.insert(
-            "avg_hit_time",
-            Value::F64(self.total_shoot_time as f64 / self.hit.max(1) as f64),
-        );
-    }
 }
+
+pub const GAME_DURATION: f32 = 60.0;
 
 pub struct ClassicGameScene {
     ids: ClassicGameSceneIds,
@@ -103,7 +104,7 @@ pub struct ClassicGameScene {
     round_timer: Timer,
     shoot_animation: InOutAnimation,
     target_spawn_state: TargetSpawnState,
-    secondary_delete_duration: Timer,
+    secondary_delete_timer: Timer,
     entity_to_remove: Vec<Entity>,
     freeze: bool,
     difficulty: GameDifficulty,
@@ -130,7 +131,7 @@ impl ClassicGameScene {
             &mut world,
             &mut physics,
             Vector3::new(0.0, 3.0, -15.0),
-            Target::new(None, None),
+            Target::new(None, Patrol::None),
         );
 
         spawn_container(
@@ -190,6 +191,12 @@ impl ClassicGameScene {
             Vector3::new(0.99, 0.99, 0.99),
         );
 
+        let secondary_delete_duration = match difficulty {
+            GameDifficulty::Easy => 3.0,
+            GameDifficulty::Medium => 2.0,
+            GameDifficulty::Hard => 1.0,
+        };
+
         Self {
             world,
             physics,
@@ -201,10 +208,10 @@ impl ClassicGameScene {
             shoot_timer: Timer::new_finished(),
             target_spawn_state: TargetSpawnState::Primary,
             rng: SmallRng::from_entropy(),
-            shoot_animation: InOutAnimation::new(3.0, 5.0),
-            secondary_delete_duration: Timer::new(1.0),
+            shoot_animation: InOutAnimation::new(IN_SHOOT_ANIM_DURATION, OUT_SHOOT_ANIM_DURATION),
+            secondary_delete_timer: Timer::new(secondary_delete_duration),
             entity_to_remove: Vec::new(),
-            round_timer: Timer::new(100.0),
+            round_timer: Timer::new(GAME_DURATION),
             freeze: false,
             difficulty,
         }
@@ -226,11 +233,7 @@ impl Scene for ClassicGameScene {
 
         renderer.rendering_info.background_type = BackgroundType::Forest;
 
-        init_player(
-            &mut self.physics,
-            renderer,
-            self.player_rigid_body_handle.clone(),
-        );
+        init_player(&mut self.physics, renderer, self.player_rigid_body_handle);
 
         // Ground
         let (objects, ref mut bound) = renderer.render_objects.next_static();
@@ -282,17 +285,53 @@ impl Scene for ClassicGameScene {
             Canvas::new()
                 .color(Color::Rgba(1.0, 1.0, 1.0, 0.3))
                 .mid_top_of(self.ids.canvas)
-                .wh(Dimensions::new(100.0, 30.0))
-                .set(self.ids.canvas_duration, &mut ui_cell);
+                .flow_right(&[
+                    (
+                        self.ids.score_canvas,
+                        Canvas::new()
+                            .length_weight(0.3)
+                            .color(Color::Rgba(1.0, 1.0, 1.0, 0.2)),
+                    ),
+                    (
+                        self.ids.duration_canvas,
+                        Canvas::new()
+                            .length_weight(0.4)
+                            .color(Color::Rgba(1.0, 1.0, 1.0, 0.4)),
+                    ),
+                    (
+                        self.ids.accuracy_canvas,
+                        Canvas::new()
+                            .length_weight(0.3)
+                            .color(Color::Rgba(1.0, 1.0, 1.0, 0.2)),
+                    ),
+                ])
+                .wh(conrod_core::Dimensions::new(200.0, 30.0))
+                .set(self.ids.indicator_canvas, &mut ui_cell);
 
             Text::new(&format!(
                 "{:02}:{:02}",
                 (round_timer_sec / 60.0) as i32,
                 (round_timer_sec % 60.0) as i32
             ))
-            .color(conrod_core::color::BLACK)
-            .middle_of(self.ids.canvas_duration)
+            .color(color::BLACK)
+            .middle_of(self.ids.duration_canvas)
             .set(self.ids.duration_label, &mut ui_cell);
+
+            let _w_duration_label = ui_cell.w_of(self.ids.duration_label).unwrap();
+
+            Text::new(&format!("{}", self.score.score))
+                .font_size(12)
+                .color(color::BLACK)
+                .middle_of(self.ids.score_canvas)
+                .set(self.ids.score_label, &mut ui_cell);
+            Text::new(&format!(
+                "{:.2}%",
+                (self.score.hit) as f32 / (self.score.hit + self.score.miss).max(1) as f32 * 100.0
+            ))
+            .font_size(12)
+            .color(color::BLACK)
+            .middle_of(self.ids.accuracy_canvas)
+            .set(self.ids.accuracy_label, &mut ui_cell);
         }
 
         let mut game_finished = false;
@@ -360,156 +399,22 @@ impl Scene for ClassicGameScene {
                 self.shoot_timer.update(delta_time);
                 self.delta_shoot_time.update(delta_time);
 
-                let mut missed = || {
-                    self.score.score -= 100;
-                    self.score.miss += 1;
-                };
-
-                let mut missed_secondary = false;
-                for (id, (target, collider_handle)) in
-                    self.world.query_mut::<(&mut Target, &ColliderHandle)>()
-                {
-                    if target.is_need_to_be_deleted(delta_time) {
-                        self.entity_to_remove.push(id);
-                        self.physics.collider_set.remove(
-                            *collider_handle,
-                            &mut self.physics.island_manager,
-                            &mut self.physics.rigid_body_set,
-                            false,
-                        );
-
-                        if !target.is_shooted() {
-                            missed_secondary = true;
-                        }
-                    }
-                }
-                for entity in self.entity_to_remove.iter() {
-                    self.world.despawn(*entity).unwrap();
-                }
-                self.entity_to_remove.clear();
-
-                if missed_secondary {
-                    self.target_spawn_state = match self.target_spawn_state {
-                        TargetSpawnState::Secondary => TargetSpawnState::Primary,
-                        _ => unreachable!(),
-                    };
-                    missed();
-                    spawn_target(
-                        &mut self.world,
-                        &mut self.physics,
-                        Vector3::new(0.0, 3.0, self.rng.sample(Uniform::new(-19.0, -13.0))),
-                        Target::new(None, None),
-                    );
-                }
-
-                self.shoot_animation.update(delta_time);
-                renderer.rendering_info.fov_shootanim.y = lerp(
-                    0.0f32,
-                    -20.0f32.to_radians(),
-                    self.shoot_animation.get_value(),
+                update_target(
+                    &mut self.world,
+                    &mut self.physics,
+                    delta_time,
+                    &mut self.rng,
                 );
 
-                if input_manager.is_mouse_press(&MouseButton::Left)
-                    && self.shoot_timer.is_finished()
-                {
-                    self.shoot_animation.trigger();
-                    self.shoot_timer.reset(0.4);
+                self.target_disposal();
 
-                    let sink = rodio::Sink::try_new(&audio_context.output_stream_handle).unwrap();
-                    sink.append(
-                        rodio::Decoder::new(BufReader::new(Cursor::new(AUDIO_FILE_SHOOT.to_vec())))
-                            .unwrap(),
-                    );
-                    audio_context.push(Sink::Regular(sink));
+                shootanim(
+                    &mut self.shoot_animation,
+                    &mut renderer.rendering_info,
+                    delta_time,
+                );
 
-                    let ray = Ray::new(
-                        nalgebra::Point::from(
-                            renderer.camera.position
-                                + renderer.camera.get_direction().into_inner() * 1.0,
-                        ),
-                        renderer.camera.get_direction().into_inner(),
-                    );
-                    if let Some((handle, _distance)) = self.physics.query_pipeline.cast_ray(
-                        &self.physics.collider_set,
-                        &ray,
-                        MAX_RAYCAST_DISTANCE,
-                        true,
-                        self.physics.interaction_groups,
-                        None,
-                    ) {
-                        let collider = self.physics.collider_set.get(handle).unwrap();
-                        let entity = Entity::from_bits(collider.user_data as u64);
-
-                        let mut need_to_spawn = false;
-                        if let Ok(mut target) = self.world.get_mut::<Target>(entity) {
-                            let sink =
-                                rodio::Sink::try_new(&audio_context.output_stream_handle).unwrap();
-                            sink.append(
-                                rodio::Decoder::new(BufReader::new(Cursor::new(
-                                    AUDIO_FILE_SHOOTED.to_vec(),
-                                )))
-                                .unwrap(),
-                            );
-                            audio_context.push(Sink::Regular(sink));
-
-                            if !target.is_shooted() {
-                                let shoot_time = self.delta_shoot_time.get_duration();
-                                self.delta_shoot_time.reset();
-
-                                self.score.total_shoot_time += shoot_time;
-
-                                need_to_spawn = true;
-                                target.shooted();
-
-                                self.target_spawn_state = match self.target_spawn_state {
-                                    TargetSpawnState::Primary => TargetSpawnState::Secondary,
-                                    TargetSpawnState::Secondary => TargetSpawnState::Primary,
-                                };
-
-                                self.score.score += ((300.0 * (3.0 - shoot_time)) as i32).max(0);
-                                self.score.hit += 1;
-                            } else {
-                                missed();
-                            }
-                        } else {
-                            missed();
-                        }
-
-                        if need_to_spawn {
-                            match self.target_spawn_state {
-                                TargetSpawnState::Primary => spawn_target(
-                                    &mut self.world,
-                                    &mut self.physics,
-                                    Vector3::new(
-                                        0.0,
-                                        3.0,
-                                        self.rng.sample(Uniform::new(-39.0, -15.0)),
-                                    ),
-                                    Target::new(None, None),
-                                ),
-                                TargetSpawnState::Secondary => {
-                                    let pos = nalgebra::Vector3::new(
-                                        self.rng.sample(Uniform::new(-13.0, 13.0)),
-                                        self.rng.sample(Uniform::new(1.0, 5.0)),
-                                        self.rng.sample(Uniform::new(-39.0, -18.0)),
-                                    );
-                                    spawn_target(
-                                        &mut self.world,
-                                        &mut self.physics,
-                                        pos,
-                                        Target::new_with_delete_duration(
-                                            self.secondary_delete_duration.clone(),
-                                            None,
-                                            None,
-                                        ),
-                                    );
-                                }
-                            }
-                        }
-                    } else {
-                        missed();
-                    }
-                }
+                self.shoot(input_manager, audio_context, &renderer.camera, delta_time);
 
                 if self.round_timer.is_finished() {
                     self.game_state = GameState::Finishing(Timer::new(FINISHING_DURATION));
@@ -532,13 +437,21 @@ impl Scene for ClassicGameScene {
         drop(ui_cell);
 
         if game_finished {
-            scene_op = SceneOp::Push(
-                Box::new(ClassicScoreScene::new(conrod_handle)),
-                Some({
-                    let mut m = HashMap::new();
-                    self.score.write_message(&mut m);
-                    m
-                }),
+            scene_op = SceneOp::Replace(
+                Box::new(GameScoreScene::new(
+                    conrod_handle,
+                    GameModeScore::Classic(ClassicGameScoreDisplay {
+                        accuracy: self.score.hit as f32 / (self.score.hit + self.score.miss) as f32
+                            * 100.0,
+                        hit: self.score.hit,
+                        miss: self.score.miss,
+                        score: self.score.score,
+                        avg_hit_time: GAME_DURATION / self.score.hit as f32,
+                        created_at: Utc::now().naive_utc(),
+                    }),
+                    self.difficulty,
+                )),
+                None,
             );
         }
 
@@ -579,5 +492,217 @@ impl Scene for ClassicGameScene {
         renderer.rendering_info.fov_shootanim.y = 0.0;
         renderer.render_objects.clear();
         window.set_is_cursor_grabbed(false);
+    }
+}
+
+impl ClassicGameScene {
+    fn shoot(
+        &mut self,
+        input_manager: &InputManager,
+        audio_context: &mut AudioContext,
+        camera: &Camera,
+        delta_time: f32,
+    ) {
+        if input_manager.is_mouse_press(&MouseButton::Left) && self.shoot_timer.is_finished() {
+            self.score.hit += 1;
+
+            self.shoot_animation.trigger();
+            self.shoot_timer.reset(0.4);
+
+            let sink = rodio::Sink::try_new(&audio_context.output_stream_handle).unwrap();
+            sink.append(
+                rodio::Decoder::new(BufReader::new(Cursor::new(AUDIO_FILE_SHOOT.to_vec())))
+                    .unwrap(),
+            );
+            audio_context.push(Sink::Regular(sink));
+
+            if let Some((handle, _distance)) = shoot_ray(&self.physics, camera) {
+                let collider = self.physics.collider_set.get(handle).unwrap();
+                let entity = Entity::from_bits(collider.user_data as u64);
+
+                let mut need_to_spawn = false;
+                if let Ok(mut target) = self.world.get_mut::<Target>(entity) {
+                    if target.try_shoot(audio_context) {
+                        let shoot_time = self.delta_shoot_time.get_duration();
+                        self.delta_shoot_time.reset();
+
+                        need_to_spawn = true;
+
+                        self.target_spawn_state = match self.target_spawn_state {
+                            TargetSpawnState::Primary => TargetSpawnState::Secondary,
+                            TargetSpawnState::Secondary => TargetSpawnState::Primary,
+                        };
+
+                        self.score.score += ((300.0 * (3.0 - shoot_time)) as i32).max(0);
+                        self.score.hit += 1;
+                    } else {
+                        // Hit fake target
+                        self.score.miss += 1;
+                    }
+                } else {
+                    // Hit other than target
+                    self.score.miss += 1;
+                }
+
+                if need_to_spawn {
+                    match self.target_spawn_state {
+                        TargetSpawnState::Primary => {
+                            self.spawn_primary();
+                        }
+                        TargetSpawnState::Secondary => {
+                            self.spawn_secondary();
+                        }
+                    };
+                }
+            } else {
+                self.score.miss += 1;
+            }
+        }
+    }
+
+    fn target_disposal(&mut self) {
+        let mut missed_secondary = false;
+        let mut fake_secondary = false;
+        for (id, (target, collider_handle)) in
+            self.world.query_mut::<(&mut Target, &ColliderHandle)>()
+        {
+            if target.is_need_to_be_deleted() {
+                self.entity_to_remove.push(id);
+                self.physics.collider_set.remove(
+                    *collider_handle,
+                    &mut self.physics.island_manager,
+                    &mut self.physics.rigid_body_set,
+                    false,
+                );
+
+                if !target.is_shooted() {
+                    if target.is_fake_target() {
+                        fake_secondary = true;
+                    }
+                    missed_secondary = true;
+                }
+            }
+        }
+        for entity in self.entity_to_remove.iter() {
+            self.world.despawn(*entity).unwrap();
+        }
+        self.entity_to_remove.clear();
+
+        if missed_secondary {
+            self.target_spawn_state = match self.target_spawn_state {
+                TargetSpawnState::Secondary => TargetSpawnState::Primary,
+                _ => unreachable!(),
+            };
+            if !fake_secondary {
+                self.score.miss += 1;
+            } else {
+                self.delta_shoot_time.reset();
+                self.score.score += 300;
+            }
+            self.spawn_primary();
+        }
+    }
+
+    fn spawn_primary(&mut self) {
+        match self.difficulty {
+            GameDifficulty::Easy => spawn_target(
+                &mut self.world,
+                &mut self.physics,
+                Vector3::new(0.0, 3.0, -15.0),
+                Target::new(None, Patrol::None),
+            ),
+            GameDifficulty::Medium => spawn_target(
+                &mut self.world,
+                &mut self.physics,
+                Vector3::new(0.0, 3.0, self.rng.sample(Uniform::new(-39.0, -15.0))),
+                Target::new(None, Patrol::None),
+            ),
+            GameDifficulty::Hard => spawn_target(
+                &mut self.world,
+                &mut self.physics,
+                Vector3::new(0.0, 3.0, self.rng.sample(Uniform::new(-39.0, -15.0))),
+                Target::new(None, Patrol::None),
+            ),
+        }
+    }
+
+    fn spawn_secondary(&mut self) {
+        match self.difficulty {
+            GameDifficulty::Easy => {
+                let pos = nalgebra::Vector3::new(
+                    self.rng.sample(Uniform::new(-7.0, 7.0)),
+                    self.rng.sample(Uniform::new(1.0, 5.0)),
+                    self.rng.sample(Uniform::new(-25.0, -18.0)),
+                );
+                spawn_target(
+                    &mut self.world,
+                    &mut self.physics,
+                    pos,
+                    Target::new_with_delete_duration(
+                        self.secondary_delete_timer.clone(),
+                        None,
+                        Patrol::None,
+                    ),
+                );
+            }
+            GameDifficulty::Medium => {
+                let pos = Vector3::new(
+                    self.rng.sample(Uniform::new(-10.0, 10.0)),
+                    self.rng.sample(Uniform::new(1.0, 5.0)),
+                    self.rng.sample(Uniform::new(-30.0, -18.0)),
+                );
+                // ~20% chance
+                let valid_random = self.rng.sample(Uniform::new(1, 100));
+                let validity = if valid_random % 10 == 0 {
+                    Some(Validity {
+                        valid_duration: 0.0,
+                        invalid_duration: 10.0,
+                    })
+                } else {
+                    None
+                };
+                spawn_target(
+                    &mut self.world,
+                    &mut self.physics,
+                    pos,
+                    Target::new_with_delete_duration(
+                        self.secondary_delete_timer.clone(),
+                        validity,
+                        Patrol::None,
+                    ),
+                );
+            }
+            GameDifficulty::Hard => {
+                let pos = nalgebra::Vector3::new(
+                    self.rng.sample(Uniform::new(-13.0, 13.0)),
+                    self.rng.sample(Uniform::new(2.0, 5.0)),
+                    self.rng.sample(Uniform::new(-35.0, -18.0)),
+                );
+                // ~10% chance
+                let valid_random = self.rng.sample(Uniform::new(0, 100));
+                let validity = if valid_random % 10 == 0 {
+                    Some(Validity {
+                        valid_duration: 0.0,
+                        invalid_duration: 100.0,
+                    })
+                } else {
+                    None
+                };
+                let mut b = pos.clone();
+                b.x = self.rng.sample(Uniform::new(-13.0, 13.0));
+                let patrol = Patrol::Linear { a: pos.clone(), b };
+
+                spawn_target(
+                    &mut self.world,
+                    &mut self.physics,
+                    pos,
+                    Target::new_with_delete_duration(
+                        self.secondary_delete_timer.clone(),
+                        validity,
+                        patrol,
+                    ),
+                );
+            }
+        };
     }
 }

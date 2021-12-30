@@ -72,10 +72,10 @@ impl GameSceneRenderer {
 
         let render_objects_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Rendering objects"),
-            contents: any_sized_as_u8_slice(
-                &render_objects
+            contents: any_slice_as_u8_slice(
+                render_objects
                     .get_objects_and_active_len(&camera.get_frustum())
-                    .0,
+                    .as_slice(),
             ),
             usage: if cfg!(target_arch = "wasm32") {
                 wgpu::BufferUsages::UNIFORM
@@ -92,16 +92,16 @@ impl GameSceneRenderer {
                 | wgpu::BufferUsages::VERTEX,
         });
 
-        let image = image::load_from_memory(include_bytes!("../../assets/images/checker.png"))
-            .unwrap()
-            .into_rgba8();
-        let ground_texture = device.create_texture_with_data(
-            queue,
-            &default_texture_descriptor("Ground texture", &image),
-            &image.into_raw()[..],
-        );
-        let ground_texture_view =
-            ground_texture.create_view(&default_texture_view_descriptor("Ground texture view"));
+        // let image = image::load_from_memory(include_bytes!("../../assets/images/checker.png"))
+        //     .unwrap()
+        //     .into_rgba8();
+        // let ground_texture = device.create_texture_with_data(
+        //     queue,
+        //     &default_texture_descriptor("Ground texture", &image),
+        //     &image.into_raw()[..],
+        // );
+        // let ground_texture_view =
+        //     ground_texture.create_view(&default_texture_view_descriptor("Ground texture view"));
 
         let noise_vol_gray_texture = device.create_texture_with_data(
             queue,
@@ -348,7 +348,7 @@ impl GameSceneRenderer {
                         },
                         visibility: wgpu::ShaderStages::FRAGMENT,
                     },
-                    default_texture_bind_group_layout_entry(3),
+                    // default_texture_bind_group_layout_entry(3),
                     wgpu::BindGroupLayoutEntry {
                         count: None,
                         binding: 4,
@@ -407,10 +407,10 @@ impl GameSceneRenderer {
                     binding: 2,
                     resource: wgpu::BindingResource::Sampler(&texture_sampler),
                 },
-                wgpu::BindGroupEntry {
-                    binding: 3,
-                    resource: wgpu::BindingResource::TextureView(&ground_texture_view),
-                },
+                // wgpu::BindGroupEntry {
+                //     binding: 3,
+                //     resource: wgpu::BindingResource::TextureView(&ground_texture_view),
+                // },
                 wgpu::BindGroupEntry {
                     binding: 4,
                     resource: wgpu::BindingResource::TextureView(&noise_vol_gray_texture_view),
@@ -634,7 +634,7 @@ impl GameSceneRenderer {
     }
 }
 
-fn default_texture_view_descriptor(label: &str) -> wgpu::TextureViewDescriptor {
+fn default_texture_view_descriptor(_label: &str) -> wgpu::TextureViewDescriptor {
     wgpu::TextureViewDescriptor::default()
     // {
     //     label: Some(label),

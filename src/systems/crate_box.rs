@@ -4,7 +4,7 @@ use crate::physics::GamePhysics;
 use crate::renderer::render_objects::{MaterialType, ShapeType};
 use crate::renderer::Renderer;
 use hecs::World;
-use nalgebra::Vector3;
+use nalgebra::{Matrix4, Vector3};
 use rapier3d::prelude::*;
 
 pub fn spawn_crate(
@@ -40,7 +40,7 @@ pub fn spawn_crate(
 }
 
 pub fn enqueue_crate(world: &mut World, physics: &mut GamePhysics, renderer: &mut Renderer) {
-    for (_id, (_crate, rb_handle, object_bound)) in
+    for (_id, (_crate, rb_handle, _object_bound)) in
         world.query_mut::<(&Crate, &RigidBodyHandle, &ObjectBound)>()
     {
         let rb = physics.rigid_body_set.get(*rb_handle).unwrap();
@@ -50,7 +50,7 @@ pub fn enqueue_crate(world: &mut World, physics: &mut GamePhysics, renderer: &mu
         objects.position = *rb.translation();
         objects.shape_type_material_ids.0 = ShapeType::Box;
         objects.shape_type_material_ids.1 = MaterialType::Crate;
-        objects.rotation = rb.rotation().to_homogeneous();
+        objects.rotation = rb.rotation().inverse().to_homogeneous();
 
         let shape = collider.shape().as_cuboid().unwrap();
         objects.shape_data1.x = shape.half_extents.x;

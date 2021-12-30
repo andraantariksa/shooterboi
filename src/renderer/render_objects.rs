@@ -19,7 +19,7 @@ pub enum MaterialType {
     Yellow = 1,
     White = 2,
     Black = 3,
-    Checker = 4,
+    // Checker = 4,
     Red = 5,
     Orange = 6,
     Crate = 7,
@@ -78,9 +78,15 @@ impl RenderQueueData {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
+pub const QUEUE_SIZE: usize = 130;
+#[cfg(target_arch = "wasm32")]
+pub const QUEUE_SIZE: usize = 60;
+
 pub struct RenderObjects {
     render_objects: Vec<(RenderQueueData, ObjectBound)>,
     render_objects_static: Vec<(RenderQueueData, ObjectBound)>,
+    resulted_objects: Vec<RenderQueueData>,
 }
 
 impl RenderObjects {
@@ -88,6 +94,7 @@ impl RenderObjects {
         Self {
             render_objects: Vec::new(),
             render_objects_static: Vec::new(),
+            resulted_objects: vec![RenderQueueData::new_none(); QUEUE_SIZE],
         }
     }
 
@@ -118,25 +125,31 @@ impl RenderObjects {
         self.render_objects_static.clear();
     }
 
-    pub fn get_objects_and_active_len(
-        &mut self,
-        frustum: &Frustum,
-    ) -> ([RenderQueueData; 70], usize) {
-        let mut resulted_objects = [RenderQueueData::new_none(); 70];
+    pub fn get_objects_and_active_len(&mut self, frustum: &Frustum) -> Vec<RenderQueueData> {
+        self.resulted_objects
+            .iter_mut()
+            .map(|x| RenderQueueData::new_none());
+
         let mut index = 0;
         for (object, bound) in self.render_objects_static.iter() {
+            if index >= QUEUE_SIZE {
+                break;
+            }
             if frustum.is_on_frustum(&object.position, bound) {
-                resulted_objects[index] = object.clone();
+                self.resulted_objects[index] = *object;
                 index += 1;
             }
         }
         for (object, bound) in self.render_objects.iter() {
+            if index >= QUEUE_SIZE {
+                break;
+            }
             if frustum.is_on_frustum(&object.position, bound) {
-                resulted_objects[index] = object.clone();
+                self.resulted_objects[index] = *object;
                 index += 1;
             }
         }
         self.render_objects.clear();
-        (resulted_objects, index)
+        self.resulted_objects.clone()
     }
 }

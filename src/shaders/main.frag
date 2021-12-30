@@ -344,7 +344,7 @@ Distance scene_dist(vec3 pos) {
     }
 
     for (uint i = 0u; i < queuecount_raymarchmaxstep_aostep_background_type.x; i++) {
-        vec3 pos_transformed = (vec4(pos - queue[i].position_scale.xyz, 1.) * queue[i].rotation).xyz;
+        vec3 pos_transformed = (queue[i].rotation * vec4(pos - queue[i].position_scale.xyz, 1.)).xyz;
         pos_transformed /= queue[i].position_scale.w;
 
         Distance d;
@@ -382,7 +382,7 @@ Distance scene_dist(vec3 pos) {
             case SHAPE_TYPE_GUNMAN:
             {
                 d = sd_gunman(
-                        pos_transformed * rot_y(queue[i].shape_data1.y),
+                        pos_transformed,
                         queue[i].shape_data1.x,
                         queue[i].shape_type_materials_id.y,
                         queue[i].shape_type_materials_id.z,
@@ -392,8 +392,8 @@ Distance scene_dist(vec3 pos) {
             case SHAPE_TYPE_SWORDMAN:
             {
                 d = sd_swordman(
-                        pos_transformed * rot_y(queue[i].shape_data2.y),
-                        queue[i].shape_data2.x,
+                        pos_transformed,
+                        queue[i].shape_data1.x,
                         queue[i].shape_type_materials_id.y,
                         queue[i].shape_type_materials_id.z,
                         i);
@@ -405,7 +405,6 @@ Distance scene_dist(vec3 pos) {
         d.distance *= queue[i].position_scale.w;
         m = sd_union(m, d);
     }
-
     return m;
 }
 
@@ -449,9 +448,8 @@ vec3 building_material(vec3 p, vec3 n) {
 
 const vec3 fog_color = vec3(0.34, 0.37, 0.4);
 vec3 apply_fog(vec3 color, float dist) {
-    float startDist = MAX_DISTANCE * .8;
-    float fog_amount = 1.0 - exp(-(dist-8.0) * (1.0/startDist));
-    return mix(color, fog_color, fog_amount);
+    float dp = dist / MAX_DISTANCE;
+    return mix(color, fog_color, smoothstep(0., 1., dp));
 }
 
 const vec3 street_color = vec3(0.890, 0.937, 0.949);
@@ -464,7 +462,7 @@ vec3 apply_street_color(vec3 color, float y) {
 vec3 get_night_sky(vec3 dir) {
     float rand = textureLod(sampler2D(rgba_noise_medium, noise_sampler), dir.xz*.2, 0.).r;
     vec3 stars = pow(textureLod(sampler2D(gray_noise_small_texture, noise_sampler), 6.*dir.xz + .5, 0.).xxx,vec3(60.))*rand;
-    vec3 moon  = vec3(2.) * textureLod(sampler2D(gray_noise_small_texture, common_sampler), dir.xy*.5, 0.).xxx
+    vec3 moon  = vec3(2.) * textureLod(sampler2D(gray_noise_small_texture, noise_sampler), dir.xy*.5, 0.).xxx
         * (1. - step(max(pow(dot(dir,normalize(vec3(25.,25.,55.))),360.),0.), .7));
     return mix(fog_color, stars, smoothstep(-5., 1., dir.y)) + moon;
     //return vec3(rand);
@@ -483,14 +481,14 @@ vec3 color_mapping(vec3 ray_hit_pos, vec3 normal, Distance d)
         case MATERIAL_WHITE:
         col = vec3(1.);
         break;
-        case MATERIAL_CHECKER:
-        {
-            vec3 texture_xz = textureLod(sampler2D(checker_texture, common_sampler), ray_hit_pos.xz, 0.).rgb;
-            vec3 texture_xy = textureLod(sampler2D(checker_texture, common_sampler), ray_hit_pos.xy, 0.).rgb;
-            vec3 texture_yz = textureLod(sampler2D(checker_texture, common_sampler), ray_hit_pos.yz, 0.).rgb;
-            col = texture_yz * abs(normal.x) + texture_xy * abs(normal.z) + texture_xz * abs(normal.y);
-            break;
-        }
+//        case MATERIAL_CHECKER:
+//        {
+//            vec3 texture_xz = textureLod(sampler2D(checker_texture, common_sampler), ray_hit_pos.xz, 0.).rgb;
+//            vec3 texture_xy = textureLod(sampler2D(checker_texture, common_sampler), ray_hit_pos.xy, 0.).rgb;
+//            vec3 texture_yz = textureLod(sampler2D(checker_texture, common_sampler), ray_hit_pos.yz, 0.).rgb;
+//            col = texture_yz * abs(normal.x) + texture_xy * abs(normal.z) + texture_xz * abs(normal.y);
+//            break;
+//        }
         case MATERIAL_BLACK:
         col = vec3(0.);
         break;
@@ -609,28 +607,26 @@ void main()
     vec3 normal = get_normal(ray_hit_pos);
 
     vec3 color = vec3(0.);
-    if (d.distance > MAX_DISTANCE * 0.5 - EPS) {
-        if (dot(ray_world_dir, WORLD_UP) > 0.) {
-            switch (queuecount_raymarchmaxstep_aostep_background_type.w) {
-                case SCENE_FOREST:
-                {
-                    float h_f = SKY_HEIGHT / ray_world_dir.y;
-                    vec3 ray_hit_sky_pos = cam_pos + h_f * ray_world_dir;
-                    color = clouds(ray_hit_sky_pos);
-                    break;
-                }
-                case SCENE_CITY:
-                {
-                    color = get_night_sky(ray_world_dir);
-                    break;
-                }
-                default:
+    if (d.distance > MAX_DISTANCE - EPS) {
+        vec3 sky_color;
+        switch (queuecount_raymarchmaxstep_aostep_background_type.w) {
+            case SCENE_FOREST:
+            {
+                float h_f = SKY_HEIGHT / ray_world_dir.y;
+                vec3 ray_hit_sky_pos = cam_pos + h_f * ray_world_dir;
+                sky_color = clouds(ray_hit_sky_pos);
                 break;
             }
-            outColor = vec4(color, 1.);
-        } else {
-            outColor = vec4(FOG_COLOR, 1.);
+            case SCENE_CITY:
+            {
+                sky_color = get_night_sky(ray_world_dir);
+                break;
+            }
+            default:
+            break;
         }
+        color = mix(FOG_COLOR, sky_color, smoothstep(0., 1., ray_world_dir.y + .5));
+        outColor = vec4(color, 1.);
     } else {
         color = color_mapping(ray_hit_pos, normal, d);
         const vec3 ambient_light = SKYCOLOR * color * 0.3;

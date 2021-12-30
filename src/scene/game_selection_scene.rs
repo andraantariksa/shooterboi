@@ -14,7 +14,6 @@ use crate::renderer::Renderer;
 use crate::scene::classic_game_scene::ClassicGameScene;
 use crate::scene::elimination_game_scene::EliminationGameScene;
 use crate::scene::hit_and_dodge_scene::HitAndDodgeGameScene;
-use crate::scene::scores_scene::ScoresScene;
 
 use crate::scene::{
     GameDifficulty, MaybeMessage, Scene, SceneOp, Value, BUTTON_HEIGHT, BUTTON_WIDTH, MARGIN,
@@ -22,6 +21,8 @@ use crate::scene::{
 use crate::window::Window;
 use conrod_core::widget_ids;
 
+
+use crate::scene::score_history_scene::ScoreHistoryScene;
 use winit::event::VirtualKeyCode;
 
 use super::GAP_BETWEEN_ITEM;
@@ -315,7 +316,7 @@ impl Scene for GameSelectionScene {
 
         if score_button.was_clicked() {
             scene_op = SceneOp::Push(
-                Box::new(ScoresScene::new(renderer, conrod_handle)),
+                Box::new(ScoreHistoryScene::new(renderer, conrod_handle)),
                 Some({
                     let mut m = HashMap::new();
                     m.insert("mode", Value::I64(self.selected_game_mode_idx as i64));

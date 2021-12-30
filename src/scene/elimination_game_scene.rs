@@ -1,7 +1,7 @@
 use conrod_core::widget::envelope_editor::EnvelopePoint;
-use conrod_core::{Color, Colorable, Positionable, Sizeable, Widget};
-use std::collections::HashMap;
+use conrod_core::{color, Color, Colorable, Positionable, Sizeable, Widget};
 
+use chrono::Utc;
 use std::io::{BufReader, Cursor};
 
 use hecs::{Entity, World};
@@ -14,33 +14,35 @@ use crate::animation::InOutAnimation;
 use crate::audio::{AudioContext, AUDIO_FILE_SHOOT};
 use crate::audio::{Sink, AUDIO_FILE_SHOOTED};
 use crate::database::Database;
-use crate::frustum::ObjectBound;
+
 use crate::gui::ConrodHandle;
 use crate::input_manager::InputManager;
 use crate::physics::GamePhysics;
 use crate::renderer::render_objects::MaterialType;
 use crate::renderer::render_objects::ShapeType;
 use crate::renderer::Renderer;
-use crate::scene::classic_score_scene::ClassicScoreScene;
 use crate::scene::pause_scene::PauseScene;
 use crate::scene::{
-    GameDifficulty, GameState, MaybeMessage, Message, Scene, SceneOp, FINISHING_DURATION,
-    MAX_RAYCAST_DISTANCE, PREPARE_DURATION,
+    GameDifficulty, GameState, MaybeMessage, Scene, SceneOp, FINISHING_DURATION,
+    IN_SHOOT_ANIM_DURATION, OUT_SHOOT_ANIM_DURATION, PREPARE_DURATION,
 };
 use crate::timer::{Stopwatch, Timer};
 use crate::util::lerp;
 use crate::window::Window;
 use conrod_core::widget::{Canvas, Text};
 use conrod_core::widget_ids;
-use gluesql::data::Value;
 
-use crate::entity::target::Target;
-use crate::entity::Wall;
+use crate::entity::target::{Patrol, Target, Validity};
+
+use crate::camera::Camera;
 use crate::renderer::rendering_info::BackgroundType;
+use crate::scene::game_score_scene::{EliminationGameScoreDisplay, GameModeScore, GameScoreScene};
 use crate::systems::player::{init_player, setup_player_collider};
-use crate::systems::target::{enqueue_target, spawn_target};
+use crate::systems::shoot_ray::shoot_ray;
+use crate::systems::shootanim::shootanim;
+use crate::systems::target::{enqueue_target, is_any_target_exists, spawn_target, update_target};
 use crate::systems::update_player_movement::update_player_position;
-use crate::systems::wall::enqueue_wall;
+use crate::systems::wall::{enqueue_wall, spawn_wall};
 use nalgebra::Vector3;
 use rand::distributions::Uniform;
 use rand::prelude::SmallRng;
@@ -50,9 +52,16 @@ widget_ids! {
     pub struct EliminationGameSceneIds {
         // The main canvas
         canvas,
-        canvas_duration,
+        start_duration_label,
+
+        indicator_canvas,
+
+        duration_canvas,
         duration_label,
-        start_duration_label
+        score_canvas,
+        score_label,
+        accuracy_canvas,
+        accuracy_label,
     }
 }
 
@@ -60,7 +69,7 @@ pub struct Score {
     pub hit: u16,
     pub miss: u16,
     pub score: i32,
-    pub total_shoot_time: f32,
+    pub hit_fake_target: u16,
 }
 
 impl Score {
@@ -69,20 +78,12 @@ impl Score {
             hit: 0,
             miss: 0,
             score: 0,
-            total_shoot_time: 0.0,
+            hit_fake_target: 0,
         }
     }
-
-    pub fn write_message(&self, message: &mut Message) {
-        message.insert("hit", Value::I64(self.hit as i64));
-        message.insert("miss", Value::I64(self.miss as i64));
-        message.insert("score", Value::I64(self.score as i64));
-        message.insert(
-            "avg_hit_time",
-            Value::F64(self.total_shoot_time as f64 / self.hit.max(1) as f64),
-        );
-    }
 }
+
+pub const GAME_DURATION: f32 = 120.0;
 
 pub struct EliminationGameScene {
     ids: EliminationGameSceneIds,
@@ -117,9 +118,34 @@ impl EliminationGameScene {
                 .build(),
         );
         physics.collider_set.insert_with_parent(
-            ColliderBuilder::new(SharedShape::cuboid(3.0, 35.0, 3.0)).build(),
+            ColliderBuilder::new(SharedShape::cuboid(3.3, 35.0, 3.3)).build(),
             ground_rigid_body_handle,
             &mut physics.rigid_body_set,
+        );
+
+        spawn_wall(
+            &mut world,
+            &mut physics,
+            Vector3::new(0.0, 70.4, -3.0),
+            Vector3::new(3.3, 0.4, 0.3),
+        );
+        spawn_wall(
+            &mut world,
+            &mut physics,
+            Vector3::new(0.0, 70.4, 3.0),
+            Vector3::new(3.3, 0.4, 0.5),
+        );
+        spawn_wall(
+            &mut world,
+            &mut physics,
+            Vector3::new(-3.0, 70.4, 0.0),
+            Vector3::new(0.5, 0.4, 3.3),
+        );
+        spawn_wall(
+            &mut world,
+            &mut physics,
+            Vector3::new(3.0, 70.4, 0.0),
+            Vector3::new(0.5, 0.4, 3.3),
         );
 
         // Player
@@ -135,9 +161,9 @@ impl EliminationGameScene {
             delta_shoot_time: Stopwatch::new(),
             shoot_timer: Timer::new_finished(),
             rng: SmallRng::from_entropy(),
-            shoot_animation: InOutAnimation::new(3.0, 5.0),
+            shoot_animation: InOutAnimation::new(IN_SHOOT_ANIM_DURATION, OUT_SHOOT_ANIM_DURATION),
             freeze: false,
-            round_timer: Timer::new(100.0),
+            round_timer: Timer::new(GAME_DURATION),
             entity_to_remove: Vec::new(),
             game_state: GameState::Preround,
             difficulty,
@@ -160,17 +186,13 @@ impl Scene for EliminationGameScene {
 
         renderer.rendering_info.background_type = BackgroundType::City;
 
-        init_player(
-            &mut self.physics,
-            renderer,
-            self.player_rigid_body_handle.clone(),
-        );
+        init_player(&mut self.physics, renderer, self.player_rigid_body_handle);
 
         // Ground
         let (objects, ref mut bound) = renderer.render_objects.next_static();
         objects.position = nalgebra::Vector3::new(0.0, 35.0, 0.0);
         objects.shape_type_material_ids.0 = ShapeType::Box;
-        objects.shape_type_material_ids.1 = MaterialType::CobblestonePaving;
+        objects.shape_type_material_ids.1 = MaterialType::Asphalt;
         objects.shape_data1 = nalgebra::Vector4::new(3.0, 35.0, 3.0, 0.0);
         *bound = objects.get_bounding_sphere_radius();
 
@@ -209,17 +231,53 @@ impl Scene for EliminationGameScene {
             Canvas::new()
                 .color(Color::Rgba(1.0, 1.0, 1.0, 0.3))
                 .mid_top_of(self.ids.canvas)
-                .wh(conrod_core::Dimensions::new(100.0, 30.0))
-                .set(self.ids.canvas_duration, &mut ui_cell);
+                .flow_right(&[
+                    (
+                        self.ids.score_canvas,
+                        Canvas::new()
+                            .length_weight(0.3)
+                            .color(Color::Rgba(1.0, 1.0, 1.0, 0.2)),
+                    ),
+                    (
+                        self.ids.duration_canvas,
+                        Canvas::new()
+                            .length_weight(0.4)
+                            .color(Color::Rgba(1.0, 1.0, 1.0, 0.4)),
+                    ),
+                    (
+                        self.ids.accuracy_canvas,
+                        Canvas::new()
+                            .length_weight(0.3)
+                            .color(Color::Rgba(1.0, 1.0, 1.0, 0.2)),
+                    ),
+                ])
+                .wh(conrod_core::Dimensions::new(200.0, 30.0))
+                .set(self.ids.indicator_canvas, &mut ui_cell);
 
             Text::new(&format!(
                 "{:02}:{:02}",
                 (round_timer_sec / 60.0) as i32,
                 (round_timer_sec % 60.0) as i32
             ))
-            .rgba(1.0, 1.0, 1.0, 1.0)
-            .middle_of(self.ids.canvas_duration)
+            .color(color::BLACK)
+            .middle_of(self.ids.duration_canvas)
             .set(self.ids.duration_label, &mut ui_cell);
+
+            let _w_duration_label = ui_cell.w_of(self.ids.duration_label).unwrap();
+
+            Text::new(&format!("{}", self.score.score))
+                .font_size(12)
+                .color(color::BLACK)
+                .middle_of(self.ids.score_canvas)
+                .set(self.ids.score_label, &mut ui_cell);
+            Text::new(&format!(
+                "{:.2}%",
+                (self.score.hit) as f32 / (self.score.hit + self.score.miss).max(1) as f32 * 100.0
+            ))
+            .font_size(12)
+            .color(color::BLACK)
+            .middle_of(self.ids.accuracy_canvas)
+            .set(self.ids.accuracy_label, &mut ui_cell);
         }
 
         let mut game_finished = false;
@@ -278,24 +336,7 @@ impl Scene for EliminationGameScene {
 
                 if timer.is_finished() {
                     if !self.freeze {
-                        for y in 0..10 {
-                            for _ in 0..15 {
-                                let r = self.rng.sample(Uniform::new(8.0, 20.0));
-                                let angle = self.rng.sample(Uniform::new(
-                                    -std::f32::consts::PI,
-                                    std::f32::consts::PI,
-                                ));
-                                let pos =
-                                    Vector3::new(r * angle.cos(), (y + 71) as f32, r * angle.sin());
-
-                                spawn_target(
-                                    &mut self.world,
-                                    &mut self.physics,
-                                    pos,
-                                    Target::new(None, None),
-                                );
-                            }
-                        }
+                        self.init_targets();
                     }
                     self.freeze = false;
                     self.game_state = GameState::Round;
@@ -307,15 +348,17 @@ impl Scene for EliminationGameScene {
                 self.shoot_timer.update(delta_time);
                 self.delta_shoot_time.update(delta_time);
 
-                let mut missed = || {
-                    self.score.score -= 100;
-                    self.score.miss += 1;
-                };
+                update_target(
+                    &mut self.world,
+                    &mut self.physics,
+                    delta_time,
+                    &mut self.rng,
+                );
 
                 for (id, (target, collider_handle)) in
                     self.world.query_mut::<(&mut Target, &ColliderHandle)>()
                 {
-                    if target.is_need_to_be_deleted(delta_time) {
+                    if target.is_need_to_be_deleted() {
                         self.entity_to_remove.push(id);
                         self.physics.collider_set.remove(
                             *collider_handle,
@@ -330,77 +373,15 @@ impl Scene for EliminationGameScene {
                 }
                 self.entity_to_remove.clear();
 
-                self.shoot_animation.update(delta_time);
-                renderer.rendering_info.fov_shootanim.y = lerp(
-                    0.0f32,
-                    -20.0f32.to_radians(),
-                    self.shoot_animation.get_value(),
+                shootanim(
+                    &mut self.shoot_animation,
+                    &mut renderer.rendering_info,
+                    delta_time,
                 );
 
-                if input_manager.is_mouse_press(&MouseButton::Left)
-                    && self.shoot_timer.is_finished()
-                {
-                    self.shoot_animation.trigger();
-                    self.shoot_timer.reset(0.4);
+                self.shoot(&input_manager, audio_context, &renderer.camera, delta_time);
 
-                    let sink = rodio::Sink::try_new(&audio_context.output_stream_handle).unwrap();
-                    sink.append(
-                        rodio::Decoder::new(BufReader::new(Cursor::new(AUDIO_FILE_SHOOT.to_vec())))
-                            .unwrap(),
-                    );
-                    audio_context.push(Sink::Regular(sink));
-
-                    let ray = Ray::new(
-                        nalgebra::Point::from(
-                            renderer.camera.position
-                                + renderer.camera.get_direction().into_inner() * 1.0,
-                        ),
-                        renderer.camera.get_direction().into_inner(),
-                    );
-                    if let Some((handle, _distance)) = self.physics.query_pipeline.cast_ray(
-                        &self.physics.collider_set,
-                        &ray,
-                        MAX_RAYCAST_DISTANCE,
-                        true,
-                        self.physics.interaction_groups,
-                        None,
-                    ) {
-                        let collider = self.physics.collider_set.get(handle).unwrap();
-                        let entity = Entity::from_bits(collider.user_data as u64);
-
-                        if let Ok(mut target) = self.world.get_mut::<Target>(entity) {
-                            let sink =
-                                rodio::Sink::try_new(&audio_context.output_stream_handle).unwrap();
-                            sink.append(
-                                rodio::Decoder::new(BufReader::new(Cursor::new(
-                                    AUDIO_FILE_SHOOTED.to_vec(),
-                                )))
-                                .unwrap(),
-                            );
-                            audio_context.push(Sink::Regular(sink));
-
-                            if !target.is_shooted() {
-                                let shoot_time = self.delta_shoot_time.get_duration();
-                                self.delta_shoot_time.reset();
-
-                                self.score.total_shoot_time += shoot_time;
-
-                                target.shooted();
-
-                                self.score.score += ((300.0 * (3.0 - shoot_time)) as i32).max(0);
-                                self.score.hit += 1;
-                            } else {
-                                missed();
-                            }
-                        } else {
-                            missed();
-                        }
-                    } else {
-                        missed();
-                    }
-                }
-
-                if self.round_timer.is_finished() {
+                if self.round_timer.is_finished() || !is_any_target_exists(&mut self.world) {
                     self.game_state = GameState::Finishing(Timer::new(FINISHING_DURATION));
                 }
             }
@@ -421,13 +402,22 @@ impl Scene for EliminationGameScene {
         drop(ui_cell);
 
         if game_finished {
-            scene_op = SceneOp::Push(
-                Box::new(ClassicScoreScene::new(conrod_handle)),
-                Some({
-                    let mut m = HashMap::new();
-                    self.score.write_message(&mut m);
-                    m
-                }),
+            scene_op = SceneOp::Replace(
+                Box::new(GameScoreScene::new(
+                    conrod_handle,
+                    GameModeScore::Elimination(EliminationGameScoreDisplay {
+                        accuracy: self.score.hit as f32 / (self.score.hit + self.score.miss) as f32
+                            * 100.0,
+                        hit: self.score.hit,
+                        miss: self.score.miss,
+                        hit_fake_target: self.score.hit_fake_target,
+                        score: self.score.score,
+                        avg_hit_time: GAME_DURATION / self.score.hit as f32,
+                        created_at: Utc::now().naive_utc(),
+                    }),
+                    self.difficulty,
+                )),
+                None,
             );
         }
 
@@ -446,13 +436,13 @@ impl Scene for EliminationGameScene {
         _conrod_handle: &mut ConrodHandle,
         _audio_context: &mut AudioContext,
     ) {
-        enqueue_target(&mut self.world, &mut self.physics, renderer);
         enqueue_wall(
             &mut self.world,
             &mut self.physics,
             renderer,
-            MaterialType::Asphalt,
+            MaterialType::Black,
         );
+        enqueue_target(&mut self.world, &mut self.physics, renderer);
     }
 
     fn deinit(
@@ -466,5 +456,135 @@ impl Scene for EliminationGameScene {
         renderer.rendering_info.fov_shootanim.y = 0.0;
         renderer.render_objects.clear();
         window.set_is_cursor_grabbed(false);
+    }
+}
+
+impl EliminationGameScene {
+    fn init_targets(&mut self) {
+        let y_amount = match self.difficulty {
+            GameDifficulty::Easy => 8,
+            GameDifficulty::Medium => 9,
+            GameDifficulty::Hard => 10,
+        };
+        let x_amount = match self.difficulty {
+            GameDifficulty::Easy => 10,
+            GameDifficulty::Medium => 12,
+            GameDifficulty::Hard => 15,
+        };
+        for y in 0..y_amount {
+            for _ in 0..x_amount {
+                match self.difficulty {
+                    GameDifficulty::Easy => {
+                        let r = self.rng.sample(Uniform::new(8.0, 20.0));
+                        let angle = self
+                            .rng
+                            .sample(Uniform::new(-std::f32::consts::PI, std::f32::consts::PI));
+                        let pos = Vector3::new(r * angle.cos(), (y + 71) as f32, r * angle.sin());
+
+                        spawn_target(
+                            &mut self.world,
+                            &mut self.physics,
+                            pos,
+                            Target::new(None, Patrol::None),
+                        );
+                    }
+                    GameDifficulty::Medium => {
+                        let r = self.rng.sample(Uniform::new(8.0, 20.0));
+                        let angle = self
+                            .rng
+                            .sample(Uniform::new(-std::f32::consts::PI, std::f32::consts::PI));
+                        let pos = Vector3::new(r * angle.cos(), (y + 71) as f32, r * angle.sin());
+                        // 50
+                        let valid_random = self.rng.sample(Uniform::new(0, 100));
+                        let validity = if valid_random % 2 == 0 {
+                            Some(Validity {
+                                valid_duration: self.rng.sample(Uniform::new(4.0, 10.0)),
+                                invalid_duration: self.rng.sample(Uniform::new(2.0, 5.0)),
+                            })
+                        } else {
+                            None
+                        };
+
+                        spawn_target(
+                            &mut self.world,
+                            &mut self.physics,
+                            pos,
+                            Target::new(validity, Patrol::None),
+                        );
+                    }
+                    GameDifficulty::Hard => {
+                        let r = self.rng.sample(Uniform::new(8.0, 20.0));
+                        let angle = self
+                            .rng
+                            .sample(Uniform::new(-std::f32::consts::PI, std::f32::consts::PI));
+                        let angle2 = self
+                            .rng
+                            .sample(Uniform::new(-std::f32::consts::PI, std::f32::consts::PI));
+                        let pos = Vector3::new(r * angle.cos(), (y + 71) as f32, r * angle.sin());
+
+                        spawn_target(
+                            &mut self.world,
+                            &mut self.physics,
+                            pos,
+                            Target::new(
+                                None,
+                                Patrol::Polar {
+                                    or: Vector3::new(0.0, 0.0, 0.0),
+                                    r,
+                                    a: angle,
+                                    b: angle2,
+                                    c: angle,
+                                },
+                            ),
+                        );
+                    }
+                };
+            }
+        }
+    }
+
+    fn shoot(
+        &mut self,
+        input_manager: &InputManager,
+        audio_context: &mut AudioContext,
+        camera: &Camera,
+        delta_time: f32,
+    ) {
+        if input_manager.is_mouse_press(&MouseButton::Left) && self.shoot_timer.is_finished() {
+            self.score.hit += 1;
+
+            self.shoot_animation.trigger();
+            self.shoot_timer.reset(0.4);
+
+            let sink = rodio::Sink::try_new(&audio_context.output_stream_handle).unwrap();
+            sink.append(
+                rodio::Decoder::new(BufReader::new(Cursor::new(AUDIO_FILE_SHOOT.to_vec())))
+                    .unwrap(),
+            );
+            audio_context.push(Sink::Regular(sink));
+
+            if let Some((handle, _distance)) = shoot_ray(&self.physics, camera) {
+                let collider = self.physics.collider_set.get(handle).unwrap();
+                let entity = Entity::from_bits(collider.user_data as u64);
+
+                if let Ok(mut target) = self.world.get_mut::<Target>(entity) {
+                    if !target.try_shoot(audio_context) {
+                        let shoot_time = self.delta_shoot_time.get_duration();
+                        self.delta_shoot_time.reset();
+
+                        target.try_shoot(audio_context);
+
+                        self.score.score += ((100.0 * (3.0 - shoot_time)) as i32).max(0);
+                        self.score.hit += 1;
+                    } else {
+                        self.score.miss += 1;
+                    }
+                } else {
+                    self.score.miss += 1;
+                }
+            } else {
+                self.score.miss += 1;
+            }
+        }
     }
 }

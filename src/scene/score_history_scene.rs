@@ -13,8 +13,6 @@ use crate::gui::ConrodHandle;
 use crate::input_manager::InputManager;
 use crate::renderer::Renderer;
 
-use crate::scene::classic_score_scene::ClassicGameScoreDisplay;
-
 use crate::scene::{
     GameDifficulty, GameMode, MaybeMessage, Scene, SceneOp, Value, BUTTON_HEIGHT, BUTTON_WIDTH,
     GAP_BETWEEN_ITEM, MARGIN,
@@ -22,13 +20,10 @@ use crate::scene::{
 use crate::window::Window;
 use conrod_core::widget_ids;
 
-use crate::scene::elimination_score_scene::EliminationGameScoreDisplay;
-use crate::scene::hit_and_dodge_score_scene::HitAndDodgeGameScoreDisplay;
-use crate::Game;
 use winit::event::VirtualKeyCode;
 
 widget_ids! {
-    pub struct ScoresSceneIds {
+    pub struct ScoreHistorySceneIds {
         canvas,
 
         header_canvas,
@@ -48,17 +43,17 @@ widget_ids! {
     }
 }
 
-pub struct ScoresScene {
-    ids: ScoresSceneIds,
+pub struct ScoreHistoryScene {
+    ids: ScoreHistorySceneIds,
     scores: GameModeScores,
     mode_selection: Idx,
     difficulty_selection: Idx,
 }
 
-impl ScoresScene {
+impl ScoreHistoryScene {
     pub fn new(_renderer: &mut Renderer, conrod_handle: &mut ConrodHandle) -> Self {
         Self {
-            ids: ScoresSceneIds::new(conrod_handle.get_ui_mut().widget_id_generator()),
+            ids: ScoreHistorySceneIds::new(conrod_handle.get_ui_mut().widget_id_generator()),
             scores: Default::default(),
             mode_selection: 0,
             difficulty_selection: 0,
@@ -66,7 +61,7 @@ impl ScoresScene {
     }
 }
 
-impl Scene for ScoresScene {
+impl Scene for ScoreHistoryScene {
     fn init(
         &mut self,
         message: MaybeMessage,
@@ -92,6 +87,12 @@ impl Scene for ScoresScene {
                 }
                 _ => unreachable!(),
             }
+        } else {
+            self.scores = GameModeScores::read(
+                database,
+                GameMode::from(self.mode_selection),
+                GameDifficulty::from(self.difficulty_selection),
+            );
         }
     }
 
@@ -126,22 +127,28 @@ impl Scene for ScoresScene {
                 ])
                 .set(self.ids.canvas, &mut ui_cell);
 
+            let mut score_list = |s: usize| {
+                let (mut score_list_event, score_list_scrollbar) = List::flow_down(s)
+                    .wh_of(self.ids.body_canvas)
+                    .item_size(150.0)
+                    .scrollbar_color(conrod_core::color::RED)
+                    .scrollbar_next_to()
+                    .padded_w_of(self.ids.body_canvas, 10.0)
+                    .middle_of(self.ids.body_canvas)
+                    .set(self.ids.score_list, &mut ui_cell);
+                if let Some(s) = score_list_scrollbar {
+                    s.set(&mut ui_cell)
+                }
+                score_list_event
+            };
+
             match &self.scores {
                 GameModeScores::Classic(x) => {
-                    let (mut score_list_event, score_list_scrollbar) = List::flow_down(x.len())
-                        .wh_of(self.ids.body_canvas)
-                        .item_size(150.0)
-                        .scrollbar_color(conrod_core::color::RED)
-                        .scrollbar_next_to()
-                        .middle_of(self.ids.body_canvas)
-                        .set(self.ids.score_list, &mut ui_cell);
-                    if let Some(s) = score_list_scrollbar {
-                        s.set(&mut ui_cell)
-                    }
+                    let mut score_list_event = score_list(x.len());
                     while let Some(item) = score_list_event.next(&ui_cell) {
                         let y = &x[item.i];
                         let s = format!(
-                            "Score: {}\nAccuracy: {}\nHit: {}\nMiss: {}\nAverage hit time: {}\n{}",
+                            "Score: {}\nAccuracy: {}\nHit: {}\nMiss: {}\nAverage hit time\nFake target hit: {}\n{}",
                             y.score, y.accuracy, y.hit, y.miss, y.avg_hit_time, y.created_at
                         );
                         let text = Text::new(&s);
@@ -149,42 +156,24 @@ impl Scene for ScoresScene {
                     }
                 }
                 GameModeScores::Elimination(x) => {
-                    let (mut score_list_event, score_list_scrollbar) = List::flow_down(x.len())
-                        .wh_of(self.ids.body_canvas)
-                        .item_size(150.0)
-                        .scrollbar_color(conrod_core::color::RED)
-                        .scrollbar_next_to()
-                        .middle_of(self.ids.body_canvas)
-                        .set(self.ids.score_list, &mut ui_cell);
-                    if let Some(s) = score_list_scrollbar {
-                        s.set(&mut ui_cell)
-                    }
+                    let mut score_list_event = score_list(x.len());
                     while let Some(item) = score_list_event.next(&ui_cell) {
                         let y = &x[item.i];
                         let s = format!(
-                            "Score: {}\nAccuracy: {}\nHit: {}\nMiss: {}\nAverage hit time: {}\n{}",
-                            y.score, y.accuracy, y.hit, y.miss, y.avg_hit_time, y.created_at
+                            "Score: {}\nAccuracy: {}\nHit: {}\nMiss: {}\nAverage hit time: {}\nFake target hit: {}\n{}",
+                            y.score, y.accuracy, y.hit, y.miss, y.avg_hit_time, y.hit_fake_target, y.created_at
                         );
                         let text = Text::new(&s);
                         item.set(text, &mut ui_cell);
                     }
                 }
                 GameModeScores::HitAndDodge(x) => {
-                    let (mut score_list_event, score_list_scrollbar) = List::flow_down(x.len())
-                        .wh_of(self.ids.body_canvas)
-                        .item_size(150.0)
-                        .scrollbar_color(conrod_core::color::RED)
-                        .scrollbar_next_to()
-                        .middle_of(self.ids.body_canvas)
-                        .set(self.ids.score_list, &mut ui_cell);
-                    if let Some(s) = score_list_scrollbar {
-                        s.set(&mut ui_cell)
-                    }
+                    let mut score_list_event = score_list(x.len());
                     while let Some(item) = score_list_event.next(&ui_cell) {
                         let y = &x[item.i];
                         let s = format!(
-                            "Score: {}\nAccuracy: {}\nHit: {}\nMiss: {}\nAverage hit time: {}\n{}",
-                            y.score, y.accuracy, y.hit, y.miss, y.avg_hit_time, y.created_at
+                            "Score: {}\nAccuracy: {}\nHit: {}\nMiss: {}\nAverage hit time: {}\nHit taken: {}\n{}",
+                            y.score, y.accuracy, y.hit, y.miss, y.avg_hit_time, y.hit_taken, y.created_at
                         );
                         let text = Text::new(&s);
                         item.set(text, &mut ui_cell);
