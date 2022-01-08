@@ -7,7 +7,7 @@ use crate::entity::HasMaterial;
 
 use crate::scene::{IN_SHOOT_ANIM_DURATION, OUT_SHOOT_ANIM_DURATION};
 use crate::timer::Timer;
-use nalgebra::{Rotation3, Unit, Vector2, Vector3};
+use nalgebra::{distance, Point, Rotation3, Unit, Vector2, Vector3};
 use rand::distributions::Uniform;
 use rand::prelude::*;
 
@@ -47,18 +47,22 @@ pub struct Gunman {
     dir: Vector3<f32>,
     material_state: EnemyMaterialState,
     next_dest: Vector2<f32>,
+    focus_time: f32,
+    speed: f32,
 }
 
 impl Gunman {
-    pub fn new(rng: &mut SmallRng) -> Self {
+    pub fn new(rng: &mut SmallRng, focus_time: f32, speed: f32) -> Self {
         Self {
-            shoot_state: ShootState::Idle(Timer::new(0.5)),
+            speed,
+            focus_time,
+            shoot_state: ShootState::Idle(Timer::new(0.3)),
             rotation_y: 0.0,
             dir: Vector3::new(0.0, 1.0, 0.0),
             material_state: EnemyMaterialState::None,
             next_dest: Vector2::new(
-                rng.sample(Uniform::new(-13.0, 13.0)),
-                rng.sample(Uniform::new(-13.0, 13.0)),
+                rng.sample(Uniform::new(-8.0, 8.0)),
+                rng.sample(Uniform::new(-8.0, 8.0)),
             ),
         }
     }
@@ -81,14 +85,14 @@ impl Gunman {
         };
 
         let current_xz_pos = obj_pos.xz();
-        if current_xz_pos.relative_eq(&self.next_dest, f32::EPSILON, 0.5) {
+        if distance(&Point::from(self.next_dest), &Point::from(current_xz_pos)) <= 0.5 {
             self.next_dest = Vector2::new(
-                rng.sample(Uniform::new(-9.0, 9.0)),
-                rng.sample(Uniform::new(-9.0, 9.0)),
+                rng.sample(Uniform::new(-8.0, 8.0)),
+                rng.sample(Uniform::new(-8.0, 8.0)),
             );
         } else {
             let dir = Unit::new_normalize(self.next_dest - current_xz_pos);
-            let next_pos = dir.into_inner() * 3.0 * delta_time;
+            let next_pos = dir.into_inner() * self.speed * delta_time;
             obj_pos.x += next_pos.x;
             obj_pos.z += next_pos.y;
         }
@@ -106,22 +110,22 @@ impl Gunman {
                 // change much, so the normalized version of this vector is optional.
                 let delta_dir = Unit::new_normalize(*current_dir - self.dir);
 
-                let mut is_moving = false;
+                let mut is_rotating = false;
 
                 if delta_dir.x.abs() > 0.01 {
                     self.dir.x += delta_dir.x * delta_time * ROTATION_SPEED;
-                    is_moving |= true;
+                    is_rotating |= true;
                 }
 
                 if delta_dir.z.abs() > 0.01 {
                     self.dir.z += delta_dir.z * delta_time * ROTATION_SPEED;
-                    is_moving |= true;
+                    is_rotating |= true;
                 }
 
-                if is_moving {
+                if is_rotating {
                     self.rotation_y = self.dir.x.atan2(self.dir.z);
                 } else if timer.is_finished() {
-                    self.shoot_state = ShootState::Focus(Timer::new(0.5));
+                    self.shoot_state = ShootState::Focus(Timer::new(self.focus_time));
                 }
             }
             ShootState::Focus(ref mut timer) => {
@@ -147,7 +151,6 @@ impl Gunman {
                 };
             }
         };
-
         op
     }
 

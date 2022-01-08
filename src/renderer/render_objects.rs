@@ -126,9 +126,9 @@ impl RenderObjects {
     }
 
     pub fn get_objects_and_active_len(&mut self, frustum: &Frustum) -> Vec<RenderQueueData> {
-        self.resulted_objects
-            .iter_mut()
-            .map(|x| RenderQueueData::new_none());
+        for object in self.resulted_objects.iter_mut() {
+            *object = RenderQueueData::new_none();
+        }
 
         let mut index = 0;
         for (object, bound) in self.render_objects_static.iter() {

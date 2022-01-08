@@ -8,21 +8,18 @@ resolver = "2"
 instant = "0.1"
 pollster = "0.2.4"
 nalgebra = "0.29.0"
-bytemuck = { version = "1.7.2", features = ["derive"] }
-ambisonic = { git = "https://github.com/andraantariksa/ambisonic.git" }
 rodio = { version = "0.14.0", default-features = false, features = ["vorbis", "flac", "wav"] }
-bincode = "1.3.3"
 rapier3d = "0.11.1"
-serde = { version = "1", features = ["derive"] }
+#serde = { version = "1", features = ["derive"] }
 log = "0.4.14"
-hecs = "0.6.5"
-rand = { version = "0.8", features = ["small_rng"] }
+hecs = "0.7.3"
+rand = { version = "0.8", default-features = false, features = ["small_rng", "getrandom"] }
 conrod_winit = "0.75"
 conrod_wgpu = "0.76"
 conrod_core = "0.76"
 getrandom = { version = "0.2", features = ["js"] }
 bitflags = "1.3.2"
-crossbeam = "0.8.1"
+crossbeam = { version = "0.8.1", default-features = false, features = ["crossbeam-channel"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 chrono = { version = "0.4", default-features = false, features = ["wasmbind"] }
@@ -30,17 +27,17 @@ gluesql = { version = "0.9.0", default-features = false, features = ["memory-sto
 uuid = { version = "0.8", features = ["wasm-bindgen", "v4"] }
 wgpu = { version = "0.11", features = ["webgl", "spirv"] }
 web-sys = "0.3.55"
-image = { version = "0.23.14", default-features = false, features = ["gif", "jpeg", "ico", "png", "pnm", "tga", "tiff", "webp", "bmp", "hdr", "dxt", "dds", "farbfeld"] }
+image = { version = "0.23.14", default-features = false, features = ["jpeg", "png"] } # , "gif", "ico", "pnm", "tga", "tiff", "webp", "bmp", "hdr", "dxt", "dds", "farbfeld"
 winit = { version = "0.25.0", features = ["web-sys"] }
 console_log = "0.2.0"
 console_error_panic_hook = "0.1.7"
 #wasm-bindgen-futures = "0.4.28"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-chrono = "0.4"
+chrono = { version = "0.4", default-features = false, features = ["std"] }
 gluesql = "0.9.0"
 wgpu = { version = "0.11", features = ["spirv"] }
-image = "0.23.14"
+image = { version = "0.23.14", default-features = false, features = ["jpeg", "png", "jpeg_rayon"] }
 winit = "0.25.0"
 env_logger = "0.9.0"
 

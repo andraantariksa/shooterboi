@@ -1,4 +1,4 @@
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub struct Timer {
     duration: f32,
 }
@@ -29,7 +29,7 @@ impl Timer {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub struct Stopwatch {
     duration: f32,
 }

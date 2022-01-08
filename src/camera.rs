@@ -8,7 +8,7 @@ pub struct Camera {
     yaw: f32,
     pitch: f32,
     pub fov: f32,
-    sensitivity: f32,
+    pub sensitivity: f32,
 }
 
 impl Camera {

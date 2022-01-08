@@ -19,7 +19,7 @@ pub fn spawn_target(
         (
             physics.collider_set.insert(
                 ColliderBuilder::new(SharedShape::ball(0.5))
-                    .user_data(entity.to_bits() as u128)
+                    .user_data(entity.to_bits().get() as u128)
                     .translation(pos)
                     .build(),
             ),

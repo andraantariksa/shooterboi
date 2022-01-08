@@ -1,6 +1,6 @@
 use conrod_core::widget::envelope_editor::EnvelopePoint;
-use conrod_core::widget::{Scrollbar, Slider, Text};
-use conrod_core::{Colorable, Labelable, Positionable, Sizeable, Widget};
+use conrod_core::widget::{Canvas, Scrollbar, Slider, Text};
+use conrod_core::{Colorable, Dimensions, Labelable, Positionable, Sizeable, Widget};
 use std::collections::HashMap;
 use winit::event_loop::ControlFlow;
 
@@ -40,6 +40,10 @@ widget_ids! {
         ambient_occlusion_sample_slider_label,
         ambient_occlusion_sample_slider,
 
+        mouse_sensitivity_canvas,
+        mouse_sensitivity_slider_label,
+        mouse_sensitivity_slider,
+
         volume_canvas,
         volume_slider_label,
         volume_slider,
@@ -48,9 +52,9 @@ widget_ids! {
         crosshair_color_canvas,
         crosshair_color_label,
         crosshair_color_color_canvas,
-        crosshair_color_r_canvas,
-        crosshair_color_g_canvas,
-        crosshair_color_b_canvas,
+        // crosshair_color_r_canvas,
+        // crosshair_color_g_canvas,
+        // crosshair_color_b_canvas,
         crosshair_color_r_slider,
         crosshair_color_g_slider,
         crosshair_color_b_slider,
@@ -114,11 +118,8 @@ impl SettingsScene {
     }
 }
 
-fn settings_item_canvas() -> conrod_core::widget::Canvas<'static> {
-    conrod_core::widget::Canvas::new()
-        .length(90.0)
-        .pad_top(10.0)
-        .pad_bottom(10.0)
+fn settings_item_canvas() -> Canvas<'static> {
+    Canvas::new().length(90.0).pad_top(10.0).pad_bottom(10.0)
 }
 
 impl Scene for SettingsScene {
@@ -202,14 +203,14 @@ impl Scene for SettingsScene {
 
         let ropa_font_id = *conrod_handle.get_font_id_map().get("ropa").unwrap();
         let mut ui_cell = conrod_handle.get_ui_mut().set_widgets();
-        conrod_core::widget::Canvas::new()
+        Canvas::new()
             .flow_down(&[
                 (
                     self.ids.body_canvas,
-                    conrod_core::widget::Canvas::new().flow_right(&[
+                    Canvas::new().flow_right(&[
                         (
                             self.ids.settings_canvas,
-                            conrod_core::widget::Canvas::new()
+                            Canvas::new()
                                 .scroll_kids_vertically()
                                 .parent(self.ids.canvas)
                                 .flow_down(&[
@@ -220,25 +221,27 @@ impl Scene for SettingsScene {
                                     ),
                                     (
                                         self.ids.crosshair_color_canvas,
-                                        conrod_core::widget::Canvas::new()
-                                            .length(90.0)
-                                            .pad_top(10.0)
-                                            .pad_bottom(10.0)
-                                            .flow_right(&[
-                                                (
-                                                    self.ids.crosshair_color_r_canvas,
-                                                    conrod_core::widget::Canvas::new(),
-                                                ),
-                                                (
-                                                    self.ids.crosshair_color_g_canvas,
-                                                    conrod_core::widget::Canvas::new(),
-                                                ),
-                                                (
-                                                    self.ids.crosshair_color_b_canvas,
-                                                    conrod_core::widget::Canvas::new(),
-                                                ),
-                                            ]),
+                                        settings_item_canvas()
+                                        // Canvas::new()
+                                            // .length(90.0)
+                                            // .pad_top(10.0)
+                                            // .pad_bottom(10.0)
+                                            // .flow_right(&[
+                                            //     (
+                                            //         self.ids.crosshair_color_r_canvas,
+                                            //         Canvas::new(),
+                                            //     ),
+                                            //     (
+                                            //         self.ids.crosshair_color_g_canvas,
+                                            //         Canvas::new(),
+                                            //     ),
+                                            //     (
+                                            //         self.ids.crosshair_color_b_canvas,
+                                            //         Canvas::new(),
+                                            //     ),
+                                            // ]),
                                     ),
+                                    (self.ids.mouse_sensitivity_canvas, settings_item_canvas()),
                                     (self.ids.volume_canvas, settings_item_canvas()),
                                     // Center dot
                                     (self.ids.center_dot_enable_canvas, settings_item_canvas()),
@@ -258,14 +261,11 @@ impl Scene for SettingsScene {
                         ),
                         (
                             self.ids.crosshair_preview_canvas,
-                            conrod_core::widget::Canvas::new().length(250.0),
+                            Canvas::new().length(250.0),
                         ),
                     ]),
                 ),
-                (
-                    self.ids.footer_canvas,
-                    conrod_core::widget::Canvas::new().length(60.0),
-                ),
+                (self.ids.footer_canvas, Canvas::new().length(60.0)),
             ])
             .set(self.ids.canvas, &mut ui_cell);
 
@@ -298,7 +298,7 @@ impl Scene for SettingsScene {
             "{}",
             renderer.rendering_info.queuecount_raymarchmaxstep_aostep.y as u8
         ))
-        .wh(conrod_core::Dimensions::new(200.0, 30.0))
+        .wh(Dimensions::new(200.0, 30.0))
         .set(self.ids.max_march_step_slider, &mut ui_cell)
         {
             renderer.rendering_info.queuecount_raymarchmaxstep_aostep.y = value.round() as u32;
@@ -319,10 +319,24 @@ impl Scene for SettingsScene {
             "{}",
             renderer.rendering_info.queuecount_raymarchmaxstep_aostep.z as u8
         ))
-        .wh(conrod_core::Dimensions::new(200.0, 30.0))
+        .wh(Dimensions::new(200.0, 30.0))
         .set(self.ids.ambient_occlusion_sample_slider, &mut ui_cell)
         {
             renderer.rendering_info.queuecount_raymarchmaxstep_aostep.z = value.round() as u32;
+        }
+
+        Text::new("Mouse sensitivity")
+            .font_id(ropa_font_id)
+            .mid_top_of(self.ids.mouse_sensitivity_canvas)
+            .set(self.ids.mouse_sensitivity_slider_label, &mut ui_cell);
+
+        for value in Slider::new(renderer.camera.sensitivity, 0.1f32, 3f32)
+            .mid_bottom_of(self.ids.mouse_sensitivity_canvas)
+            .label(&format!("{:.3}", renderer.camera.sensitivity))
+            .wh(Dimensions::new(200.0, 30.0))
+            .set(self.ids.mouse_sensitivity_slider, &mut ui_cell)
+        {
+            renderer.camera.sensitivity = value;
         }
 
         Text::new("Audio Volume")
@@ -333,7 +347,7 @@ impl Scene for SettingsScene {
         for value in Slider::new(audio_context.get_volume(), 0f32, 1f32)
             .mid_bottom_of(self.ids.volume_canvas)
             .label(&format!("{}", (audio_context.get_volume() * 100.0) as u8))
-            .wh(conrod_core::Dimensions::new(200.0, 30.0))
+            .wh(Dimensions::new(200.0, 30.0))
             .set(self.ids.volume_slider, &mut ui_cell)
         {
             audio_context.set_volume(value);
@@ -346,7 +360,7 @@ impl Scene for SettingsScene {
 
         for value in conrod_core::widget::Toggle::new(renderer.crosshair.center_dot_enabled)
             .mid_bottom_of(self.ids.center_dot_enable_canvas)
-            .wh(conrod_core::Dimensions::new(40.0, 40.0))
+            .wh(Dimensions::new(40.0, 40.0))
             .set(self.ids.center_dot_enable_toggle, &mut ui_cell)
         {
             renderer.crosshair.center_dot_enabled = value;
@@ -362,7 +376,7 @@ impl Scene for SettingsScene {
         //         .mid_bottom_of(self.ids.center_dot_opacity_canvas)
         //
         //         .label(&format!("{}", renderer.crosshair.center_dot_opacity))
-        //         .wh(conrod_core::Dimensions::new(200.0, 30.0))
+        //         .wh(Dimensions::new(200.0, 30.0))
         //         .set(self.ids.center_dot_opacity_slider, &mut ui_cell)
         // {
         //     renderer.crosshair.center_dot_opacity = value;
@@ -379,7 +393,7 @@ impl Scene for SettingsScene {
                 "{}",
                 renderer.crosshair.center_dot_thickness as u8
             ))
-            .wh(conrod_core::Dimensions::new(200.0, 30.0))
+            .wh(Dimensions::new(200.0, 30.0))
             .set(self.ids.center_dot_thickness_slider, &mut ui_cell)
         {
             renderer.crosshair.center_dot_thickness = value.round();
@@ -392,7 +406,7 @@ impl Scene for SettingsScene {
 
         for value in conrod_core::widget::Toggle::new(renderer.crosshair.inner_line_enabled)
             .mid_bottom_of(self.ids.inner_line_enable_canvas)
-            .wh(conrod_core::Dimensions::new(40.0, 40.0))
+            .wh(Dimensions::new(40.0, 40.0))
             .set(self.ids.inner_line_enable_toggle, &mut ui_cell)
         {
             renderer.crosshair.inner_line_enabled = value;
@@ -408,7 +422,7 @@ impl Scene for SettingsScene {
         //         .mid_bottom_of(self.ids.inner_line_opacity_canvas)
         //
         //         .label(&format!("{}", renderer.crosshair.inner_line_opacity))
-        //         .wh(conrod_core::Dimensions::new(200.0, 30.0))
+        //         .wh(Dimensions::new(200.0, 30.0))
         //         .set(self.ids.inner_line_opacity_slider, &mut ui_cell)
         // {
         //     renderer.crosshair.inner_line_opacity = value;
@@ -425,7 +439,7 @@ impl Scene for SettingsScene {
                 "{}",
                 renderer.crosshair.inner_line_thickness as u8
             ))
-            .wh(conrod_core::Dimensions::new(200.0, 30.0))
+            .wh(Dimensions::new(200.0, 30.0))
             .set(self.ids.inner_line_thickness_slider, &mut ui_cell)
         {
             renderer.crosshair.inner_line_thickness = value.round();
@@ -439,7 +453,7 @@ impl Scene for SettingsScene {
         for value in Slider::new(renderer.crosshair.inner_line_offset, 0f32, 100f32)
             .mid_bottom_of(self.ids.inner_line_offset_canvas)
             .label(&format!("{}", renderer.crosshair.inner_line_offset as u8))
-            .wh(conrod_core::Dimensions::new(200.0, 30.0))
+            .wh(Dimensions::new(200.0, 30.0))
             .set(self.ids.inner_line_offset_slider, &mut ui_cell)
         {
             renderer.crosshair.inner_line_offset = value.round();
@@ -452,7 +466,7 @@ impl Scene for SettingsScene {
 
         for value in conrod_core::widget::Toggle::new(renderer.crosshair.outer_line_enabled)
             .mid_bottom_of(self.ids.outer_line_enable_canvas)
-            .wh(conrod_core::Dimensions::new(40.0, 40.0))
+            .wh(Dimensions::new(40.0, 40.0))
             .set(self.ids.outer_line_enable_toggle, &mut ui_cell)
         {
             renderer.crosshair.outer_line_enabled = value;
@@ -468,7 +482,7 @@ impl Scene for SettingsScene {
         //         .mid_bottom_of(self.ids.outer_line_opacity_canvas)
         //
         //         .label(&format!("{}", renderer.crosshair.outer_line_opacity))
-        //         .wh(conrod_core::Dimensions::new(200.0, 30.0))
+        //         .wh(Dimensions::new(200.0, 30.0))
         //         .set(self.ids.outer_line_opacity_slider, &mut ui_cell)
         // {
         //     renderer.crosshair.outer_line_opacity = value;
@@ -485,7 +499,7 @@ impl Scene for SettingsScene {
                 "{}",
                 renderer.crosshair.outer_line_thickness as u8
             ))
-            .wh(conrod_core::Dimensions::new(200.0, 30.0))
+            .wh(Dimensions::new(200.0, 30.0))
             .set(self.ids.outer_line_thickness_slider, &mut ui_cell)
         {
             renderer.crosshair.outer_line_thickness = value.round();
@@ -499,58 +513,54 @@ impl Scene for SettingsScene {
         for value in Slider::new(renderer.crosshair.outer_line_offset, 0f32, 100f32)
             .mid_bottom_of(self.ids.outer_line_offset_canvas)
             .label(&format!("{}", renderer.crosshair.outer_line_offset as u8))
-            .wh(conrod_core::Dimensions::new(200.0, 30.0))
+            .wh(Dimensions::new(200.0, 30.0))
             .set(self.ids.outer_line_offset_slider, &mut ui_cell)
         {
             renderer.crosshair.outer_line_offset = value.round();
         }
 
-        Text::new("Red color")
-            .font_id(ropa_font_id)
-            .padded_w_of(self.ids.crosshair_color_r_canvas, MARGIN)
-            .center_justify()
-            .mid_top_of(self.ids.crosshair_color_r_canvas)
-            .set(self.ids.crosshair_color_r_label, &mut ui_cell);
-
-        for value in Slider::new(renderer.crosshair.color.x, 0f32, 1f32)
-            .mid_bottom_of(self.ids.crosshair_color_r_canvas)
-            .padded_w_of(self.ids.crosshair_color_r_canvas, MARGIN)
-            .label(&format!("{:.3}", renderer.crosshair.color.x))
-            .wh(conrod_core::Dimensions::new(200.0, 30.0))
-            .set(self.ids.crosshair_color_r_slider, &mut ui_cell)
-        {
-            renderer.crosshair.color.x = value;
-        }
-
         Text::new("Green color")
             .font_id(ropa_font_id)
-            .padded_w_of(self.ids.crosshair_color_r_canvas, MARGIN)
             .center_justify()
-            .mid_top_of(self.ids.crosshair_color_g_canvas)
+            .mid_top_of(self.ids.crosshair_color_canvas)
             .set(self.ids.crosshair_color_g_label, &mut ui_cell);
 
         for value in Slider::new(renderer.crosshair.color.y, 0f32, 1f32)
-            .mid_bottom_of(self.ids.crosshair_color_g_canvas)
-            .padded_w_of(self.ids.crosshair_color_r_canvas, MARGIN)
+            .mid_bottom_of(self.ids.crosshair_color_canvas)
             .label(&format!("{:.3}", renderer.crosshair.color.y))
-            .wh(conrod_core::Dimensions::new(200.0, 30.0))
+            .wh(Dimensions::new(80.0, 30.0))
             .set(self.ids.crosshair_color_g_slider, &mut ui_cell)
         {
             renderer.crosshair.color.y = value;
         }
 
+        Text::new("Red color")
+            .font_id(ropa_font_id)
+            .center_justify()
+            .left_from(self.ids.crosshair_color_g_label, 50.0)
+            .set(self.ids.crosshair_color_r_label, &mut ui_cell);
+
+        for value in Slider::new(renderer.crosshair.color.x, 0f32, 1f32)
+            .label(&format!("{:.3}", renderer.crosshair.color.x))
+            .align_middle_x_of(self.ids.crosshair_color_r_label)
+            .align_middle_y_of(self.ids.crosshair_color_g_slider)
+            .wh(Dimensions::new(80.0, 30.0))
+            .set(self.ids.crosshair_color_r_slider, &mut ui_cell)
+        {
+            renderer.crosshair.color.x = value;
+        }
+
         Text::new("Blue color")
             .font_id(ropa_font_id)
-            .padded_w_of(self.ids.crosshair_color_r_canvas, MARGIN)
             .center_justify()
-            .mid_top_of(self.ids.crosshair_color_b_canvas)
+            .right_from(self.ids.crosshair_color_g_label, 50.0)
             .set(self.ids.crosshair_color_b_label, &mut ui_cell);
 
         for value in Slider::new(renderer.crosshair.color.z, 0f32, 1f32)
-            .mid_bottom_of(self.ids.crosshair_color_b_canvas)
-            .padded_w_of(self.ids.crosshair_color_r_canvas, MARGIN)
+            .align_middle_x_of(self.ids.crosshair_color_b_label)
+            .align_middle_y_of(self.ids.crosshair_color_g_slider)
             .label(&format!("{:.3}", renderer.crosshair.color.z))
-            .wh(conrod_core::Dimensions::new(200.0, 30.0))
+            .wh(Dimensions::new(80.0, 30.0))
             .set(self.ids.crosshair_color_b_slider, &mut ui_cell)
         {
             renderer.crosshair.color.z = value;
@@ -558,13 +568,13 @@ impl Scene for SettingsScene {
 
         conrod_core::widget::Image::new(crosshair_texture_id)
             .middle_of(self.ids.crosshair_preview_canvas)
-            .wh(conrod_core::Dimensions::new(200.0, 200.0))
+            .wh(Dimensions::new(200.0, 200.0))
             .set(self.ids.crosshair_preview_image, &mut ui_cell);
 
         for _press in conrod_core::widget::Button::new()
             .label("Back")
             .bottom_left_with_margin_on(self.ids.footer_canvas, MARGIN)
-            .wh(conrod_core::Dimensions::new(100.0, 30.0))
+            .wh(Dimensions::new(100.0, 30.0))
             .set(self.ids.back_button, &mut ui_cell)
         {
             scene_op = SceneOp::Pop(1, {
@@ -610,7 +620,8 @@ impl Scene for SettingsScene {
                 outer_line_enable = {},\
                 outer_line_thickness = {},\
                 outer_line_length = {},\
-                outer_line_offset = {}",
+                outer_line_offset = {},\
+                mouse_sensitivity = {}",
                 audio_context.volume,
                 renderer.rendering_info.queuecount_raymarchmaxstep_aostep.y,
                 renderer.rendering_info.queuecount_raymarchmaxstep_aostep.z,
@@ -627,6 +638,7 @@ impl Scene for SettingsScene {
                 renderer.crosshair.outer_line_thickness,
                 renderer.crosshair.outer_line_length,
                 renderer.crosshair.outer_line_offset,
+                renderer.camera.sensitivity,
             ))
             .unwrap();
     }

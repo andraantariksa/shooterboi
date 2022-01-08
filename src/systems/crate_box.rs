@@ -19,12 +19,12 @@ pub fn spawn_crate(
             .translation(translation)
             .lock_rotations()
             .lock_translations()
-            .user_data(entity.to_bits() as u128)
+            .user_data(entity.to_bits().get() as u128)
             .build(),
     );
     physics.collider_set.insert_with_parent(
         ColliderBuilder::new(SharedShape::cuboid(size.x, size.y, size.z))
-            .user_data(entity.to_bits() as u128)
+            .user_data(entity.to_bits().get() as u128)
             .build(),
         rb_handle,
         &mut physics.rigid_body_set,

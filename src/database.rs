@@ -49,46 +49,46 @@ impl GameModeScores {
                 match output {
                     Payload::Select { labels, rows } => {
                         for row in rows {
-                            let mut classic_score = ClassicGameScoreDisplay::new();
+                            let mut score = ClassicGameScoreDisplay::new();
                             for (idx, label) in labels.iter().enumerate() {
                                 match label.as_str() {
                                     "accuracy" => {
-                                        classic_score.accuracy = match row[idx] {
+                                        score.accuracy = match row[idx] {
                                             Value::F64(x) => x,
                                             _ => unreachable!(),
                                         }
                                             as f32;
                                     }
                                     "hit" => {
-                                        classic_score.hit = match row[idx] {
+                                        score.hit = match row[idx] {
                                             Value::I64(x) => x,
                                             _ => unreachable!(),
                                         }
                                             as u16;
                                     }
                                     "miss" => {
-                                        classic_score.miss = match row[idx] {
+                                        score.miss = match row[idx] {
                                             Value::I64(x) => x,
                                             _ => unreachable!(),
                                         }
                                             as u16;
                                     }
                                     "score" => {
-                                        classic_score.score = match row[idx] {
+                                        score.score = match row[idx] {
                                             Value::I64(x) => x,
                                             _ => unreachable!(),
                                         }
                                             as i32;
                                     }
                                     "avg_hit_time" => {
-                                        classic_score.avg_hit_time = match row[idx] {
+                                        score.avg_hit_time = match row[idx] {
                                             Value::F64(x) => x,
                                             _ => unreachable!(),
                                         }
                                             as f32;
                                     }
                                     "created_at" => {
-                                        classic_score.created_at = match row[idx] {
+                                        score.created_at = match row[idx] {
                                             Value::Timestamp(x) => x,
                                             _ => unreachable!(),
                                         };
@@ -97,7 +97,7 @@ impl GameModeScores {
                                     _ => unreachable!(),
                                 }
                             }
-                            score_rows.push(classic_score);
+                            score_rows.push(score);
                         }
                     }
                     _ => {}
@@ -113,53 +113,60 @@ impl GameModeScores {
                 match output {
                     Payload::Select { labels, rows } => {
                         for row in rows {
-                            let mut classic_score = EliminationGameScoreDisplay::new();
+                            let mut score = EliminationGameScoreDisplay::new();
                             for (idx, label) in labels.iter().enumerate() {
                                 match label.as_str() {
                                     "accuracy" => {
-                                        classic_score.accuracy = match row[idx] {
+                                        score.accuracy = match row[idx] {
                                             Value::F64(x) => x,
                                             _ => unreachable!(),
                                         }
                                             as f32;
                                     }
                                     "hit" => {
-                                        classic_score.hit = match row[idx] {
+                                        score.hit = match row[idx] {
                                             Value::I64(x) => x,
                                             _ => unreachable!(),
                                         }
                                             as u16;
                                     }
                                     "miss" => {
-                                        classic_score.miss = match row[idx] {
+                                        score.miss = match row[idx] {
                                             Value::I64(x) => x,
                                             _ => unreachable!(),
                                         }
                                             as u16;
                                     }
                                     "score" => {
-                                        classic_score.score = match row[idx] {
+                                        score.score = match row[idx] {
                                             Value::I64(x) => x,
                                             _ => unreachable!(),
                                         }
                                             as i32;
                                     }
                                     "hit_fake_target" => {
-                                        classic_score.hit_fake_target = match row[idx] {
+                                        score.hit_fake_target = match row[idx] {
                                             Value::I64(x) => x,
                                             _ => unreachable!(),
                                         }
                                             as u16;
                                     }
+                                    "running_time" => {
+                                        score.running_time = match row[idx] {
+                                            Value::F64(x) => x,
+                                            _ => unreachable!(),
+                                        }
+                                            as f32;
+                                    }
                                     "avg_hit_time" => {
-                                        classic_score.avg_hit_time = match row[idx] {
+                                        score.avg_hit_time = match row[idx] {
                                             Value::F64(x) => x,
                                             _ => unreachable!(),
                                         }
                                             as f32;
                                     }
                                     "created_at" => {
-                                        classic_score.created_at = match row[idx] {
+                                        score.created_at = match row[idx] {
                                             Value::Timestamp(x) => x,
                                             _ => unreachable!(),
                                         };
@@ -168,7 +175,7 @@ impl GameModeScores {
                                     _ => unreachable!(),
                                 }
                             }
-                            score_rows.push(classic_score);
+                            score_rows.push(score);
                         }
                     }
                     _ => {}
@@ -184,53 +191,53 @@ impl GameModeScores {
                 match output {
                     Payload::Select { labels, rows } => {
                         for row in rows {
-                            let mut classic_score = HitAndDodgeGameScoreDisplay::new();
+                            let mut score = HitAndDodgeGameScoreDisplay::new();
                             for (idx, label) in labels.iter().enumerate() {
                                 match label.as_str() {
                                     "accuracy" => {
-                                        classic_score.accuracy = match row[idx] {
+                                        score.accuracy = match row[idx] {
                                             Value::F64(x) => x,
                                             _ => unreachable!(),
                                         }
                                             as f32;
                                     }
                                     "hit" => {
-                                        classic_score.hit = match row[idx] {
+                                        score.hit = match row[idx] {
                                             Value::I64(x) => x,
                                             _ => unreachable!(),
                                         }
                                             as u16;
                                     }
                                     "miss" => {
-                                        classic_score.miss = match row[idx] {
+                                        score.miss = match row[idx] {
                                             Value::I64(x) => x,
                                             _ => unreachable!(),
                                         }
                                             as u16;
                                     }
                                     "score" => {
-                                        classic_score.score = match row[idx] {
+                                        score.score = match row[idx] {
                                             Value::I64(x) => x,
                                             _ => unreachable!(),
                                         }
                                             as i32;
                                     }
                                     "hit_taken" => {
-                                        classic_score.score = match row[idx] {
+                                        score.hit_taken = match row[idx] {
                                             Value::I64(x) => x,
                                             _ => unreachable!(),
                                         }
-                                            as i32;
+                                            as u16;
                                     }
                                     "avg_hit_time" => {
-                                        classic_score.avg_hit_time = match row[idx] {
+                                        score.avg_hit_time = match row[idx] {
                                             Value::F64(x) => x,
                                             _ => unreachable!(),
                                         }
                                             as f32;
                                     }
                                     "created_at" => {
-                                        classic_score.created_at = match row[idx] {
+                                        score.created_at = match row[idx] {
                                             Value::Timestamp(x) => x,
                                             _ => unreachable!(),
                                         };
@@ -239,7 +246,7 @@ impl GameModeScores {
                                     _ => unreachable!(),
                                 }
                             }
-                            score_rows.push(classic_score);
+                            score_rows.push(score);
                         }
                     }
                     _ => {}
@@ -289,6 +296,8 @@ impl Database {
     outer_line_thickness FLOAT NOT NULL,
     outer_line_length FLOAT NOT NULL,
     outer_line_offset FLOAT NOT NULL,
+
+    mouse_sensitivity FLOAT NOT NULL
 )",
             )
             .unwrap();
@@ -315,6 +324,7 @@ impl Database {
     score INTEGER NOT NULL,
     avg_hit_time FLOAT NOT NULL,
     hit_fake_target INTEGER NOT NULL,
+    running_time FLOAT NOT NULL,
     created_at TIMESTAMP NOT NULL,
 )",
             )
@@ -343,7 +353,8 @@ impl Database {
                         1.0, 0.0, 0.0,\
                         TRUE, 2.0,\
                         TRUE, 6.0, 20.0, 5.0,\
-                        TRUE, 3.0, 6.0, 49.0)",
+                        TRUE, 3.0, 6.0, 49.0,\
+                        0.5)",
                         )
                         .unwrap();
                 }
@@ -377,6 +388,12 @@ impl Database {
                                     Value::I64(x) => x,
                                     _ => unreachable!(),
                                 } as u32;
+                        }
+                        "mouse_sensitivity" => {
+                            renderer.camera.sensitivity = match rows[0][idx] {
+                                Value::F64(x) => x,
+                                _ => unreachable!(),
+                            } as f32;
                         }
                         "crosshair_color_r" => {
                             renderer.crosshair.color.x = match rows[0][idx] {

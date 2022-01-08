@@ -7,6 +7,29 @@ pub enum InOutAnimationState {
     Backward(Timer),
 }
 
+impl PartialEq for InOutAnimationState {
+    fn eq(&self, other: &Self) -> bool {
+        match self {
+            InOutAnimationState::Stopped => match other {
+                InOutAnimationState::Stopped => true,
+                _ => false,
+            },
+            InOutAnimationState::Foward(_) => match other {
+                InOutAnimationState::Foward(_) => true,
+                _ => false,
+            },
+            InOutAnimationState::Backward(_) => match other {
+                InOutAnimationState::Backward(_) => true,
+                _ => false,
+            },
+        }
+    }
+
+    fn ne(&self, other: &Self) -> bool {
+        !self.eq(other)
+    }
+}
+
 pub struct InOutAnimation {
     sec_to_forward: f32,
     sec_to_backward: f32,

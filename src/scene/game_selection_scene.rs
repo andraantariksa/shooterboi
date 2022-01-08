@@ -21,7 +21,6 @@ use crate::scene::{
 use crate::window::Window;
 use conrod_core::widget_ids;
 
-
 use crate::scene::score_history_scene::ScoreHistoryScene;
 use winit::event::VirtualKeyCode;
 
@@ -119,17 +118,17 @@ impl Scene for GameSelectionScene {
             GameModeDetails {
                 image: image_id,
                 title: "Classic",
-                description: "You have to shoot every spawned target (colored red). The target will be disappeared after you shoot it and another target will be spawned.",
+                description: "You have to shoot every spawned target. The target will be disappeared after you shoot it and another target will appear.",
             },
             GameModeDetails {
                 image: image_id,
                 title: "Elimination",
-                description: "The multiple target will appear. The player needs to shoot all of the target before appear too much.",
+                description: "A lot of target will appear. You have to shot all of the target.\nEasy - Static target\nMedium - Target may be transformed to invalid for a time\nHard - Target will move",
             },
             GameModeDetails {
                 image: image_id,
-                title: "Move and shoot",
-                description: "You have to move and shoot the target.",
+                title: "Hit and Dodge",
+                description: "You have to shoot the gunman while avoiding the bullet and swordman attack.",
             }];
 
         {

@@ -3,7 +3,6 @@ use conrod_core::widget::envelope_editor::EnvelopePoint;
 use conrod_core::widget::{Button, Canvas, Text};
 use conrod_core::{Labelable, Positionable, Sizeable, Widget};
 
-
 use winit::event_loop::ControlFlow;
 
 use crate::audio::AudioContext;
@@ -21,10 +20,10 @@ use conrod_core::widget_ids;
 
 use gluesql::chrono::Utc;
 
-
 use crate::scene::score_history_scene::ScoreHistoryScene;
 use winit::event::VirtualKeyCode;
 
+#[derive(Debug)]
 pub struct ClassicGameScoreDisplay {
     pub accuracy: f32,
     pub hit: u16,
@@ -54,6 +53,7 @@ pub struct EliminationGameScoreDisplay {
     pub hit_fake_target: u16,
     pub score: i32,
     pub avg_hit_time: f32,
+    pub running_time: f32,
     pub created_at: NaiveDateTime,
 }
 
@@ -66,6 +66,7 @@ impl EliminationGameScoreDisplay {
             score: 0,
             avg_hit_time: 0.0,
             hit_fake_target: 0,
+            running_time: 0.0,
             created_at: Utc::now().naive_utc(),
         }
     }
@@ -134,6 +135,18 @@ widget_ids! {
         avg_hit_time_canvas,
         avg_hit_time_label,
         avg_hit_time_value_label,
+
+        hit_taken_canvas,
+        hit_taken_label,
+        hit_taken_value_label,
+
+        hit_fake_target_canvas,
+        hit_fake_target_label,
+        hit_fake_target_value_label,
+
+        running_time_canvas,
+        running_time_label,
+        running_time_value_label,
     }
 }
 
@@ -177,7 +190,7 @@ impl Scene for GameScoreScene {
                 {},\
                 \"{}\")",
                     self.difficulty as u8,
-                    score.hit as f32 / (score.hit + score.miss).max(1) as f32 * 100.0,
+                    score.accuracy,
                     score.hit,
                     score.miss,
                     score.score,
@@ -195,14 +208,16 @@ impl Scene for GameScoreScene {
                 {},\
                 {},\
                 {},\
+                {},\
                 \"{}\")",
                     self.difficulty as u8,
-                    score.hit as f32 / (score.hit + score.miss).max(1) as f32 * 100.0,
+                    score.accuracy,
                     score.hit,
                     score.miss,
                     score.score,
                     score.avg_hit_time,
                     score.hit_fake_target,
+                    score.running_time,
                     Utc::now().naive_utc()
                 )
             }
@@ -218,7 +233,7 @@ impl Scene for GameScoreScene {
                 {},\
                 \"{}\")",
                     self.difficulty as u8,
-                    score.hit as f32 / (score.hit + score.miss).max(1) as f32 * 100.0,
+                    score.accuracy,
                     score.hit,
                     score.miss,
                     score.score,
@@ -260,88 +275,222 @@ impl Scene for GameScoreScene {
 
             match &self.score {
                 GameModeScore::Classic(score) => {
-                    Canvas::new()
-                        .down_from(self.ids.title_label, 50.0)
-                        .align_middle_x()
-                        .w(ITEM_WIDTH)
-                        .set(self.ids.accuracy_canvas, &mut ui_cell);
+                    let mut prev_canvas_id = self.ids.title_label;
 
-                    Canvas::new()
-                        .down_from(self.ids.accuracy_canvas, GAP_BETWEEN_ITEM)
-                        .align_middle_x()
-                        .w(ITEM_WIDTH)
-                        .set(self.ids.hit_canvas, &mut ui_cell);
+                    let l = [
+                        (
+                            &self.ids.hit_canvas,
+                            &self.ids.hit_label,
+                            "Hit",
+                            &self.ids.hit_value_label,
+                            &format!("{}", score.hit),
+                        ),
+                        (
+                            &self.ids.score_canvas,
+                            &self.ids.score_label,
+                            "Score",
+                            &self.ids.score_value_label,
+                            &format!("{}", score.score),
+                        ),
+                        (
+                            &self.ids.avg_hit_time_canvas,
+                            &self.ids.avg_hit_time_label,
+                            "Avg hit time",
+                            &self.ids.avg_hit_time_value_label,
+                            &format!("{:.2}s", score.avg_hit_time),
+                        ),
+                        (
+                            &self.ids.miss_canvas,
+                            &self.ids.miss_label,
+                            "Miss",
+                            &self.ids.miss_value_label,
+                            &format!("{}", score.miss),
+                        ),
+                        (
+                            &self.ids.accuracy_canvas,
+                            &self.ids.accuracy_label,
+                            "Accuracy",
+                            &self.ids.accuracy_value_label,
+                            &format!("{:.2}%", score.accuracy),
+                        ),
+                    ];
 
-                    Canvas::new()
-                        .down_from(self.ids.hit_canvas, GAP_BETWEEN_ITEM)
-                        .align_middle_x()
-                        .w(ITEM_WIDTH)
-                        .set(self.ids.score_canvas, &mut ui_cell);
+                    for (i, (id_canvas, id_label, label_text, id_value_label, value_text)) in
+                        l.iter().enumerate()
+                    {
+                        Canvas::new()
+                            .down_from(prev_canvas_id, if i == 0 { 50.0 } else { GAP_BETWEEN_ITEM })
+                            .align_middle_x()
+                            .w(ITEM_WIDTH)
+                            .set(**id_canvas, &mut ui_cell);
 
-                    Canvas::new()
-                        .down_from(self.ids.score_canvas, GAP_BETWEEN_ITEM)
-                        .align_middle_x()
-                        .w(ITEM_WIDTH)
-                        .set(self.ids.avg_hit_time_canvas, &mut ui_cell);
+                        prev_canvas_id = **id_canvas;
+                    }
+                    for (id_canvas, id_label, label_text, id_value_label, value_text) in l.iter() {
+                        Text::new(label_text)
+                            .mid_left_of(**id_canvas)
+                            .left_justify()
+                            .set(**id_label, &mut ui_cell);
 
-                    Canvas::new()
-                        .down_from(self.ids.avg_hit_time_canvas, GAP_BETWEEN_ITEM)
-                        .align_middle_x()
-                        .w(ITEM_WIDTH)
-                        .set(self.ids.miss_canvas, &mut ui_cell);
-
-                    Text::new("Accuracy")
-                        .mid_left_of(self.ids.accuracy_canvas)
-                        .left_justify()
-                        .set(self.ids.accuracy_label, &mut ui_cell);
-
-                    Text::new(&format!("{:.1}%", score.accuracy))
-                        .mid_right_of(self.ids.accuracy_canvas)
-                        .left_justify()
-                        .set(self.ids.accuracy_value_label, &mut ui_cell);
-
-                    Text::new("Hit")
-                        .mid_left_of(self.ids.hit_canvas)
-                        .left_justify()
-                        .set(self.ids.hit_label, &mut ui_cell);
-
-                    Text::new(&format!("{}", score.hit))
-                        .mid_right_of(self.ids.hit_canvas)
-                        .left_justify()
-                        .set(self.ids.hit_value_label, &mut ui_cell);
-
-                    Text::new("Score")
-                        .mid_left_of(self.ids.score_canvas)
-                        .left_justify()
-                        .set(self.ids.score_label, &mut ui_cell);
-
-                    Text::new(&format!("{}", score.score))
-                        .mid_right_of(self.ids.score_canvas)
-                        .left_justify()
-                        .set(self.ids.score_value_label, &mut ui_cell);
-
-                    Text::new("Avg hit time")
-                        .mid_left_of(self.ids.avg_hit_time_canvas)
-                        .left_justify()
-                        .set(self.ids.avg_hit_time_label, &mut ui_cell);
-
-                    Text::new(&format!("{:.3}s", score.avg_hit_time))
-                        .mid_right_of(self.ids.avg_hit_time_canvas)
-                        .left_justify()
-                        .set(self.ids.avg_hit_time_value_label, &mut ui_cell);
-
-                    Text::new("Miss")
-                        .mid_left_of(self.ids.miss_canvas)
-                        .left_justify()
-                        .set(self.ids.miss_label, &mut ui_cell);
-
-                    Text::new(&format!("{}", score.miss))
-                        .mid_right_of(self.ids.miss_canvas)
-                        .left_justify()
-                        .set(self.ids.miss_value_label, &mut ui_cell);
+                        Text::new(value_text)
+                            .mid_right_of(**id_canvas)
+                            .left_justify()
+                            .set(**id_value_label, &mut ui_cell);
+                    }
                 }
-                GameModeScore::Elimination(_) => {}
-                GameModeScore::HitAndDodge(_) => {}
+                GameModeScore::Elimination(score) => {
+                    let mut prev_canvas_id = self.ids.title_label;
+
+                    let l = [
+                        (
+                            &self.ids.hit_canvas,
+                            &self.ids.hit_label,
+                            "Hit",
+                            &self.ids.hit_value_label,
+                            &format!("{}", score.hit),
+                        ),
+                        (
+                            &self.ids.score_canvas,
+                            &self.ids.score_label,
+                            "Score",
+                            &self.ids.score_value_label,
+                            &format!("{}", score.score),
+                        ),
+                        (
+                            &self.ids.avg_hit_time_canvas,
+                            &self.ids.avg_hit_time_label,
+                            "Avg hit time",
+                            &self.ids.avg_hit_time_value_label,
+                            &format!("{:.2}s", score.avg_hit_time),
+                        ),
+                        (
+                            &self.ids.miss_canvas,
+                            &self.ids.miss_label,
+                            "Miss",
+                            &self.ids.miss_value_label,
+                            &format!("{}", score.miss),
+                        ),
+                        (
+                            &self.ids.accuracy_canvas,
+                            &self.ids.accuracy_label,
+                            "Accuracy",
+                            &self.ids.accuracy_value_label,
+                            &format!("{:.2}%", score.accuracy),
+                        ),
+                        (
+                            &self.ids.hit_fake_target_canvas,
+                            &self.ids.hit_fake_target_label,
+                            "Hit fake target",
+                            &self.ids.hit_fake_target_value_label,
+                            &format!("{}", score.hit_fake_target),
+                        ),
+                        (
+                            &self.ids.running_time_canvas,
+                            &self.ids.running_time_label,
+                            "Running time",
+                            &self.ids.running_time_value_label,
+                            &format!(
+                                "{:02}:{:02}",
+                                (score.running_time / 60.0) as i32,
+                                (score.running_time % 60.0) as i32
+                            ),
+                        ),
+                    ];
+
+                    for (i, (id_canvas, id_label, label_text, id_value_label, value_text)) in
+                        l.iter().enumerate()
+                    {
+                        Canvas::new()
+                            .down_from(prev_canvas_id, if i == 0 { 50.0 } else { GAP_BETWEEN_ITEM })
+                            .align_middle_x()
+                            .w(ITEM_WIDTH)
+                            .set(**id_canvas, &mut ui_cell);
+
+                        prev_canvas_id = **id_canvas;
+                    }
+                    for (id_canvas, id_label, label_text, id_value_label, value_text) in l.iter() {
+                        Text::new(label_text)
+                            .mid_left_of(**id_canvas)
+                            .left_justify()
+                            .set(**id_label, &mut ui_cell);
+
+                        Text::new(value_text)
+                            .mid_right_of(**id_canvas)
+                            .left_justify()
+                            .set(**id_value_label, &mut ui_cell);
+                    }
+                }
+                GameModeScore::HitAndDodge(score) => {
+                    let mut prev_canvas_id = self.ids.title_label;
+
+                    let l = [
+                        (
+                            &self.ids.hit_canvas,
+                            &self.ids.hit_label,
+                            "Hit",
+                            &self.ids.hit_value_label,
+                            &format!("{}", score.hit),
+                        ),
+                        (
+                            &self.ids.score_canvas,
+                            &self.ids.score_label,
+                            "Score",
+                            &self.ids.score_value_label,
+                            &format!("{}", score.score),
+                        ),
+                        (
+                            &self.ids.avg_hit_time_canvas,
+                            &self.ids.avg_hit_time_label,
+                            "Avg hit time",
+                            &self.ids.avg_hit_time_value_label,
+                            &format!("{:.2}s", score.avg_hit_time),
+                        ),
+                        (
+                            &self.ids.miss_canvas,
+                            &self.ids.miss_label,
+                            "Miss",
+                            &self.ids.miss_value_label,
+                            &format!("{}", score.miss),
+                        ),
+                        (
+                            &self.ids.accuracy_canvas,
+                            &self.ids.accuracy_label,
+                            "Accuracy",
+                            &self.ids.accuracy_value_label,
+                            &format!("{:.2}%", score.accuracy),
+                        ),
+                        (
+                            &self.ids.hit_taken_canvas,
+                            &self.ids.hit_taken_label,
+                            "Hit taken",
+                            &self.ids.hit_taken_value_label,
+                            &format!("{}", score.hit_taken),
+                        ),
+                    ];
+
+                    for (i, (id_canvas, id_label, label_text, id_value_label, value_text)) in
+                        l.iter().enumerate()
+                    {
+                        Canvas::new()
+                            .down_from(prev_canvas_id, if i == 0 { 50.0 } else { GAP_BETWEEN_ITEM })
+                            .align_middle_x()
+                            .w(ITEM_WIDTH)
+                            .set(**id_canvas, &mut ui_cell);
+
+                        prev_canvas_id = **id_canvas;
+                    }
+                    for (id_canvas, id_label, label_text, id_value_label, value_text) in l.iter() {
+                        Text::new(label_text)
+                            .mid_left_of(**id_canvas)
+                            .left_justify()
+                            .set(**id_label, &mut ui_cell);
+
+                        Text::new(value_text)
+                            .mid_right_of(**id_canvas)
+                            .left_justify()
+                            .set(**id_value_label, &mut ui_cell);
+                    }
+                }
             }
 
             next_button = Button::new()

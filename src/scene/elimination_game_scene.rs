@@ -83,8 +83,6 @@ impl Score {
     }
 }
 
-pub const GAME_DURATION: f32 = 120.0;
-
 pub struct EliminationGameScene {
     ids: EliminationGameSceneIds,
     world: World,
@@ -96,7 +94,7 @@ pub struct EliminationGameScene {
     rng: SmallRng,
     shoot_animation: InOutAnimation,
     entity_to_remove: Vec<Entity>,
-    round_timer: Timer,
+    round_stopwatch: Stopwatch,
     freeze: bool,
     game_state: GameState,
     difficulty: GameDifficulty,
@@ -163,7 +161,7 @@ impl EliminationGameScene {
             rng: SmallRng::from_entropy(),
             shoot_animation: InOutAnimation::new(IN_SHOOT_ANIM_DURATION, OUT_SHOOT_ANIM_DURATION),
             freeze: false,
-            round_timer: Timer::new(GAME_DURATION),
+            round_stopwatch: Stopwatch::new(),
             entity_to_remove: Vec::new(),
             game_state: GameState::Preround,
             difficulty,
@@ -220,7 +218,7 @@ impl Scene for EliminationGameScene {
         _control_flow: &mut ControlFlow,
         _database: &mut Database,
     ) -> SceneOp {
-        let round_timer_sec = self.round_timer.get_duration();
+        let round_timer_sec = self.round_stopwatch.get_duration();
 
         let mut ui_cell = conrod_handle.get_ui_mut().set_widgets();
         {
@@ -344,7 +342,7 @@ impl Scene for EliminationGameScene {
                 }
             }
             GameState::Round => {
-                self.round_timer.update(delta_time);
+                self.round_stopwatch.update(delta_time);
                 self.shoot_timer.update(delta_time);
                 self.delta_shoot_time.update(delta_time);
 
@@ -381,14 +379,15 @@ impl Scene for EliminationGameScene {
 
                 self.shoot(&input_manager, audio_context, &renderer.camera, delta_time);
 
-                if self.round_timer.is_finished() || !is_any_target_exists(&mut self.world) {
+                if !is_any_target_exists(&mut self.world) {
                     self.game_state = GameState::Finishing(Timer::new(FINISHING_DURATION));
                 }
             }
             GameState::Finishing(ref mut timer) => {
+                renderer.game_renderer.render_crosshair = false;
                 timer.update(delta_time);
 
-                Text::new("Time out!")
+                Text::new("Finished!")
                     .align_middle_x_of(self.ids.canvas)
                     .align_middle_y_of(self.ids.canvas)
                     .set(self.ids.start_duration_label, &mut ui_cell);
@@ -406,13 +405,16 @@ impl Scene for EliminationGameScene {
                 Box::new(GameScoreScene::new(
                     conrod_handle,
                     GameModeScore::Elimination(EliminationGameScoreDisplay {
-                        accuracy: self.score.hit as f32 / (self.score.hit + self.score.miss) as f32
+                        accuracy: self.score.hit as f32
+                            / (self.score.hit + self.score.miss).max(1) as f32
                             * 100.0,
                         hit: self.score.hit,
                         miss: self.score.miss,
                         hit_fake_target: self.score.hit_fake_target,
                         score: self.score.score,
-                        avg_hit_time: GAME_DURATION / self.score.hit as f32,
+                        avg_hit_time: self.round_stopwatch.get_duration()
+                            / self.score.hit.max(1) as f32,
+                        running_time: self.round_stopwatch.get_duration(),
                         created_at: Utc::now().naive_utc(),
                     }),
                     self.difficulty,
@@ -462,17 +464,12 @@ impl Scene for EliminationGameScene {
 impl EliminationGameScene {
     fn init_targets(&mut self) {
         let y_amount = match self.difficulty {
-            GameDifficulty::Easy => 8,
-            GameDifficulty::Medium => 9,
-            GameDifficulty::Hard => 10,
-        };
-        let x_amount = match self.difficulty {
-            GameDifficulty::Easy => 10,
-            GameDifficulty::Medium => 12,
-            GameDifficulty::Hard => 15,
+            GameDifficulty::Easy => 7,
+            GameDifficulty::Medium => 8,
+            GameDifficulty::Hard => 9,
         };
         for y in 0..y_amount {
-            for _ in 0..x_amount {
+            for _ in 0..2 {
                 match self.difficulty {
                     GameDifficulty::Easy => {
                         let r = self.rng.sample(Uniform::new(8.0, 20.0));
@@ -551,8 +548,6 @@ impl EliminationGameScene {
         delta_time: f32,
     ) {
         if input_manager.is_mouse_press(&MouseButton::Left) && self.shoot_timer.is_finished() {
-            self.score.hit += 1;
-
             self.shoot_animation.trigger();
             self.shoot_timer.reset(0.4);
 
@@ -565,17 +560,15 @@ impl EliminationGameScene {
 
             if let Some((handle, _distance)) = shoot_ray(&self.physics, camera) {
                 let collider = self.physics.collider_set.get(handle).unwrap();
-                let entity = Entity::from_bits(collider.user_data as u64);
+                let entity = Entity::from_bits(collider.user_data as u64).unwrap();
 
                 if let Ok(mut target) = self.world.get_mut::<Target>(entity) {
-                    if !target.try_shoot(audio_context) {
+                    if target.try_shoot(audio_context) {
                         let shoot_time = self.delta_shoot_time.get_duration();
                         self.delta_shoot_time.reset();
 
-                        target.try_shoot(audio_context);
-
-                        self.score.score += ((100.0 * (3.0 - shoot_time)) as i32).max(0);
                         self.score.hit += 1;
+                        self.score.score += ((100.0 * (4.0 - shoot_time)) as i32).max(50);
                     } else {
                         self.score.miss += 1;
                     }

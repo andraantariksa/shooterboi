@@ -632,12 +632,12 @@ void main()
         const vec3 ambient_light = SKYCOLOR * color * 0.3;
         vec3 post_color = ambient_light;
         post_color += blinn_phong(
-        color,
+            color,
             vec3(1.0),
             10.0,
             ray_hit_pos,
             cam_pos,
-            vec3(0.0, 30.0, 0.0),
+            queuecount_raymarchmaxstep_aostep_background_type.w == SCENE_CITY ? vec3(0.0, 80.0, 0.0) : vec3(0.0, 20.0, 0.0),
             vec3(0.4),
             normal);
         #if DEBUG_POSITION == 1

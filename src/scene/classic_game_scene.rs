@@ -89,7 +89,7 @@ impl Score {
     }
 }
 
-pub const GAME_DURATION: f32 = 60.0;
+pub const GAME_DURATION: f32 = 90.0;
 
 pub struct ClassicGameScene {
     ids: ClassicGameSceneIds,
@@ -317,8 +317,6 @@ impl Scene for ClassicGameScene {
             .middle_of(self.ids.duration_canvas)
             .set(self.ids.duration_label, &mut ui_cell);
 
-            let _w_duration_label = ui_cell.w_of(self.ids.duration_label).unwrap();
-
             Text::new(&format!("{}", self.score.score))
                 .font_size(12)
                 .color(color::BLACK)
@@ -421,6 +419,7 @@ impl Scene for ClassicGameScene {
                 }
             }
             GameState::Finishing(ref mut timer) => {
+                renderer.game_renderer.render_crosshair = false;
                 timer.update(delta_time);
 
                 Text::new("Time out!")
@@ -441,12 +440,13 @@ impl Scene for ClassicGameScene {
                 Box::new(GameScoreScene::new(
                     conrod_handle,
                     GameModeScore::Classic(ClassicGameScoreDisplay {
-                        accuracy: self.score.hit as f32 / (self.score.hit + self.score.miss) as f32
+                        accuracy: (self.score.hit) as f32
+                            / (self.score.hit + self.score.miss).max(1) as f32
                             * 100.0,
                         hit: self.score.hit,
                         miss: self.score.miss,
                         score: self.score.score,
-                        avg_hit_time: GAME_DURATION / self.score.hit as f32,
+                        avg_hit_time: GAME_DURATION / self.score.hit.max(1) as f32,
                         created_at: Utc::now().naive_utc(),
                     }),
                     self.difficulty,
@@ -504,8 +504,6 @@ impl ClassicGameScene {
         delta_time: f32,
     ) {
         if input_manager.is_mouse_press(&MouseButton::Left) && self.shoot_timer.is_finished() {
-            self.score.hit += 1;
-
             self.shoot_animation.trigger();
             self.shoot_timer.reset(0.4);
 
@@ -518,7 +516,7 @@ impl ClassicGameScene {
 
             if let Some((handle, _distance)) = shoot_ray(&self.physics, camera) {
                 let collider = self.physics.collider_set.get(handle).unwrap();
-                let entity = Entity::from_bits(collider.user_data as u64);
+                let entity = Entity::from_bits(collider.user_data as u64).unwrap();
 
                 let mut need_to_spawn = false;
                 if let Ok(mut target) = self.world.get_mut::<Target>(entity) {
@@ -533,8 +531,8 @@ impl ClassicGameScene {
                             TargetSpawnState::Secondary => TargetSpawnState::Primary,
                         };
 
-                        self.score.score += ((300.0 * (3.0 - shoot_time)) as i32).max(0);
                         self.score.hit += 1;
+                        self.score.score += ((100.0 * (3.0 - shoot_time)) as i32).max(0);
                     } else {
                         // Hit fake target
                         self.score.miss += 1;

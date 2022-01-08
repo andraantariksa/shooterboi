@@ -87,7 +87,7 @@ impl Score {
     }
 }
 
-pub const GAME_DURATION: f32 = 100.0;
+pub const GAME_DURATION: f32 = 90.0;
 
 pub struct HitAndDodgeGameScene {
     ids: HitAndDodgeGameSceneIds,
@@ -118,25 +118,53 @@ impl HitAndDodgeGameScene {
         // Ground
         physics
             .collider_set
-            .insert(ColliderBuilder::new(SharedShape::cuboid(10.0, 1.0, 10.0)).build());
+            .insert(ColliderBuilder::new(SharedShape::cuboid(1000.0, 1.0, 1000.0)).build());
 
         let player_rigid_body_handle =
             setup_player_collider(&mut physics, Vector3::new(0.0, 1.0, 0.0));
 
         let mut rng = SmallRng::from_entropy();
 
-        spawn_gunman(
-            &mut world,
-            &mut physics,
-            Vector3::<f32>::new(2.0, 2.5, -2.0),
-            Gunman::new(&mut rng),
-        );
-        spawn_swordman(
-            &mut world,
-            &mut physics,
-            Vector3::<f32>::new(-2.0, 2.5, -2.0),
-            Swordman::new(),
-        );
+        match difficulty {
+            GameDifficulty::Medium => {
+                spawn_swordman(
+                    &mut world,
+                    &mut physics,
+                    Vector3::<f32>::new(-2.0, 2.5, -2.0),
+                    Swordman::new(),
+                );
+
+                spawn_gunman(
+                    &mut world,
+                    &mut physics,
+                    Vector3::<f32>::new(2.0, 2.5, -2.0),
+                    Gunman::new(&mut rng, 0.0, 4.0),
+                );
+            }
+            GameDifficulty::Hard => {
+                spawn_swordman(
+                    &mut world,
+                    &mut physics,
+                    Vector3::<f32>::new(-2.0, 2.5, -2.0),
+                    Swordman::new(),
+                );
+
+                spawn_gunman(
+                    &mut world,
+                    &mut physics,
+                    Vector3::<f32>::new(2.0, 2.5, -2.0),
+                    Gunman::new(&mut rng, 0.0, 6.0),
+                );
+            }
+            GameDifficulty::Easy => {
+                spawn_gunman(
+                    &mut world,
+                    &mut physics,
+                    Vector3::<f32>::new(2.0, 2.5, -2.0),
+                    Gunman::new(&mut rng, 0.3, 4.0),
+                );
+            }
+        };
 
         spawn_wall(
             &mut world,
@@ -275,13 +303,13 @@ impl Scene for HitAndDodgeGameScene {
 
             let _w_duration_label = ui_cell.w_of(self.ids.duration_label).unwrap();
 
-            Text::new(&format!("{:.2}%", self.score.score))
+            Text::new(&format!("{}", self.score.score))
                 .font_size(12)
                 .color(color::BLACK)
                 .middle_of(self.ids.score_canvas)
                 .set(self.ids.score_label, &mut ui_cell);
             Text::new(&format!(
-                "{:02}%",
+                "{:.2}%",
                 (self.score.hit) as f32 / (self.score.hit + self.score.miss).max(1) as f32 * 100.0
             ))
             .font_size(12)
@@ -365,6 +393,7 @@ impl Scene for HitAndDodgeGameScene {
                 update_swordmans(
                     &mut self.world,
                     &mut self.physics,
+                    &mut self.score,
                     delta_time,
                     &renderer.camera.position,
                 );
@@ -384,6 +413,7 @@ impl Scene for HitAndDodgeGameScene {
                 }
             }
             GameState::Finishing(ref mut timer) => {
+                renderer.game_renderer.render_crosshair = false;
                 self.shoot_timer.update(delta_time);
                 timer.update(delta_time);
 
@@ -405,13 +435,14 @@ impl Scene for HitAndDodgeGameScene {
                 Box::new(GameScoreScene::new(
                     conrod_handle,
                     GameModeScore::HitAndDodge(HitAndDodgeGameScoreDisplay {
-                        accuracy: self.score.hit as f32 / (self.score.hit + self.score.miss) as f32
+                        accuracy: self.score.hit as f32
+                            / (self.score.hit + self.score.miss).max(1) as f32
                             * 100.0,
                         hit: self.score.hit,
                         miss: self.score.miss,
                         hit_taken: self.score.hit_taken,
                         score: self.score.score,
-                        avg_hit_time: GAME_DURATION / self.score.hit as f32,
+                        avg_hit_time: GAME_DURATION / self.score.hit.max(1) as f32,
                         created_at: Utc::now().naive_utc(),
                     }),
                     self.difficulty,
@@ -470,8 +501,6 @@ impl HitAndDodgeGameScene {
         delta_time: f32,
     ) {
         if input_manager.is_mouse_press(&MouseButton::Left) && self.shoot_timer.is_finished() {
-            self.score.hit += 1;
-
             self.shoot_animation.trigger();
             self.shoot_timer.reset(0.4);
 
@@ -484,28 +513,28 @@ impl HitAndDodgeGameScene {
 
             if let Some((handle, _distance)) = shoot_ray(&self.physics, camera) {
                 let collider = self.physics.collider_set.get(handle).unwrap();
-                let entity = Entity::from_bits(collider.user_data as u64);
+                if let Some(entity) = Entity::from_bits(collider.user_data as u64) {
+                    if let Ok(mut gunman) = self.world.get_mut::<Gunman>(entity) {
+                        gunman.hit();
 
-                if let Ok(mut gunman) = self.world.get_mut::<Gunman>(entity) {
-                    gunman.hit();
+                        let shoot_time = self.delta_shoot_time.get_duration();
+                        self.delta_shoot_time.reset();
 
-                    let shoot_time = self.delta_shoot_time.get_duration();
-                    self.delta_shoot_time.reset();
-
-                    self.score.score += ((500.0 * (5.0 - shoot_time)) as i32).max(300);
-                } else if let Ok(mut swordman) = self.world.get_mut::<Swordman>(entity) {
-                    swordman.hit();
-
-                    let shoot_time = self.delta_shoot_time.get_duration();
-                    self.delta_shoot_time.reset();
-
-                    self.score.score += ((100.0 * (5.0 - shoot_time)) as i32).max(100);
+                        self.score.hit += 1;
+                        self.score.score += ((100.0 * (7.0 - shoot_time)) as i32).max(100);
+                    }
+                    // else if let Ok(mut swordman) = self.world.get_mut::<Swordman>(entity) {
+                    //     swordman.hit();
+                    //
+                    //     let shoot_time = self.delta_shoot_time.get_duration();
+                    //     self.delta_shoot_time.reset();
+                    //
+                    //     self.score.score += ((100.0 * (5.0 - shoot_time)) as i32).max(100);
                 } else {
-                    // Hit other than gunman & swordman
                     self.score.miss += 1;
                 }
             } else {
-                // Hit nothing
+                // Hit other than gunman & swordman
                 self.score.miss += 1;
             }
         }
@@ -514,34 +543,43 @@ impl HitAndDodgeGameScene {
     fn bullet_disposal(&mut self) {
         while let Ok(contact_event) = self.physics.contact_recv.try_recv() {
             match contact_event {
-                ContactEvent::Started(maybe_player_handle, maybe_bullet_handle) => {
-                    let collider = self.physics.collider_set.get(maybe_bullet_handle).unwrap();
-                    let entity = Entity::from_bits(collider.user_data as u64);
+                ContactEvent::Started(a_collider, b_collider) => {
+                    let mut res = None;
+                    let mut has_player = false;
 
-                    let mut bullet_hit = false;
+                    if let Some(collider) = self.physics.collider_set.get(a_collider) {
+                        has_player |= collider.user_data == u128::MAX;
+                        if let Some(entity) = Entity::from_bits(collider.user_data as u64) {
+                            if self.world.get::<Bullet>(entity).is_ok() {
+                                res = Some((collider.parent().unwrap(), entity))
+                            }
+                        }
+                    }
+                    if let Some(collider) = self.physics.collider_set.get(b_collider) {
+                        has_player |= collider.user_data == u128::MAX;
+                        if let Some(entity) = Entity::from_bits(collider.user_data as u64) {
+                            if self.world.get::<Bullet>(entity).is_ok() {
+                                res = Some((collider.parent().unwrap(), entity))
+                            }
+                        }
+                    }
 
-                    if self.world.get::<Bullet>(entity).is_ok() {
-                        let rb = collider.parent().unwrap();
+                    if let Some((rb, e)) = res {
                         self.physics.rigid_body_set.remove(
                             rb,
                             &mut self.physics.island_manager,
                             &mut self.physics.collider_set,
                             &mut self.physics.joint_set,
                         );
-                        self.entity_to_remove.push(entity);
+                        self.entity_to_remove.push(e);
 
-                        bullet_hit = true;
-                    }
-
-                    let collider = self.physics.collider_set.get(maybe_player_handle).unwrap();
-                    let is_player = collider.user_data == u128::MAX;
-
-                    if is_player && bullet_hit {
-                        self.score.hit_taken += 1;
+                        if has_player {
+                            self.score.hit_taken += 1;
+                        }
                     }
                 }
                 ContactEvent::Stopped(_, _) => {}
-            }
+            };
         }
         for entity in self.entity_to_remove.iter() {
             self.world.despawn(*entity).unwrap();

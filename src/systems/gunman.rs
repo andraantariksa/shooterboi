@@ -25,12 +25,67 @@ pub fn spawn_gunman(
             .build(),
     );
     physics.collider_set.insert_with_parent(
+        ColliderBuilder::new(SharedShape::cuboid(0.3 * 0.2, 1.4 * 0.2, 0.4 * 0.2))
+            .user_data(entity.to_bits().get() as u128)
+            .build(),
+        rigid_body_handle,
+        &mut physics.rigid_body_set,
+    );
+    // Arms
+    // Left
+    physics.collider_set.insert_with_parent(
         ColliderBuilder::new(SharedShape::capsule(
-            Point3::<f32>::new(0.0, 3.1 * 0.2, 0.0),
-            Point3::<f32>::new(0.0, -4.5 * 0.2, 0.0),
-            1.0 * 0.2,
+            Point3::<f32>::new(1.1, 1.4, 0.0) * 0.2,
+            Point3::<f32>::new(1.1, 1.4 - 2.3, 0.0) * 0.2,
+            0.4 * 0.2,
         ))
-        .user_data(entity.to_bits() as u128)
+        .user_data(entity.to_bits().get() as u128)
+        .build(),
+        rigid_body_handle,
+        &mut physics.rigid_body_set,
+    );
+    // Right
+    physics.collider_set.insert_with_parent(
+        ColliderBuilder::new(SharedShape::capsule(
+            Point3::<f32>::new(-1.1, 1.6, 0.0) * 0.2,
+            Point3::<f32>::new(-1.1, 1.6, 2.3) * 0.2,
+            0.4 * 0.2,
+        ))
+        .user_data(entity.to_bits().get() as u128)
+        .build(),
+        rigid_body_handle,
+        &mut physics.rigid_body_set,
+    );
+    // Head
+    physics.collider_set.insert_with_parent(
+        ColliderBuilder::new(SharedShape::ball(0.2))
+            .translation(Vector3::new(0.0, 3.1, 0.0) * 0.2)
+            .user_data(entity.to_bits().get() as u128)
+            .build(),
+        rigid_body_handle,
+        &mut physics.rigid_body_set,
+    );
+    // Legs
+    // Left
+    physics.collider_set.insert_with_parent(
+        ColliderBuilder::new(SharedShape::capsule(
+            Point3::<f32>::new(0.5, -2.0, 0.0) * 0.2,
+            Point3::<f32>::new(0.5, -2.0 - 2.5, 0.0) * 0.2,
+            0.4 * 0.2,
+        ))
+        .user_data(entity.to_bits().get() as u128)
+        .build(),
+        rigid_body_handle,
+        &mut physics.rigid_body_set,
+    );
+    // Right
+    physics.collider_set.insert_with_parent(
+        ColliderBuilder::new(SharedShape::capsule(
+            Point3::<f32>::new(-0.5, -2.0, 0.0) * 0.2,
+            Point3::<f32>::new(-0.5, -2.0 - 2.5, 0.0) * 0.2,
+            0.4 * 0.2,
+        ))
+        .user_data(entity.to_bits().get() as u128)
         .build(),
         rigid_body_handle,
         &mut physics.rigid_body_set,
@@ -97,7 +152,7 @@ pub fn spawn_bullet(
     );
     physics.collider_set.insert_with_parent(
         ColliderBuilder::new(SharedShape::ball(BULLET_RAD))
-            .user_data(entity.to_bits() as u128)
+            .user_data(entity.to_bits().get() as u128)
             .active_events(ActiveEvents::CONTACT_EVENTS)
             .build(),
         rigid_body_handle,
