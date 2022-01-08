@@ -161,10 +161,7 @@ impl Target {
             Patrol::Linear { a, b } => {
                 match &self.patrol_state {
                     PatrolState::AToB => {
-                        if distance(
-                            &Point3::from_coordinates(obj_pos.clone()),
-                            &Point3::from_coordinates(b.clone()),
-                        ) <= f32::EPSILON
+                        if distance(&Point3::from(obj_pos.clone()), &Point3::from(b.clone())) <= 0.5
                         {
                             self.patrol_state = PatrolState::BToA;
                         } else {
@@ -175,10 +172,7 @@ impl Target {
                         }
                     }
                     PatrolState::BToA => {
-                        if distance(
-                            &Point3::from_coordinates(obj_pos.clone()),
-                            &Point3::from_coordinates(a.clone()),
-                        ) <= f32::EPSILON
+                        if distance(&Point3::from(obj_pos.clone()), &Point3::from(a.clone())) <= 0.5
                         {
                             self.patrol_state = PatrolState::AToB;
                         } else {

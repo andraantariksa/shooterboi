@@ -148,7 +148,7 @@ impl Scene for ScoreHistoryScene {
                     while let Some(item) = score_list_event.next(&ui_cell) {
                         let y = &x[item.i];
                         let s = format!(
-                            "Score: {}\nAccuracy: {:.2}%\nHit: {}\nMiss: {}\nAverage hit time{:.2}s\n{}",
+                            "Score: {}\nAccuracy: {:.2}%\nHit: {}\nMiss: {}\nAverage hit time{:.2}s\n{}\n\n",
                             y.score, y.accuracy, y.hit, y.miss, y.avg_hit_time, y.created_at
                         );
                         let text = Text::new(&s);
@@ -160,7 +160,7 @@ impl Scene for ScoreHistoryScene {
                     while let Some(item) = score_list_event.next(&ui_cell) {
                         let y = &x[item.i];
                         let s = format!(
-                            "Score: {}\nAccuracy: {:.2}%\nHit: {}\nMiss: {}\nAverage hit time: {:.2}s\nFake target hit: {}\nRunning time: {:02}:{:02}\n{}",
+                            "Score: {}\nAccuracy: {:.2}%\nHit: {}\nMiss: {}\nAverage hit time: {:.2}s\nFake target hit: {}\nRunning time: {:02}:{:02}\n{}\n\n",
                             y.score, y.accuracy, y.hit, y.miss, y.avg_hit_time, y.hit_fake_target, (y.running_time / 60.0) as i32, (y.running_time % 60.0) as i32, y.created_at
                         );
                         let text = Text::new(&s);
@@ -172,7 +172,7 @@ impl Scene for ScoreHistoryScene {
                     while let Some(item) = score_list_event.next(&ui_cell) {
                         let y = &x[item.i];
                         let s = format!(
-                            "Score: {}\nAccuracy: {:.2}%\nHit: {}\nMiss: {}\nAverage hit time: {:.2}\nHit taken: {}\n{}",
+                            "Score: {}\nAccuracy: {:.2}%\nHit: {}\nMiss: {}\nAverage hit time: {:.2}\nHit taken: {}\n{}\n\n",
                             y.score, y.accuracy, y.hit, y.miss, y.avg_hit_time, y.hit_taken, y.created_at
                         );
                         let text = Text::new(&s);
