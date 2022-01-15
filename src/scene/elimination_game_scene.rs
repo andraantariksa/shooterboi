@@ -459,6 +459,7 @@ impl Scene for EliminationGameScene {
     ) {
         renderer.rendering_info.fov_shootanim.y = 0.0;
         renderer.render_objects.clear();
+        renderer.game_renderer.render_crosshair = false;
         window.set_is_cursor_grabbed(false);
     }
 }
@@ -471,7 +472,7 @@ impl EliminationGameScene {
             GameDifficulty::Hard => 9,
         };
         for y in 0..y_amount {
-            for _ in 0..2 {
+            for _ in 0..4 {
                 match self.difficulty {
                     GameDifficulty::Easy => {
                         let r = self.rng.sample(Uniform::new(8.0, 20.0));

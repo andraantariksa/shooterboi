@@ -1,4 +1,5 @@
 use conrod_core::widget::envelope_editor::EnvelopePoint;
+use conrod_core::widget::{Button, Canvas, Image};
 use conrod_core::{Labelable, Positionable, Sizeable, Widget};
 use std::io::{BufReader, Cursor};
 use winit::event_loop::ControlFlow;
@@ -13,9 +14,7 @@ use crate::scene::exit_confirm_scene::QuitConfirmScene;
 use crate::scene::game_selection_scene::GameSelectionScene;
 use crate::scene::guide_scene::GuideScene;
 use crate::scene::settings_scene::SettingsScene;
-use crate::scene::{
-    MaybeMessage, Scene, SceneOp, Value, BUTTON_HEIGHT, BUTTON_WIDTH, MARGIN,
-};
+use crate::scene::{MaybeMessage, Scene, SceneOp, Value, BUTTON_HEIGHT, BUTTON_WIDTH, MARGIN};
 use crate::window::Window;
 use conrod_core::widget_ids;
 use rodio::Source;
@@ -104,7 +103,7 @@ impl Scene for MainMenuScene {
         let classic_game_button;
         #[cfg(not(target_arch = "wasm32"))]
         let mut quit_button;
-        let guide_button;
+        // let guide_button;
 
         {
             let image_id = *conrod_handle.get_image_id_map().get("title").unwrap();
@@ -112,11 +111,11 @@ impl Scene for MainMenuScene {
             let ratio = image.height as f64 / image.width as f64;
             let mut ui_cell = conrod_handle.get_ui_mut().set_widgets();
 
-            conrod_core::widget::Canvas::new().set(self.ids.canvas, &mut ui_cell);
+            Canvas::new().set(self.ids.canvas, &mut ui_cell);
 
             #[cfg(not(target_arch = "wasm32"))]
             {
-                quit_button = conrod_core::widget::Button::new()
+                quit_button = Button::new()
                     .label("Quit")
                     .wh(conrod_core::Dimensions::new(BUTTON_WIDTH, BUTTON_HEIGHT))
                     .bottom_left_with_margin_on(self.ids.canvas, MARGIN)
@@ -127,7 +126,7 @@ impl Scene for MainMenuScene {
 
             const GAP_BETWEEN_BUTTON: f64 = 20.0;
 
-            let mut _settings_button = conrod_core::widget::Button::new()
+            let mut _settings_button = Button::new()
                 .label("Settings")
                 .wh(conrod_core::Dimensions::new(BUTTON_WIDTH, BUTTON_HEIGHT));
             if cfg!(target_arch = "wasm32") {
@@ -139,29 +138,30 @@ impl Scene for MainMenuScene {
             }
             settings_button = _settings_button.set(self.ids.settings_button, &mut ui_cell);
 
-            guide_button = conrod_core::widget::Button::new()
-                .label("Guide")
-                .wh(conrod_core::Dimensions::new(BUTTON_WIDTH, BUTTON_HEIGHT))
-                .up_from(self.ids.settings_button, GAP_BETWEEN_BUTTON)
-                .set(self.ids.guide_button, &mut ui_cell);
+            // guide_button = Button::new()
+            //     .label("Guide")
+            //     .wh(conrod_core::Dimensions::new(BUTTON_WIDTH, BUTTON_HEIGHT))
+            //     .up_from(self.ids.settings_button, GAP_BETWEEN_BUTTON)
+            //     .set(self.ids.guide_button, &mut ui_cell);
 
-            classic_game_button = conrod_core::widget::Button::new()
+            classic_game_button = Button::new()
                 .label("Play")
                 .wh(conrod_core::Dimensions::new(BUTTON_WIDTH, BUTTON_HEIGHT))
-                .up_from(self.ids.guide_button, GAP_BETWEEN_BUTTON)
+                .up_from(self.ids.settings_button, GAP_BETWEEN_BUTTON)
+                // .up_from(self.ids.guide_button, GAP_BETWEEN_BUTTON)
                 .set(self.ids.start_classic_mode_button, &mut ui_cell);
 
             let logo_w = canvas_w - BUTTON_WIDTH - MARGIN * 2.0;
-            conrod_core::widget::Image::new(image_id)
+            Image::new(image_id)
                 .bottom_right_with_margin_on(self.ids.canvas, MARGIN)
                 .w(logo_w)
                 .h(ratio * logo_w)
                 .set(self.ids.title_image, &mut ui_cell);
         }
 
-        for _press in guide_button {
-            scene_op = SceneOp::Push(Box::new(GuideScene::new(renderer, conrod_handle)), None);
-        }
+        // for _press in guide_button {
+        //     scene_op = SceneOp::Push(Box::new(GuideScene::new(renderer, conrod_handle)), None);
+        // }
 
         if input_manager.is_keyboard_pressed(&VirtualKeyCode::Escape) || {
             #[cfg(not(target_arch = "wasm32"))]

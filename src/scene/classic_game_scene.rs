@@ -493,6 +493,7 @@ impl Scene for ClassicGameScene {
     ) {
         renderer.rendering_info.fov_shootanim.y = 0.0;
         renderer.render_objects.clear();
+        renderer.game_renderer.render_crosshair = false;
         window.set_is_cursor_grabbed(false);
     }
 }

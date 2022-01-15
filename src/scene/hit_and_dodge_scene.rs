@@ -523,6 +523,8 @@ impl HitAndDodgeGameScene {
 
                         self.score.hit += 1;
                         self.score.score += ((100.0 * (7.0 - shoot_time)) as i32).max(100);
+                    } else {
+                        self.score.miss += 1;
                     }
                     // else if let Ok(mut swordman) = self.world.get_mut::<Swordman>(entity) {
                     //     swordman.hit();
