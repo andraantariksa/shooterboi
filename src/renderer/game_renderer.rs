@@ -1,5 +1,6 @@
 use image::GenericImage;
 use wgpu::util::DeviceExt;
+use std::ops::Range;
 
 use crate::camera::Camera;
 use crate::gui::ConrodHandle;
@@ -8,6 +9,11 @@ use crate::renderer::rendering_info::RenderingInfo;
 use crate::renderer::vertex::{CoordColorVertex, CoordVertex, QUAD_VERTICES};
 use crate::renderer::{RenderObjects, SurfaceAndWindowConfig};
 use crate::util::{any_sized_as_u8_slice, any_slice_as_u8_slice};
+
+struct TerrainResolution {
+    width: f32,
+    height: f32
+}
 
 pub struct GameSceneRenderer {
     pub main_render_pipeline: wgpu::RenderPipeline,
@@ -18,6 +24,7 @@ pub struct GameSceneRenderer {
     pub render_objects_buffer: wgpu::Buffer,
     pub quad_vertex_buffer: wgpu::Buffer,
     pub crosshair_vertex_buffer: wgpu::Buffer,
+    pub terrain_texture: wgpu::Texture,
     pub render_crosshair: bool,
 }
 
@@ -281,13 +288,26 @@ impl GameSceneRenderer {
             &default_texture_view_descriptor("RGBA noise medium texture view"),
         );
 
+        let image =
+            image::load_from_memory(include_bytes!("../../assets/images/terrain.png"))
+                .unwrap()
+                .into_rgba8();
+
+        let terrain_texture = device.create_texture_with_data(
+            queue,
+            &default_texture_descriptor("Terrain texture", &image),
+            &image.into_raw()[..]);
+
+        let terrain_texture_view = terrain_texture.create_view(
+            &default_texture_view_descriptor("Terrain texture view"));
+        
         let texture_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
             label: Some("Texture sampler"),
             address_mode_u: wgpu::AddressMode::Repeat,
             address_mode_v: wgpu::AddressMode::Repeat,
             address_mode_w: wgpu::AddressMode::Repeat,
             mag_filter: wgpu::FilterMode::Linear,
-            min_filter: wgpu::FilterMode::Nearest,
+            min_filter: wgpu::FilterMode::Linear,
             mipmap_filter: wgpu::FilterMode::Nearest,
             lod_min_clamp: 0.0,
             lod_max_clamp: 0.0,
@@ -381,6 +401,16 @@ impl GameSceneRenderer {
                         },
                         visibility: wgpu::ShaderStages::FRAGMENT,
                     },
+                    wgpu::BindGroupLayoutEntry {
+                        count: None,
+                        binding: 19,
+                        ty: wgpu::BindingType::Texture {
+                            multisampled: false,
+                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                        },
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                    },
                 ],
             });
 
@@ -470,6 +500,10 @@ impl GameSceneRenderer {
                 wgpu::BindGroupEntry {
                     binding: 18,
                     resource: wgpu::BindingResource::Sampler(&noise_sampler),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 19,
+                    resource: wgpu::BindingResource::TextureView(&terrain_texture_view),
                 },
             ],
         });
@@ -587,6 +621,7 @@ impl GameSceneRenderer {
             rendering_info_buffer,
             quad_vertex_buffer,
             crosshair_vertex_buffer,
+            terrain_texture,
             render_crosshair: false,
         }
     }
@@ -677,5 +712,25 @@ fn default_texture_descriptor<T: GenericImage>(
         dimension: wgpu::TextureDimension::D2,
         format: wgpu::TextureFormat::Rgba8UnormSrgb,
         usage: wgpu::TextureUsages::TEXTURE_BINDING,
+    }
+}
+
+fn terrain_texture_descriptor(
+    width: u32,
+    height: u32
+) -> wgpu::TextureDescriptor<'static> {
+    wgpu::TextureDescriptor {
+        label: Some("Terrain"),
+        size: wgpu::Extent3d {
+            width: width,
+            height: height,
+            depth_or_array_layers: 1,
+        },
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format: wgpu::TextureFormat::R32Float,
+        usage: wgpu::TextureUsages::TEXTURE_BINDING |
+            wgpu::TextureUsages::STORAGE_BINDING
     }
 }

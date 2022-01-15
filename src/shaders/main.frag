@@ -228,10 +228,10 @@ float fbm_9( in vec2 x )
 }
 
 float sd_terrain(vec2 p) {
-    const float sca = 0.1;
-    p *= sca;
-    float h = fbm_9(p);
-    return h * 1.8;
+    //const float sca = 0.1;
+    //float h = fbm_9(p * sca);
+    float h = textureLod(sampler2D(terrain_texture, common_sampler), p * 0.05, 0.).r;
+    return h * 2.8;
 }
 
 const float building_c = 30.;
@@ -449,7 +449,7 @@ vec3 building_material(vec3 p, vec3 n) {
 const vec3 fog_color = vec3(0.34, 0.37, 0.4);
 vec3 apply_fog(vec3 color, float dist) {
     float dp = dist / MAX_DISTANCE;
-    return mix(color, fog_color, smoothstep(0., 1., dp));
+    return mix(color, SKYCOLOR, smoothstep(0., 1., dp));
 }
 
 const vec3 street_color = vec3(0.890, 0.937, 0.949);
@@ -519,7 +519,7 @@ vec3 color_mapping(vec3 ray_hit_pos, vec3 normal, Distance d)
         }
         case MATERIAL_GRASS:
         {
-            col = texture_map_triplanar(grass_texture, ray_hit_pos, normal);
+            col = texture_map_triplanar(grass_texture, ray_hit_pos / 4.0, normal);
             break;
         }
         case MATERIAL_COBBLESTONE_PAVING:
