@@ -146,6 +146,7 @@ pub fn spawn_bullet(
     let entity = world.reserve_entity();
     let rigid_body_handle = physics.rigid_body_set.insert(
         RigidBodyBuilder::new(RigidBodyType::Dynamic)
+            .user_data(entity.to_bits().get() as u128)
             .translation(pos)
             .linvel(dir * BULLET_SPEED)
             .build(),

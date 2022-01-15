@@ -17,6 +17,7 @@ pub fn setup_player_collider(physics: &mut GamePhysics, position: Vector3<f32>) 
             Point3::<f32>::new(0.0, 0.5, 0.0),
             0.5,
         ))
+        .active_events(ActiveEvents::CONTACT_EVENTS)
         .user_data(u128::MAX)
         .build(),
         player_rigid_body_handle,

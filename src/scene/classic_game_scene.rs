@@ -337,25 +337,6 @@ impl Scene for ClassicGameScene {
         let mut scene_op = SceneOp::None;
 
         if !self.freeze {
-            self.physics.physics_pipeline.step(
-                &self.physics.gravity,
-                &self.physics.integration_parameters,
-                &mut self.physics.island_manager,
-                &mut self.physics.broad_phase,
-                &mut self.physics.narrow_phase,
-                &mut self.physics.rigid_body_set,
-                &mut self.physics.collider_set,
-                &mut self.physics.joint_set,
-                &mut self.physics.ccd_solver,
-                &(),
-                &(),
-            );
-            self.physics.query_pipeline.update(
-                &self.physics.island_manager,
-                &self.physics.rigid_body_set,
-                &self.physics.collider_set,
-            );
-
             renderer.camera.move_direction(input_manager.mouse_movement);
 
             let _player_position = update_player_position(
@@ -432,6 +413,27 @@ impl Scene for ClassicGameScene {
                 }
             }
         };
+
+        if !self.freeze {
+            self.physics.physics_pipeline.step(
+                &self.physics.gravity,
+                &self.physics.integration_parameters,
+                &mut self.physics.island_manager,
+                &mut self.physics.broad_phase,
+                &mut self.physics.narrow_phase,
+                &mut self.physics.rigid_body_set,
+                &mut self.physics.collider_set,
+                &mut self.physics.joint_set,
+                &mut self.physics.ccd_solver,
+                &(),
+                &(),
+            );
+            self.physics.query_pipeline.update(
+                &self.physics.island_manager,
+                &self.physics.rigid_body_set,
+                &self.physics.collider_set,
+            );
+        }
 
         drop(ui_cell);
 

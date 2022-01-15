@@ -138,7 +138,7 @@ impl HitAndDodgeGameScene {
                     &mut world,
                     &mut physics,
                     Vector3::<f32>::new(2.0, 2.5, -2.0),
-                    Gunman::new(&mut rng, 0.0, 4.0),
+                    Gunman::new(&mut rng, 0.0, 3.0),
                 );
             }
             GameDifficulty::Hard => {
@@ -153,7 +153,7 @@ impl HitAndDodgeGameScene {
                     &mut world,
                     &mut physics,
                     Vector3::<f32>::new(2.0, 2.5, -2.0),
-                    Gunman::new(&mut rng, 0.0, 6.0),
+                    Gunman::new(&mut rng, 0.0, 5.0),
                 );
             }
             GameDifficulty::Easy => {
@@ -161,7 +161,7 @@ impl HitAndDodgeGameScene {
                     &mut world,
                     &mut physics,
                     Vector3::<f32>::new(2.0, 2.5, -2.0),
-                    Gunman::new(&mut rng, 0.3, 4.0),
+                    Gunman::new(&mut rng, 0.3, 3.0),
                 );
             }
         };
@@ -323,25 +323,6 @@ impl Scene for HitAndDodgeGameScene {
         let mut scene_op = SceneOp::None;
 
         if !self.freeze {
-            self.physics.physics_pipeline.step(
-                &self.physics.gravity,
-                &self.physics.integration_parameters,
-                &mut self.physics.island_manager,
-                &mut self.physics.broad_phase,
-                &mut self.physics.narrow_phase,
-                &mut self.physics.rigid_body_set,
-                &mut self.physics.collider_set,
-                &mut self.physics.joint_set,
-                &mut self.physics.ccd_solver,
-                &(),
-                &self.physics.event_handler,
-            );
-            self.physics.query_pipeline.update(
-                &self.physics.island_manager,
-                &self.physics.rigid_body_set,
-                &self.physics.collider_set,
-            );
-
             renderer.camera.move_direction(input_manager.mouse_movement);
 
             let _player_position = update_player_position(
@@ -406,8 +387,6 @@ impl Scene for HitAndDodgeGameScene {
 
                 self.shoot(input_manager, audio_context, &renderer.camera, delta_time);
 
-                self.bullet_disposal();
-
                 if self.round_timer.is_finished() {
                     self.game_state = GameState::Finishing(Timer::new(FINISHING_DURATION));
                 }
@@ -427,6 +406,28 @@ impl Scene for HitAndDodgeGameScene {
                 }
             }
         };
+
+        if !self.freeze {
+            self.physics.physics_pipeline.step(
+                &self.physics.gravity,
+                &self.physics.integration_parameters,
+                &mut self.physics.island_manager,
+                &mut self.physics.broad_phase,
+                &mut self.physics.narrow_phase,
+                &mut self.physics.rigid_body_set,
+                &mut self.physics.collider_set,
+                &mut self.physics.joint_set,
+                &mut self.physics.ccd_solver,
+                &(),
+                &mut self.physics.event_handler,
+            );
+            self.physics.query_pipeline.update(
+                &self.physics.island_manager,
+                &self.physics.rigid_body_set,
+                &self.physics.collider_set,
+            );
+            self.bullet_disposal();
+        }
 
         drop(ui_cell);
 
@@ -551,15 +552,16 @@ impl HitAndDodgeGameScene {
                         has_player |= collider.user_data == u128::MAX;
                         if let Some(entity) = Entity::from_bits(collider.user_data as u64) {
                             if self.world.get::<Bullet>(entity).is_ok() {
-                                res = Some((collider.parent().unwrap(), entity))
+                                res = Some((collider.parent().unwrap(), entity));
                             }
                         }
                     }
+
                     if let Some(collider) = self.physics.collider_set.get(b_collider) {
                         has_player |= collider.user_data == u128::MAX;
                         if let Some(entity) = Entity::from_bits(collider.user_data as u64) {
                             if self.world.get::<Bullet>(entity).is_ok() {
-                                res = Some((collider.parent().unwrap(), entity))
+                                res = Some((collider.parent().unwrap(), entity));
                             }
                         }
                     }
