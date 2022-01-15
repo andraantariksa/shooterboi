@@ -1,7 +1,7 @@
 #define SENTINEL_IDX 9999
 
 #define EPS 0.0001
-#define MAX_DISTANCE 500.0
+#define MAX_DISTANCE 100.0
 #define MAX_QUEUE 100
 
 #define SHAPE_TYPE_NONE 0
@@ -82,6 +82,7 @@ layout(binding = 15) uniform texture2D rgba_noise_medium;
 layout(binding = 16) uniform texture2D gray_noise_small_texture;
 layout(binding = 17) uniform texture2D asphalt_texture;
 layout(binding = 18) uniform sampler noise_sampler;
+layout(binding = 19) uniform texture2D terrain_texture;
 
 layout(location = 0) out vec4 outColor;
 
