@@ -1,7 +1,7 @@
 #define SENTINEL_IDX 9999
 
 #define EPS 0.0001
-#define MAX_DISTANCE 100.0
+#define MAX_DISTANCE 400.0
 #define MAX_QUEUE 100
 
 #define SHAPE_TYPE_NONE 0
