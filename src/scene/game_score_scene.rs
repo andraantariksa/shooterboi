@@ -1,8 +1,11 @@
+use std::collections::HashMap;
+
 use chrono::NaiveDateTime;
 use conrod_core::widget::envelope_editor::EnvelopePoint;
 use conrod_core::widget::{Button, Canvas, Text};
 use conrod_core::{Labelable, Positionable, Sizeable, Widget};
 
+use gluesql::prelude::Value;
 use winit::event_loop::ControlFlow;
 
 use crate::audio::AudioContext;
@@ -509,7 +512,19 @@ impl Scene for GameScoreScene {
         if score_history_button.was_clicked() {
             scene_op = SceneOp::Replace(
                 Box::new(ScoreHistoryScene::new(_renderer, conrod_handle)),
-                None,
+                {
+                    let mut m = HashMap::new();
+                    m.insert(
+                        "mode",
+                        Value::I64(match self.score {
+                            GameModeScore::Classic(_) => 0,
+                            GameModeScore::Elimination(_) => 1,
+                            GameModeScore::HitAndDodge(_) => 2,
+                        } as i64),
+                    );
+                    m.insert("difficulty", Value::I64(self.difficulty as i64));
+                    Some(m)
+                },
             );
         }
 

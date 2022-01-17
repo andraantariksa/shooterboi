@@ -71,11 +71,9 @@ fn main() -> BuildScriptResult<()> {
     let target = std::env::var("TARGET").unwrap();
     let profile = std::env::var("PROFILE").unwrap();
 
+    compile_options.set_optimization_level(OptimizationLevel::Zero);
     if profile.contains("debug") {
-        compile_options.set_optimization_level(OptimizationLevel::Zero);
         compile_options.set_generate_debug_info();
-    } else {
-        compile_options.set_optimization_level(OptimizationLevel::Performance);
     }
 
     println!("cargo:warning=Build profile {}", profile);

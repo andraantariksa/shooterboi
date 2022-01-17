@@ -231,7 +231,7 @@ float sd_terrain(vec2 p) {
     //const float sca = 0.1;
     //float h = fbm_9(p * sca);
     float h = textureLod(sampler2D(terrain_texture, common_sampler), p * 0.05, 0.).r;
-    return h * 2.8;
+    return h * 2.5;
 }
 
 const float building_c = 30.;

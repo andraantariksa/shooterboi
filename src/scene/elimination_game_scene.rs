@@ -366,6 +366,7 @@ impl Scene for EliminationGameScene {
             }
             GameState::Finishing(ref mut timer) => {
                 renderer.game_renderer.render_crosshair = false;
+                self.shoot_timer.update(delta_time);
                 timer.update(delta_time);
 
                 Text::new("Finished!")

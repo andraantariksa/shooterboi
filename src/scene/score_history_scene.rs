@@ -75,25 +75,20 @@ impl Scene for ScoreHistoryScene {
         renderer.is_render_game = false;
 
         if let Some(m) = message {
-            match m.get("mode").unwrap() {
-                Value::I64(x) => {
-                    self.mode_selection = *x as usize;
-
-                    self.scores = GameModeScores::read(
-                        database,
-                        GameMode::from(self.mode_selection),
-                        GameDifficulty::from(self.difficulty_selection),
-                    );
-                }
+            self.mode_selection = match m.get("mode").unwrap() {
+                Value::I64(x) => *x as usize,
                 _ => unreachable!(),
-            }
-        } else {
-            self.scores = GameModeScores::read(
-                database,
-                GameMode::from(self.mode_selection),
-                GameDifficulty::from(self.difficulty_selection),
-            );
+            };
+            self.difficulty_selection = match m.get("difficulty").unwrap() {
+                Value::I64(x) => *x as usize,
+                _ => unreachable!(),
+            };
         }
+        self.scores = GameModeScores::read(
+            database,
+            GameMode::from(self.mode_selection),
+            GameDifficulty::from(self.difficulty_selection),
+        );
     }
 
     fn update(
