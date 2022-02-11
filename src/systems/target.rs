@@ -1,4 +1,4 @@
-use crate::entity::target::Target;
+use crate::entity::target::SphereTarget;
 use crate::physics::GamePhysics;
 use crate::renderer::render_objects::ShapeType;
 use crate::renderer::Renderer;
@@ -11,7 +11,7 @@ pub fn spawn_target(
     world: &mut World,
     physics: &mut GamePhysics,
     pos: Vector3<f32>,
-    target: Target,
+    target: SphereTarget,
 ) {
     let entity = world.reserve_entity();
     world.spawn_at(
@@ -30,7 +30,7 @@ pub fn spawn_target(
 
 pub fn is_any_target_exists(world: &mut World) -> bool {
     let mut exists = false;
-    for (_, (_)) in world.query_mut::<(&Target)>() {
+    for (_, (_)) in world.query_mut::<(&SphereTarget)>() {
         exists = true;
         break;
     }
@@ -38,7 +38,7 @@ pub fn is_any_target_exists(world: &mut World) -> bool {
 }
 
 pub fn enqueue_target(world: &mut World, physics: &mut GamePhysics, renderer: &mut Renderer) {
-    for (_id, (collider_handle, target)) in world.query_mut::<(&ColliderHandle, &Target)>() {
+    for (_id, (collider_handle, target)) in world.query_mut::<(&ColliderHandle, &SphereTarget)>() {
         let collider = physics.collider_set.get(*collider_handle).unwrap();
 
         let (objects, ref mut bound) = renderer.render_objects.next();
@@ -60,7 +60,9 @@ pub fn update_target(
     delta_time: f32,
     rng: &mut SmallRng,
 ) {
-    for (_id, (target, collider_handle)) in world.query_mut::<(&mut Target, &ColliderHandle)>() {
+    for (_id, (target, collider_handle)) in
+        world.query_mut::<(&mut SphereTarget, &ColliderHandle)>()
+    {
         let target_collider = physics.collider_set.get_mut(*collider_handle).unwrap();
         let mut target_pos = *target_collider.translation();
         target.update(delta_time, &mut target_pos);

@@ -32,7 +32,7 @@ use crate::window::Window;
 use conrod_core::widget::{Canvas, Text};
 use conrod_core::widget_ids;
 
-use crate::entity::target::{Patrol, Target, Validity};
+use crate::entity::target::{Patrol, SphereTarget, Validity};
 
 use crate::camera::Camera;
 use crate::renderer::rendering_info::BackgroundType;
@@ -218,6 +218,8 @@ impl Scene for EliminationGameScene {
         _control_flow: &mut ControlFlow,
         _database: &mut Database,
     ) -> SceneOp {
+        let mut shoot_trigger = false;
+
         let round_timer_sec = self.round_stopwatch.get_duration();
 
         let mut ui_cell = conrod_handle.get_ui_mut().set_widgets();
@@ -283,7 +285,9 @@ impl Scene for EliminationGameScene {
         let mut scene_op = SceneOp::None;
 
         if !self.freeze {
-            renderer.camera.move_direction(input_manager.mouse_movement);
+            renderer
+                .camera
+                .move_direction(input_manager.mouse_movement * delta_time);
 
             let _player_position = update_player_position(
                 delta_time,
@@ -334,8 +338,9 @@ impl Scene for EliminationGameScene {
                     &mut self.rng,
                 );
 
-                for (id, (target, collider_handle)) in
-                    self.world.query_mut::<(&mut Target, &ColliderHandle)>()
+                for (id, (target, collider_handle)) in self
+                    .world
+                    .query_mut::<(&mut SphereTarget, &ColliderHandle)>()
                 {
                     if target.is_need_to_be_deleted() {
                         self.entity_to_remove.push(id);
@@ -358,7 +363,7 @@ impl Scene for EliminationGameScene {
                     delta_time,
                 );
 
-                self.shoot(&input_manager, audio_context, &renderer.camera, delta_time);
+                shoot_trigger = true;
 
                 if !is_any_target_exists(&mut self.world) {
                     self.game_state = GameState::Finishing(Timer::new(FINISHING_DURATION));
@@ -399,6 +404,10 @@ impl Scene for EliminationGameScene {
                 &self.physics.rigid_body_set,
                 &self.physics.collider_set,
             );
+
+            if shoot_trigger {
+                self.shoot(&input_manager, audio_context, &renderer.camera, delta_time);
+            }
         }
 
         drop(ui_cell);
@@ -486,7 +495,7 @@ impl EliminationGameScene {
                             &mut self.world,
                             &mut self.physics,
                             pos,
-                            Target::new(None, Patrol::None),
+                            SphereTarget::new(None, Patrol::None),
                         );
                     }
                     GameDifficulty::Medium => {
@@ -510,7 +519,7 @@ impl EliminationGameScene {
                             &mut self.world,
                             &mut self.physics,
                             pos,
-                            Target::new(validity, Patrol::None),
+                            SphereTarget::new(validity, Patrol::None),
                         );
                     }
                     GameDifficulty::Hard => {
@@ -527,7 +536,7 @@ impl EliminationGameScene {
                             &mut self.world,
                             &mut self.physics,
                             pos,
-                            Target::new(
+                            SphereTarget::new(
                                 None,
                                 Patrol::Polar {
                                     or: Vector3::new(0.0, 0.0, 0.0),
@@ -554,19 +563,17 @@ impl EliminationGameScene {
         if input_manager.is_mouse_press(&MouseButton::Left) && self.shoot_timer.is_finished() {
             self.shoot_animation.trigger();
             self.shoot_timer.reset(0.4);
-
             let sink = rodio::Sink::try_new(&audio_context.output_stream_handle).unwrap();
             sink.append(
                 rodio::Decoder::new(BufReader::new(Cursor::new(AUDIO_FILE_SHOOT.to_vec())))
                     .unwrap(),
             );
             audio_context.push(Sink::Regular(sink));
-
             if let Some((handle, _distance)) = shoot_ray(&self.physics, camera) {
                 let collider = self.physics.collider_set.get(handle).unwrap();
                 let entity = Entity::from_bits(collider.user_data as u64).unwrap();
 
-                if let Ok(mut target) = self.world.get_mut::<Target>(entity) {
+                if let Ok(mut target) = self.world.get_mut::<SphereTarget>(entity) {
                     if target.try_shoot(audio_context) {
                         let shoot_time = self.delta_shoot_time.get_duration();
                         self.delta_shoot_time.reset();

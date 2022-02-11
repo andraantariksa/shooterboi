@@ -110,15 +110,15 @@ impl Game {
                 if self.window.is_cursor_grabbed() {
                     let mut dir_diff = nalgebra::Vector2::new(0.0, 0.0);
                     if self.input_manager.is_keyboard_press(&VirtualKeyCode::Left) {
-                        dir_diff.x += 400.0 * delta_time;
+                        dir_diff.x += 400.0;
                     } else if self.input_manager.is_keyboard_press(&VirtualKeyCode::Right) {
-                        dir_diff.x -= 400.0 * delta_time;
+                        dir_diff.x -= 400.0;
                     }
 
                     if self.input_manager.is_keyboard_press(&VirtualKeyCode::Up) {
-                        dir_diff.y += 400.0 * delta_time;
+                        dir_diff.y += 400.0;
                     } else if self.input_manager.is_keyboard_press(&VirtualKeyCode::Down) {
-                        dir_diff.y -= 400.0 * delta_time;
+                        dir_diff.y -= 400.0;
                     }
 
                     self.input_manager.mouse_movement += dir_diff;

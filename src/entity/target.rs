@@ -41,7 +41,7 @@ enum PatrolState {
 }
 
 #[derive(Clone)]
-pub struct Target {
+pub struct SphereTarget {
     shooted: bool,
     delete_timer: Option<Timer>,
     validity: Option<Validity>,
@@ -53,7 +53,7 @@ pub struct Target {
 pub const SPEED_LIN: f32 = 5.0;
 pub const SPEED_POL: f32 = 0.3;
 
-impl Target {
+impl SphereTarget {
     pub fn new(validity: Option<Validity>, patrol: Patrol) -> Self {
         let validity_state = if let Some(x) = &validity {
             ValidityState::Valid(Timer::new(x.valid_duration))
@@ -109,14 +109,14 @@ impl Target {
         );
         audio_context.push(Sink::Regular(sink));
 
-        if !self.is_fake_target() {
+        if !self.is_invalid_target() {
             self.shooted = true;
             self.delete_timer = Some(Timer::new(0.3));
         }
         self.shooted
     }
 
-    pub fn is_fake_target(&self) -> bool {
+    pub fn is_invalid_target(&self) -> bool {
         match self.validity_state {
             ValidityState::Invalid(_) => true,
             _ => false,
@@ -195,7 +195,6 @@ impl Target {
                 match &self.patrol_state {
                     PatrolState::AToB => {
                         if (*c - b).abs() <= SPEED_POL {
-                            //println!("State B to A {} {} {}", a, b, c);
                             self.patrol_state = PatrolState::BToA;
                         } else {
                             let mut sign = (b - *c).signum();
@@ -208,7 +207,6 @@ impl Target {
                     }
                     PatrolState::BToA => {
                         if (*c - a).abs() <= SPEED_POL {
-                            //println!("State A to B {} {} {}", a, b, c);
                             self.patrol_state = PatrolState::AToB;
                         } else {
                             let mut sign = (a - *c).signum();

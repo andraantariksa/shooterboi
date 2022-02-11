@@ -79,10 +79,12 @@ impl Scene for ScoreHistoryScene {
                 Value::I64(x) => *x as usize,
                 _ => unreachable!(),
             };
-            self.difficulty_selection = match m.get("difficulty").unwrap() {
-                Value::I64(x) => *x as usize,
-                _ => unreachable!(),
-            };
+            if let Some(y) = m.get("difficulty") {
+                self.difficulty_selection = match y {
+                    Value::I64(x) => *x as usize,
+                    _ => unreachable!(),
+                };
+            }
         }
         self.scores = GameModeScores::read(
             database,

@@ -330,7 +330,7 @@ impl Scene for SettingsScene {
             .mid_top_of(self.ids.mouse_sensitivity_canvas)
             .set(self.ids.mouse_sensitivity_slider_label, &mut ui_cell);
 
-        for value in Slider::new(renderer.camera.sensitivity, 0.1f32, 3f32)
+        for value in Slider::new(renderer.camera.sensitivity, 0.1f32, 100f32)
             .mid_bottom_of(self.ids.mouse_sensitivity_canvas)
             .label(&format!("{:.3}", renderer.camera.sensitivity))
             .wh(Dimensions::new(200.0, 30.0))

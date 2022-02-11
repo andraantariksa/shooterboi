@@ -13,7 +13,7 @@ use crate::animation::InOutAnimation;
 use crate::audio::{AudioContext, AUDIO_FILE_SHOOT};
 use crate::audio::{Sink, AUDIO_FILE_SHOOTED};
 use crate::database::Database;
-use crate::entity::target::{Patrol, Target, Validity};
+use crate::entity::target::{Patrol, SphereTarget, Validity};
 
 use crate::gui::ConrodHandle;
 use crate::input_manager::InputManager;
@@ -131,7 +131,7 @@ impl ClassicGameScene {
             &mut world,
             &mut physics,
             Vector3::new(0.0, 3.0, -15.0),
-            Target::new(None, Patrol::None),
+            SphereTarget::new(None, Patrol::None),
         );
 
         spawn_container(
@@ -274,6 +274,8 @@ impl Scene for ClassicGameScene {
         _control_flow: &mut ControlFlow,
         _database: &mut Database,
     ) -> SceneOp {
+        let mut shoot_trigger = false;
+
         let round_timer_sec = self.round_timer.get_duration();
 
         let mut ui_cell = conrod_handle.get_ui_mut().set_widgets();
@@ -337,7 +339,9 @@ impl Scene for ClassicGameScene {
         let mut scene_op = SceneOp::None;
 
         if !self.freeze {
-            renderer.camera.move_direction(input_manager.mouse_movement);
+            renderer
+                .camera
+                .move_direction(input_manager.mouse_movement * delta_time);
 
             let _player_position = update_player_position(
                 delta_time,
@@ -393,7 +397,7 @@ impl Scene for ClassicGameScene {
                     delta_time,
                 );
 
-                self.shoot(input_manager, audio_context, &renderer.camera, delta_time);
+                shoot_trigger = true;
 
                 if self.round_timer.is_finished() {
                     self.game_state = GameState::Finishing(Timer::new(FINISHING_DURATION));
@@ -434,6 +438,10 @@ impl Scene for ClassicGameScene {
                 &self.physics.rigid_body_set,
                 &self.physics.collider_set,
             );
+
+            if shoot_trigger {
+                self.shoot(&input_manager, audio_context, &renderer.camera, delta_time);
+            }
         }
 
         drop(ui_cell);
@@ -523,7 +531,7 @@ impl ClassicGameScene {
                 let entity = Entity::from_bits(collider.user_data as u64).unwrap();
 
                 let mut need_to_spawn = false;
-                if let Ok(mut target) = self.world.get_mut::<Target>(entity) {
+                if let Ok(mut target) = self.world.get_mut::<SphereTarget>(entity) {
                     if target.try_shoot(audio_context) {
                         let shoot_time = self.delta_shoot_time.get_duration();
                         self.delta_shoot_time.reset();
@@ -565,8 +573,9 @@ impl ClassicGameScene {
     fn target_disposal(&mut self) {
         let mut missed_secondary = false;
         let mut fake_secondary = false;
-        for (id, (target, collider_handle)) in
-            self.world.query_mut::<(&mut Target, &ColliderHandle)>()
+        for (id, (target, collider_handle)) in self
+            .world
+            .query_mut::<(&mut SphereTarget, &ColliderHandle)>()
         {
             if target.is_need_to_be_deleted() {
                 self.entity_to_remove.push(id);
@@ -578,7 +587,7 @@ impl ClassicGameScene {
                 );
 
                 if !target.is_shooted() {
-                    if target.is_fake_target() {
+                    if target.is_invalid_target() {
                         fake_secondary = true;
                     }
                     missed_secondary = true;
@@ -611,19 +620,19 @@ impl ClassicGameScene {
                 &mut self.world,
                 &mut self.physics,
                 Vector3::new(0.0, 3.0, -15.0),
-                Target::new(None, Patrol::None),
+                SphereTarget::new(None, Patrol::None),
             ),
             GameDifficulty::Medium => spawn_target(
                 &mut self.world,
                 &mut self.physics,
                 Vector3::new(0.0, 3.0, self.rng.sample(Uniform::new(-39.0, -15.0))),
-                Target::new(None, Patrol::None),
+                SphereTarget::new(None, Patrol::None),
             ),
             GameDifficulty::Hard => spawn_target(
                 &mut self.world,
                 &mut self.physics,
                 Vector3::new(0.0, 3.0, self.rng.sample(Uniform::new(-39.0, -15.0))),
-                Target::new(None, Patrol::None),
+                SphereTarget::new(None, Patrol::None),
             ),
         }
     }
@@ -640,7 +649,7 @@ impl ClassicGameScene {
                     &mut self.world,
                     &mut self.physics,
                     pos,
-                    Target::new_with_delete_duration(
+                    SphereTarget::new_with_delete_duration(
                         self.secondary_delete_timer.clone(),
                         None,
                         Patrol::None,
@@ -667,7 +676,7 @@ impl ClassicGameScene {
                     &mut self.world,
                     &mut self.physics,
                     pos,
-                    Target::new_with_delete_duration(
+                    SphereTarget::new_with_delete_duration(
                         self.secondary_delete_timer.clone(),
                         validity,
                         Patrol::None,
@@ -698,7 +707,7 @@ impl ClassicGameScene {
                     &mut self.world,
                     &mut self.physics,
                     pos,
-                    Target::new_with_delete_duration(
+                    SphereTarget::new_with_delete_duration(
                         self.secondary_delete_timer.clone(),
                         validity,
                         patrol,

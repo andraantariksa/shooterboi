@@ -25,9 +25,13 @@ pub fn spawn_gunman(
             .build(),
     );
     physics.collider_set.insert_with_parent(
-        ColliderBuilder::new(SharedShape::cuboid(0.3 * 0.2, 1.4 * 0.2, 0.4 * 0.2))
-            .user_data(entity.to_bits().get() as u128)
-            .build(),
+        ColliderBuilder::new(SharedShape::cuboid(
+            0.3 * 3.1 * 0.2,
+            1.4 * 1.4 * 0.2,
+            0.4 * 3.0 * 0.2,
+        ))
+        .user_data(entity.to_bits().get() as u128)
+        .build(),
         rigid_body_handle,
         &mut physics.rigid_body_set,
     );

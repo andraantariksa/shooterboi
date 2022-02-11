@@ -258,6 +258,8 @@ impl Scene for HitAndDodgeGameScene {
         _control_flow: &mut ControlFlow,
         _database: &mut Database,
     ) -> SceneOp {
+        let mut shoot_trigger = false;
+
         let round_timer_sec = self.round_timer.get_duration();
 
         let mut ui_cell = conrod_handle.get_ui_mut().set_widgets();
@@ -323,7 +325,9 @@ impl Scene for HitAndDodgeGameScene {
         let mut scene_op = SceneOp::None;
 
         if !self.freeze {
-            renderer.camera.move_direction(input_manager.mouse_movement);
+            renderer
+                .camera
+                .move_direction(input_manager.mouse_movement * delta_time);
 
             let _player_position = update_player_position(
                 delta_time,
@@ -385,7 +389,7 @@ impl Scene for HitAndDodgeGameScene {
                     delta_time,
                 );
 
-                self.shoot(input_manager, audio_context, &renderer.camera, delta_time);
+                shoot_trigger = true;
 
                 if self.round_timer.is_finished() {
                     self.game_state = GameState::Finishing(Timer::new(FINISHING_DURATION));
@@ -426,8 +430,13 @@ impl Scene for HitAndDodgeGameScene {
                 &self.physics.rigid_body_set,
                 &self.physics.collider_set,
             );
-            self.bullet_disposal();
+
+            if shoot_trigger {
+                self.shoot(&input_manager, audio_context, &renderer.camera, delta_time);
+            }
         }
+
+        self.bullet_disposal();
 
         drop(ui_cell);
 
@@ -504,23 +513,19 @@ impl HitAndDodgeGameScene {
         if input_manager.is_mouse_press(&MouseButton::Left) && self.shoot_timer.is_finished() {
             self.shoot_animation.trigger();
             self.shoot_timer.reset(0.4);
-
             let sink = rodio::Sink::try_new(&audio_context.output_stream_handle).unwrap();
             sink.append(
                 rodio::Decoder::new(BufReader::new(Cursor::new(AUDIO_FILE_SHOOT.to_vec())))
                     .unwrap(),
             );
             audio_context.push(Sink::Regular(sink));
-
             if let Some((handle, _distance)) = shoot_ray(&self.physics, camera) {
                 let collider = self.physics.collider_set.get(handle).unwrap();
                 if let Some(entity) = Entity::from_bits(collider.user_data as u64) {
                     if let Ok(mut gunman) = self.world.get_mut::<Gunman>(entity) {
                         gunman.hit();
-
                         let shoot_time = self.delta_shoot_time.get_duration();
                         self.delta_shoot_time.reset();
-
                         self.score.hit += 1;
                         self.score.score += ((100.0 * (7.0 - shoot_time)) as i32).max(100);
                     } else {
