@@ -4,7 +4,7 @@ use crate::physics::GamePhysics;
 use crate::renderer::render_objects::{MaterialType, ShapeType};
 use crate::renderer::Renderer;
 use hecs::World;
-use nalgebra::{Matrix4, Vector3};
+use nalgebra::{Vector3};
 use rapier3d::prelude::*;
 
 pub fn spawn_wall(

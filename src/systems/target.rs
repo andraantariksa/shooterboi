@@ -3,7 +3,7 @@ use crate::physics::GamePhysics;
 use crate::renderer::render_objects::ShapeType;
 use crate::renderer::Renderer;
 use hecs::World;
-use nalgebra::{Matrix4, Vector3};
+use nalgebra::Vector3;
 use rand::prelude::SmallRng;
 use rapier3d::prelude::{ColliderBuilder, ColliderHandle, SharedShape};
 
@@ -28,13 +28,12 @@ pub fn spawn_target(
     );
 }
 
+#[allow(clippy::never_loop)]
 pub fn is_any_target_exists(world: &mut World) -> bool {
-    let mut exists = false;
-    for (_, (_)) in world.query_mut::<(&SphereTarget)>() {
-        exists = true;
-        break;
+    for (_, _) in world.query_mut::<&SphereTarget>() {
+        return true;
     }
-    exists
+    false
 }
 
 pub fn enqueue_target(world: &mut World, physics: &mut GamePhysics, renderer: &mut Renderer) {
@@ -58,7 +57,7 @@ pub fn update_target(
     world: &mut World,
     physics: &mut GamePhysics,
     delta_time: f32,
-    rng: &mut SmallRng,
+    _rng: &mut SmallRng,
 ) {
     for (_id, (target, collider_handle)) in
         world.query_mut::<(&mut SphereTarget, &ColliderHandle)>()

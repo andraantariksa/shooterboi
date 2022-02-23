@@ -7,7 +7,7 @@ use crate::renderer::render_objects::ShapeType;
 use crate::renderer::Renderer;
 use crate::scene::hit_and_dodge_scene::Score;
 use hecs::World;
-use nalgebra::{Matrix4, Point3, Vector3};
+use nalgebra::{Point3, Vector3};
 use rapier3d::prelude::*;
 
 pub fn spawn_swordman(

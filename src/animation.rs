@@ -10,23 +10,10 @@ pub enum InOutAnimationState {
 impl PartialEq for InOutAnimationState {
     fn eq(&self, other: &Self) -> bool {
         match self {
-            InOutAnimationState::Stopped => match other {
-                InOutAnimationState::Stopped => true,
-                _ => false,
-            },
-            InOutAnimationState::Foward(_) => match other {
-                InOutAnimationState::Foward(_) => true,
-                _ => false,
-            },
-            InOutAnimationState::Backward(_) => match other {
-                InOutAnimationState::Backward(_) => true,
-                _ => false,
-            },
+            InOutAnimationState::Stopped => matches!(other, InOutAnimationState::Stopped),
+            InOutAnimationState::Foward(_) => matches!(other, InOutAnimationState::Foward(_)),
+            InOutAnimationState::Backward(_) => matches!(other, InOutAnimationState::Backward(_)),
         }
-    }
-
-    fn ne(&self, other: &Self) -> bool {
-        !self.eq(other)
     }
 }
 

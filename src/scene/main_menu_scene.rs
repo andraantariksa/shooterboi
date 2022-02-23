@@ -12,7 +12,7 @@ use crate::renderer::Renderer;
 
 use crate::scene::exit_confirm_scene::QuitConfirmScene;
 use crate::scene::game_selection_scene::GameSelectionScene;
-use crate::scene::guide_scene::GuideScene;
+
 use crate::scene::settings_scene::SettingsScene;
 use crate::scene::{MaybeMessage, Scene, SceneOp, Value, BUTTON_HEIGHT, BUTTON_WIDTH, MARGIN};
 use crate::window::Window;
@@ -49,16 +49,19 @@ pub fn play_bgm(message: &MaybeMessage, audio_context: &mut AudioContext) {
         }
     };
     if play_bgm().is_none() {
-        let sink = rodio::Sink::try_new(&audio_context.output_stream_handle).unwrap();
-        sink.append(
-            rodio::Decoder::new(BufReader::new(Cursor::new(AUDIO_FILE_AWESOMENESS.to_vec())))
-                .unwrap()
-                .repeat_infinite(),
-        );
-        sink.set_volume(audio_context.get_volume());
-        audio_context
-            .global_sinks_map
-            .insert("bgm", Sink::Regular(sink));
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            let sink = rodio::Sink::try_new(&audio_context.output_stream_handle).unwrap();
+            sink.append(
+                rodio::Decoder::new(BufReader::new(Cursor::new(AUDIO_FILE_AWESOMENESS.to_vec())))
+                    .unwrap()
+                    .repeat_infinite(),
+            );
+            sink.set_volume(audio_context.get_volume());
+            audio_context
+                .global_sinks_map
+                .insert("bgm", Sink::Regular(sink));
+        }
     }
 }
 

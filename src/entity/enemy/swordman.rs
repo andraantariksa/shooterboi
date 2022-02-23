@@ -5,7 +5,7 @@ use crate::physics::GamePhysics;
 use crate::renderer::render_objects::MaterialType;
 use crate::scene::hit_and_dodge_scene::Score;
 use crate::timer::Timer;
-use nalgebra::{distance, Point, Rotation3, Unit, Vector3};
+use nalgebra::{distance, Point, Unit, Vector3};
 use rapier3d::prelude::Ray;
 
 pub enum EnemyState {
@@ -43,15 +43,12 @@ impl Swordman {
         physics: &GamePhysics,
         score: &mut Score,
     ) {
-        match self.material_state {
-            EnemyMaterialState::Hitted(ref mut timer) => {
-                timer.update(delta_time);
-                if timer.is_finished() {
-                    self.material_state = EnemyMaterialState::None;
-                }
+        if let EnemyMaterialState::Hitted(ref mut timer) = self.material_state {
+            timer.update(delta_time);
+            if timer.is_finished() {
+                self.material_state = EnemyMaterialState::None;
             }
-            _ => {}
-        };
+        }
 
         let current_dir = Unit::new_normalize(*player_pos - *obj_pos);
         match &mut self.state {

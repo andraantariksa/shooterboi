@@ -115,6 +115,7 @@ pub trait Scene {
         database: &mut Database,
     );
 
+    #[allow(clippy::too_many_arguments)]
     fn update(
         &mut self,
         window: &mut Window,

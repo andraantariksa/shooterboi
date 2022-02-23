@@ -280,15 +280,12 @@ impl Scene for SettingsScene {
             .parent(self.ids.header_canvas)
             .set(self.ids.title_text, &mut ui_cell);
 
-        const GAP_BETWEEN_OPTION_SETTINGS: f64 = 30.0;
-        const GAP_BETWEEN_LABEL_TO_OPTION_SETTINGS: f64 = 20.0;
-
         Text::new("Maximum raymarch step")
             .font_id(ropa_font_id)
             .mid_top_of(self.ids.max_march_step_canvas)
             .set(self.ids.max_march_step_slider_label, &mut ui_cell);
 
-        for value in Slider::new(
+        if let Some(value) = Slider::new(
             renderer.rendering_info.queuecount_raymarchmaxstep_aostep.y as f32,
             0f32,
             200f32,
@@ -309,7 +306,7 @@ impl Scene for SettingsScene {
             .mid_top_of(self.ids.ambient_occlusion_sample_canvas)
             .set(self.ids.ambient_occlusion_sample_slider_label, &mut ui_cell);
 
-        for value in Slider::new(
+        if let Some(value) = Slider::new(
             renderer.rendering_info.queuecount_raymarchmaxstep_aostep.z as f32,
             0f32,
             10f32,
@@ -330,7 +327,7 @@ impl Scene for SettingsScene {
             .mid_top_of(self.ids.mouse_sensitivity_canvas)
             .set(self.ids.mouse_sensitivity_slider_label, &mut ui_cell);
 
-        for value in Slider::new(renderer.camera.sensitivity, 0.1f32, 100f32)
+        if let Some(value) = Slider::new(renderer.camera.sensitivity, 0.1f32, 100f32)
             .mid_bottom_of(self.ids.mouse_sensitivity_canvas)
             .label(&format!("{:.3}", renderer.camera.sensitivity))
             .wh(Dimensions::new(200.0, 30.0))
@@ -344,7 +341,7 @@ impl Scene for SettingsScene {
             .mid_top_of(self.ids.volume_canvas)
             .set(self.ids.volume_slider_label, &mut ui_cell);
 
-        for value in Slider::new(audio_context.get_volume(), 0f32, 1f32)
+        if let Some(value) = Slider::new(audio_context.get_volume(), 0f32, 1f32)
             .mid_bottom_of(self.ids.volume_canvas)
             .label(&format!("{}", (audio_context.get_volume() * 100.0) as u8))
             .wh(Dimensions::new(200.0, 30.0))
@@ -387,7 +384,7 @@ impl Scene for SettingsScene {
             .mid_top_of(self.ids.center_dot_thickness_canvas)
             .set(self.ids.center_dot_thickness_slider_label, &mut ui_cell);
 
-        for value in Slider::new(renderer.crosshair.center_dot_thickness, 0f32, 100f32)
+        if let Some(value) = Slider::new(renderer.crosshair.center_dot_thickness, 0f32, 100f32)
             .mid_bottom_of(self.ids.center_dot_thickness_canvas)
             .label(&format!(
                 "{}",
@@ -433,7 +430,7 @@ impl Scene for SettingsScene {
             .mid_top_of(self.ids.inner_line_thickness_canvas)
             .set(self.ids.inner_line_thickness_slider_label, &mut ui_cell);
 
-        for value in Slider::new(renderer.crosshair.inner_line_thickness, 0f32, 100f32)
+        if let Some(value) = Slider::new(renderer.crosshair.inner_line_thickness, 0f32, 100f32)
             .mid_bottom_of(self.ids.inner_line_thickness_canvas)
             .label(&format!(
                 "{}",
@@ -450,7 +447,7 @@ impl Scene for SettingsScene {
             .mid_top_of(self.ids.inner_line_offset_canvas)
             .set(self.ids.inner_line_offset_slider_label, &mut ui_cell);
 
-        for value in Slider::new(renderer.crosshair.inner_line_offset, 0f32, 100f32)
+        if let Some(value) = Slider::new(renderer.crosshair.inner_line_offset, 0f32, 100f32)
             .mid_bottom_of(self.ids.inner_line_offset_canvas)
             .label(&format!("{}", renderer.crosshair.inner_line_offset as u8))
             .wh(Dimensions::new(200.0, 30.0))
@@ -493,7 +490,7 @@ impl Scene for SettingsScene {
             .mid_top_of(self.ids.outer_line_thickness_canvas)
             .set(self.ids.outer_line_thickness_slider_label, &mut ui_cell);
 
-        for value in Slider::new(renderer.crosshair.outer_line_thickness, 0f32, 100f32)
+        if let Some(value) = Slider::new(renderer.crosshair.outer_line_thickness, 0f32, 100f32)
             .mid_bottom_of(self.ids.outer_line_thickness_canvas)
             .label(&format!(
                 "{}",
@@ -510,7 +507,7 @@ impl Scene for SettingsScene {
             .mid_top_of(self.ids.outer_line_offset_canvas)
             .set(self.ids.outer_line_offset_slider_label, &mut ui_cell);
 
-        for value in Slider::new(renderer.crosshair.outer_line_offset, 0f32, 100f32)
+        if let Some(value) = Slider::new(renderer.crosshair.outer_line_offset, 0f32, 100f32)
             .mid_bottom_of(self.ids.outer_line_offset_canvas)
             .label(&format!("{}", renderer.crosshair.outer_line_offset as u8))
             .wh(Dimensions::new(200.0, 30.0))
@@ -525,7 +522,7 @@ impl Scene for SettingsScene {
             .mid_top_of(self.ids.crosshair_color_canvas)
             .set(self.ids.crosshair_color_g_label, &mut ui_cell);
 
-        for value in Slider::new(renderer.crosshair.color.y, 0f32, 1f32)
+        if let Some(value) = Slider::new(renderer.crosshair.color.y, 0f32, 1f32)
             .mid_bottom_of(self.ids.crosshair_color_canvas)
             .label(&format!("{:.3}", renderer.crosshair.color.y))
             .wh(Dimensions::new(80.0, 30.0))
@@ -540,7 +537,7 @@ impl Scene for SettingsScene {
             .left_from(self.ids.crosshair_color_g_label, 50.0)
             .set(self.ids.crosshair_color_r_label, &mut ui_cell);
 
-        for value in Slider::new(renderer.crosshair.color.x, 0f32, 1f32)
+        if let Some(value) = Slider::new(renderer.crosshair.color.x, 0f32, 1f32)
             .label(&format!("{:.3}", renderer.crosshair.color.x))
             .align_middle_x_of(self.ids.crosshair_color_r_label)
             .align_middle_y_of(self.ids.crosshair_color_g_slider)
@@ -556,7 +553,7 @@ impl Scene for SettingsScene {
             .right_from(self.ids.crosshair_color_g_label, 50.0)
             .set(self.ids.crosshair_color_b_label, &mut ui_cell);
 
-        for value in Slider::new(renderer.crosshair.color.z, 0f32, 1f32)
+        if let Some(value) = Slider::new(renderer.crosshair.color.z, 0f32, 1f32)
             .align_middle_x_of(self.ids.crosshair_color_b_label)
             .align_middle_y_of(self.ids.crosshair_color_g_slider)
             .label(&format!("{:.3}", renderer.crosshair.color.z))

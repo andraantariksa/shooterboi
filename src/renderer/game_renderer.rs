@@ -1,6 +1,6 @@
 use image::GenericImage;
 use wgpu::util::DeviceExt;
-use std::ops::Range;
+
 
 use crate::camera::Camera;
 use crate::gui::ConrodHandle;
@@ -722,8 +722,8 @@ fn terrain_texture_descriptor(
     wgpu::TextureDescriptor {
         label: Some("Terrain"),
         size: wgpu::Extent3d {
-            width: width,
-            height: height,
+            width,
+            height,
             depth_or_array_layers: 1,
         },
         mip_level_count: 1,

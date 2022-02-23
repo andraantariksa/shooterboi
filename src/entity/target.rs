@@ -1,7 +1,7 @@
 use crate::audio::{AudioContext, Sink, AUDIO_FILE_SHOOTED};
 use crate::renderer::render_objects::MaterialType;
 use crate::timer::Timer;
-use nalgebra::{distance, Point3, Unit, Vector2, Vector3};
+use nalgebra::{distance, Point3, Unit, Vector3};
 use std::io::{BufReader, Cursor};
 
 #[derive(Clone)]
@@ -103,11 +103,15 @@ impl SphereTarget {
     }
 
     pub fn try_shoot(&mut self, audio_context: &mut AudioContext) -> bool {
-        let sink = rodio::Sink::try_new(&audio_context.output_stream_handle).unwrap();
-        sink.append(
-            rodio::Decoder::new(BufReader::new(Cursor::new(AUDIO_FILE_SHOOTED.to_vec()))).unwrap(),
-        );
-        audio_context.push(Sink::Regular(sink));
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            let sink = rodio::Sink::try_new(&audio_context.output_stream_handle).unwrap();
+            sink.append(
+                rodio::Decoder::new(BufReader::new(Cursor::new(AUDIO_FILE_SHOOTED.to_vec())))
+                    .unwrap(),
+            );
+            audio_context.push(Sink::Regular(sink));
+        }
 
         if !self.is_invalid_target() {
             self.shooted = true;
@@ -117,10 +121,7 @@ impl SphereTarget {
     }
 
     pub fn is_invalid_target(&self) -> bool {
-        match self.validity_state {
-            ValidityState::Invalid(_) => true,
-            _ => false,
-        }
+        matches!(self.validity_state, ValidityState::Invalid(_))
     }
 
     pub fn get_material(&self) -> MaterialType {
@@ -161,22 +162,20 @@ impl SphereTarget {
             Patrol::Linear { a, b } => {
                 match &self.patrol_state {
                     PatrolState::AToB => {
-                        if distance(&Point3::from(obj_pos.clone()), &Point3::from(b.clone())) <= 0.5
-                        {
+                        if distance(&Point3::from(*obj_pos), &Point3::from(*b)) <= 0.5 {
                             self.patrol_state = PatrolState::BToA;
                         } else {
-                            let dir = Unit::new_normalize(*b - obj_pos.clone());
+                            let dir = Unit::new_normalize(*b - *obj_pos);
                             let next_pos = dir.into_inner() * SPEED_LIN * delta_time;
                             obj_pos.x += next_pos.x;
                             obj_pos.z += next_pos.y;
                         }
                     }
                     PatrolState::BToA => {
-                        if distance(&Point3::from(obj_pos.clone()), &Point3::from(a.clone())) <= 0.5
-                        {
+                        if distance(&Point3::from(*obj_pos), &Point3::from(*a)) <= 0.5 {
                             self.patrol_state = PatrolState::AToB;
                         } else {
-                            let dir = Unit::new_normalize(*a - obj_pos.clone());
+                            let dir = Unit::new_normalize(*a - *obj_pos);
                             let next_pos = dir.into_inner() * SPEED_LIN * delta_time;
                             obj_pos.x += next_pos.x;
                             obj_pos.z += next_pos.y;
@@ -197,8 +196,8 @@ impl SphereTarget {
                         if (*c - b).abs() <= SPEED_POL {
                             self.patrol_state = PatrolState::BToA;
                         } else {
-                            let mut sign = (b - *c).signum();
-                            *c = *c + sign * SPEED_POL * delta_time;
+                            let sign = (b - *c).signum();
+                            *c += sign * SPEED_POL * delta_time;
                             obj_pos.x = r * c.cos();
                             obj_pos.z = r * c.sin();
                             obj_pos.x += or.x;
@@ -209,8 +208,8 @@ impl SphereTarget {
                         if (*c - a).abs() <= SPEED_POL {
                             self.patrol_state = PatrolState::AToB;
                         } else {
-                            let mut sign = (a - *c).signum();
-                            *c = *c + sign * SPEED_POL * delta_time;
+                            let sign = (a - *c).signum();
+                            *c += sign * SPEED_POL * delta_time;
                             obj_pos.x = r * c.cos();
                             obj_pos.z = r * c.sin();
                             obj_pos.x += or.x;
@@ -223,12 +222,9 @@ impl SphereTarget {
             _ => {}
         };
 
-        match self.delete_timer {
-            Some(ref mut timer) => {
-                timer.update(delta_time);
-            }
-            None => {}
-        };
+        if let Some(ref mut timer) = self.delete_timer {
+            timer.update(delta_time);
+        }
     }
 
     pub fn is_need_to_be_deleted(&self) -> bool {

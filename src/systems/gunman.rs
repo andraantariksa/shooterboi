@@ -6,10 +6,10 @@ use crate::renderer::render_objects::MaterialType;
 use crate::renderer::render_objects::ShapeType;
 use crate::renderer::Renderer;
 use hecs::World;
-use nalgebra::{Matrix4, Point3, Vector3};
+use nalgebra::{Point3, Vector3};
 use rand::prelude::SmallRng;
 use rapier3d::prelude::*;
-use std::ops::Mul;
+
 
 pub fn spawn_gunman(
     world: &mut World,

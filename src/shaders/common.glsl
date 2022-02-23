@@ -180,15 +180,15 @@ vec3 n)
     vec3 h = normalize(l + v);
     float diff = max(dot(l, n), 0.0);
     float spec = max(dot(h, n), 0.0);
-    if (diff < 0.0) {
-        // Light not visible from this point on the surface
-        return vec3(0.0, 0.0, 0.0);
-    }
-    if (spec < 0.0) {
-        // Light reflection in opposite direction as viewer, apply only diffuse
-        // component
-        return light_intensity * (k_d * diff);
-    }
+//    if (diff < 0.0) {
+//        // Light not visible from this point on the surface
+//        return vec3(0.0, 0.0, 0.0);
+//    }
+//    if (spec < 0.0) {
+//        // Light reflection in opposite direction as viewer, apply only diffuse
+//        // component
+//        return light_intensity * (k_d * diff);
+//    }
     return light_intensity * (k_d * diff + k_s * pow(spec, alpha));
 }
 

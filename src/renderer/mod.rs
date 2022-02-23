@@ -46,7 +46,7 @@ impl Renderer {
         let instance = wgpu::Instance::new(if cfg!(target_arch = "wasm32") {
             wgpu::Backends::GL
         } else {
-            wgpu::Backends::VULKAN
+            wgpu::Backends::all()
         });
         let surface = unsafe { instance.create_surface(window) };
         let adapter = instance

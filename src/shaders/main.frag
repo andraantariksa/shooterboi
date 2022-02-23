@@ -256,7 +256,6 @@ Distance sd_city(vec3 p) {
         q -= vec3(o.x, 0., o.y);
         d = min(d, sd_box(q, vec3(x_s, height, z_s)));
 
-
         q.y -= height;
 
         // Building 2nd floor

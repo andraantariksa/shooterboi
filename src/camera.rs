@@ -69,23 +69,23 @@ impl Camera {
             bottom: FrustumPlane::new(
                 self.position,
                 nalgebra::Unit::new_normalize(
-                    (&(&front_times_far + up * half_v_side)).cross(&right),
+                    (&(front_times_far + up * half_v_side)).cross(&right),
                 ),
             ),
             top: FrustumPlane::new(
                 self.position,
-                nalgebra::Unit::new_normalize(right.cross(&(&front_times_far - up * half_v_side))),
+                nalgebra::Unit::new_normalize(right.cross(&(front_times_far - up * half_v_side))),
             ),
             left: FrustumPlane::new(
                 self.position,
                 nalgebra::Unit::new_normalize(
-                    (&(&front_times_far - right.into_inner() * half_h_side)).cross(&up),
+                    (&(front_times_far - right.into_inner() * half_h_side)).cross(&up),
                 ),
             ),
             right: FrustumPlane::new(
                 self.position,
                 nalgebra::Unit::new_normalize(
-                    (&up).cross(&(&front_times_far + right.into_inner() * half_h_side)),
+                    (&up).cross(&(front_times_far + right.into_inner() * half_h_side)),
                 ),
             ),
         }

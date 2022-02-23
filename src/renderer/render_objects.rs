@@ -1,6 +1,7 @@
 use crate::frustum::{Frustum, ObjectBound};
 use nalgebra::{Matrix4, Vector3, Vector4};
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Copy)]
 #[repr(u32)]
 pub enum ShapeType {
@@ -12,6 +13,7 @@ pub enum ShapeType {
     Gunman = 5,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Copy)]
 #[repr(u32)]
 pub enum MaterialType {

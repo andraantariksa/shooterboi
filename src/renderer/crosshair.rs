@@ -1,4 +1,4 @@
-use crate::renderer::vertex::{CoordColorVertex};
+use crate::renderer::vertex::CoordColorVertex;
 use crate::util::any_slice_as_u8_slice;
 use nalgebra::{Rotation2, Vector2, Vector3, Vector4};
 
@@ -230,7 +230,7 @@ impl Crosshair {
     }
 
     pub fn vertices_len(&self) -> u32 {
-        0 + if self.outer_line_enabled { 6 * 4 } else { 0 }
+        (if self.outer_line_enabled { 6 * 4 } else { 0 })
             + if self.inner_line_enabled { 6 * 4 } else { 0 }
             + if self.center_dot_enabled { 6 } else { 0 }
     }

@@ -125,7 +125,7 @@ impl Scene for ScoreHistoryScene {
                 .set(self.ids.canvas, &mut ui_cell);
 
             let mut score_list = |s: usize| {
-                let (mut score_list_event, score_list_scrollbar) = List::flow_down(s)
+                let (score_list_event, score_list_scrollbar) = List::flow_down(s)
                     .wh_of(self.ids.body_canvas)
                     .item_size(150.0)
                     .scrollbar_color(conrod_core::color::RED)

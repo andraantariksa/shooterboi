@@ -318,7 +318,7 @@ impl Scene for GameScoreScene {
                         ),
                     ];
 
-                    for (i, (id_canvas, id_label, label_text, id_value_label, value_text)) in
+                    for (i, (id_canvas, _id_label, _label_text, _id_value_label, _value_text)) in
                         l.iter().enumerate()
                     {
                         Canvas::new()
@@ -400,7 +400,7 @@ impl Scene for GameScoreScene {
                         ),
                     ];
 
-                    for (i, (id_canvas, id_label, label_text, id_value_label, value_text)) in
+                    for (i, (id_canvas, _id_label, _label_text, _id_value_label, _value_text)) in
                         l.iter().enumerate()
                     {
                         Canvas::new()
@@ -471,7 +471,7 @@ impl Scene for GameScoreScene {
                         ),
                     ];
 
-                    for (i, (id_canvas, id_label, label_text, id_value_label, value_text)) in
+                    for (i, (id_canvas, _id_label, _label_text, _id_value_label, _value_text)) in
                         l.iter().enumerate()
                     {
                         Canvas::new()

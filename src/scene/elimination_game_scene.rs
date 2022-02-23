@@ -12,7 +12,7 @@ use winit::event_loop::ControlFlow;
 
 use crate::animation::InOutAnimation;
 use crate::audio::{AudioContext, AUDIO_FILE_SHOOT};
-use crate::audio::{Sink, AUDIO_FILE_SHOOTED};
+use crate::audio::{Sink};
 use crate::database::Database;
 
 use crate::gui::ConrodHandle;
@@ -27,7 +27,7 @@ use crate::scene::{
     IN_SHOOT_ANIM_DURATION, OUT_SHOOT_ANIM_DURATION, PREPARE_DURATION,
 };
 use crate::timer::{Stopwatch, Timer};
-use crate::util::lerp;
+
 use crate::window::Window;
 use conrod_core::widget::{Canvas, Text};
 use conrod_core::widget_ids;
@@ -406,7 +406,7 @@ impl Scene for EliminationGameScene {
             );
 
             if shoot_trigger {
-                self.shoot(&input_manager, audio_context, &renderer.camera, delta_time);
+                self.shoot(input_manager, audio_context, &renderer.camera, delta_time);
             }
         }
 
@@ -558,17 +558,21 @@ impl EliminationGameScene {
         input_manager: &InputManager,
         audio_context: &mut AudioContext,
         camera: &Camera,
-        delta_time: f32,
+        _delta_time: f32,
     ) {
         if input_manager.is_mouse_press(&MouseButton::Left) && self.shoot_timer.is_finished() {
             self.shoot_animation.trigger();
             self.shoot_timer.reset(0.4);
-            let sink = rodio::Sink::try_new(&audio_context.output_stream_handle).unwrap();
-            sink.append(
-                rodio::Decoder::new(BufReader::new(Cursor::new(AUDIO_FILE_SHOOT.to_vec())))
-                    .unwrap(),
-            );
-            audio_context.push(Sink::Regular(sink));
+
+            #[cfg(not(target_arch = "wasm32"))]
+            {
+                let sink = rodio::Sink::try_new(&audio_context.output_stream_handle).unwrap();
+                sink.append(
+                    rodio::Decoder::new(BufReader::new(Cursor::new(AUDIO_FILE_SHOOT.to_vec())))
+                        .unwrap(),
+                );
+                audio_context.push(Sink::Regular(sink));
+            }
             if let Some((handle, _distance)) = shoot_ray(&self.physics, camera) {
                 let collider = self.physics.collider_set.get(handle).unwrap();
                 let entity = Entity::from_bits(collider.user_data as u64).unwrap();

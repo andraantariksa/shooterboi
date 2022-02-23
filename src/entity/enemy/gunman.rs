@@ -7,7 +7,7 @@ use crate::entity::HasMaterial;
 
 use crate::scene::{IN_SHOOT_ANIM_DURATION, OUT_SHOOT_ANIM_DURATION};
 use crate::timer::Timer;
-use nalgebra::{distance, Point, Rotation3, Unit, Vector2, Vector3};
+use nalgebra::{distance, Point, Unit, Vector2, Vector3};
 use rand::distributions::Uniform;
 use rand::prelude::*;
 
@@ -74,15 +74,12 @@ impl Gunman {
         obj_pos: &mut Vector3<f32>,
         player_pos: &Vector3<f32>,
     ) -> GunmanOp {
-        match self.material_state {
-            EnemyMaterialState::Hitted(ref mut timer) => {
-                timer.update(delta_time);
-                if timer.is_finished() {
-                    self.material_state = EnemyMaterialState::None;
-                }
+        if let EnemyMaterialState::Hitted(ref mut timer) = self.material_state {
+            timer.update(delta_time);
+            if timer.is_finished() {
+                self.material_state = EnemyMaterialState::None;
             }
-            _ => {}
-        };
+        }
 
         let current_xz_pos = obj_pos.xz();
         if distance(&Point::from(self.next_dest), &Point::from(current_xz_pos)) <= 0.5 {
@@ -143,12 +140,9 @@ impl Gunman {
             }
             ShootState::Shoot(ref mut anim) => {
                 anim.update(delta_time);
-                match anim.get_state() {
-                    InOutAnimationState::Stopped => {
-                        self.shoot_state = ShootState::Idle(Timer::new(0.5));
-                    }
-                    _ => {}
-                };
+                if let InOutAnimationState::Stopped = anim.get_state() {
+                    self.shoot_state = ShootState::Idle(Timer::new(0.5));
+                }
             }
         };
         op

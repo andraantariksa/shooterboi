@@ -60,7 +60,6 @@ widget_ids! {
 }
 
 struct GameModeDetails {
-    image: conrod_core::image::Id,
     title: &'static str,
     description: &'static str,
 }
@@ -112,21 +111,16 @@ impl Scene for GameSelectionScene {
         let play_3_button;
         let score_button;
 
-        let image_id = *conrod_handle.get_image_id_map().get("title").unwrap();
-
         let game_modes = [
             GameModeDetails {
-                image: image_id,
                 title: "Classic",
                 description: "You have to shoot every spawned target. The target will be disappeared after you shoot it and another target will appear.",
             },
             GameModeDetails {
-                image: image_id,
                 title: "Elimination",
-                description: "A lot of target will appear. You have to shot all of the target.\nEasy - Static target\nMedium - Target may be transformed to invalid for a time\nHard - Target will move",
+                description: "A lot of target will appear around you. You have to shoot all of the target and eliminate them.",
             },
             GameModeDetails {
-                image: image_id,
                 title: "Hit and Dodge",
                 description: "You have to shoot the gunman while avoiding the bullet and swordman attack.",
             }];
